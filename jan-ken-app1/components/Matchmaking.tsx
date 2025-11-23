@@ -294,6 +294,15 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
 
   // Join queue via contract - PRODUCTION MODE
   useEffect(() => {
+    // CRITICAL: Check connector client before proceeding
+    if (!connectorClient) {
+      console.warn('⚠️ Connector client not available, cannot send transaction');
+      if (isConnected && address) {
+        setTxError('Wallet connection issue. Please disconnect and reconnect your wallet.');
+      }
+      return;
+    }
+    
     if (!isConnected || !writeContract || hasJoinedQueue) return;
     
     // Check network - Base Sepolia chain ID is 84532
@@ -406,29 +415,40 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
         console.log('Simulate data:', simulateData);
         console.log('Simulate error:', simulateError);
         
-        // Check Wagmi connector client
+        // Check Wagmi connector client - CRITICAL CHECK
         console.log('🔍 Wagmi connector client check:');
         console.log('  - Connector client available:', !!connectorClient);
         console.log('  - isConnected:', isConnected);
         console.log('  - address:', address);
+        console.log('  - chainId:', chainId);
         
+        // CRITICAL: If connector client is not available, we cannot send transactions
         if (!connectorClient) {
           console.error('  - ❌ CRITICAL: Connector client is not available!');
           console.error('  - This means Wagmi cannot send transactions.');
           console.error('  - isConnected:', isConnected);
           console.error('  - address:', address);
+          console.error('  - chainId:', chainId);
           console.error('  - Farcaster provider available:', !!farcasterProvider);
           
           // If connected but no client, this is a critical issue
           if (isConnected && address) {
             console.error('  - ⚠️ Wallet is connected but connector client is missing!');
             console.error('  - This usually means connector needs to be reconnected.');
-            setTxError('Wallet connection issue. Please disconnect and reconnect your wallet.');
+            console.error('  - SOLUTION: Disconnect and reconnect your wallet.');
+            setTxError('Wallet connection issue detected. Please disconnect and reconnect your wallet to fix this.');
+            setHasJoinedQueue(false);
+            setTxStartTime(null);
+            return;
+          } else {
+            console.error('  - ⚠️ Wallet is not connected, cannot send transaction.');
+            setTxError('Wallet not connected. Please connect your wallet first.');
             setHasJoinedQueue(false);
             setTxStartTime(null);
             return;
           }
         } else {
+          console.log('  - ✅ Connector client is available!');
           console.log('  - Connector client account:', connectorClient.account);
           console.log('  - Connector client chain:', connectorClient.chain);
           console.log('  - Connector client transport:', !!connectorClient.transport);
@@ -440,6 +460,8 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
             if (connectorProvider) {
               console.log('  - Connector provider chainId:', connectorProvider.chainId);
               console.log('  - Connector provider is same as Farcaster provider:', connectorProvider === farcasterProvider);
+            } else {
+              console.warn('  - ⚠️ Connector provider is not available in connector client');
             }
           } catch (err) {
             console.warn('  - Could not get connector provider:', err);
