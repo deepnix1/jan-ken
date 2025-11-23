@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { useWriteContract, useReadContract, useAccount, useWaitForTransactionReceipt } from 'wagmi';
+import { useWriteContract, useReadContract, useAccount, useWaitForTransactionReceipt, useSimulateContract } from 'wagmi';
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from '@/lib/contract';
 import { isValidChoice, isValidBetAmount } from '@/lib/security';
 
@@ -27,6 +27,17 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
 
   const { data: hash, writeContract, isPending, error: writeError, reset: resetWriteContract, status } = useWriteContract();
   const [txStartTime, setTxStartTime] = useState<number | null>(null);
+  
+  // Simulate contract call to get gas estimates
+  const { data: simulateData } = useSimulateContract({
+    address: CONTRACT_ADDRESS as `0x${string}`,
+    abi: CONTRACT_ABI,
+    functionName: 'makeChoice',
+    args: selectedChoice ? [selectedChoice] : undefined,
+    query: {
+      enabled: !!selectedChoice && !isPending && !hash,
+    },
+  });
   
   const { isLoading: isConfirming, isSuccess: isTxSuccess, isError: isReceiptError } = useWaitForTransactionReceipt({
     hash,
@@ -183,15 +194,25 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
     setTxStartTime(Date.now());
     
     try {
-      // Send choice to contract - PRODUCTION MODE
-      // Note: Wagmi v3 doesn't support callbacks - use hook state instead
-      console.log('📤 Sending makeChoice transaction for choice:', choiceId);
-      writeContract({
+      // Use simulateData.request if available (Wagmi v3 way)
+      // This includes all gas parameters needed for wallet popup
+      const writeParams: any = {
         address: CONTRACT_ADDRESS as `0x${string}`,
         abi: CONTRACT_ABI,
         functionName: 'makeChoice',
         args: [choiceId],
-      });
+      };
+      
+      // If simulateData is available, use its request which includes gas params
+      if (simulateData && (simulateData as any).request) {
+        // Use the request from simulation which includes gas estimates
+        console.log('📤 Using simulateData.request for gas parameters');
+        writeContract((simulateData as any).request);
+      } else {
+        // Fallback: send without gas params (wallet will estimate)
+        console.log('📤 Sending makeChoice transaction (wallet will estimate gas)');
+        writeContract(writeParams);
+      }
       console.log('Transaction request sent, waiting for wallet approval and hash...');
     } catch (error: any) {
       console.error('Error making choice:', error);

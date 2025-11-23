@@ -269,24 +269,35 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
           console.warn('⚠️ Simulation error (non-critical), proceeding anyway:', errorMsg);
         }
         
-        // Don't wait for simulation - send transaction immediately
-        // Simulation is optional and might not be ready
+        // Wait for simulation to be ready - it provides gas estimates
+        // This ensures wallet popup shows correct gas fee
+        if (!simulateData) {
+          console.warn('⚠️ Simulation not ready yet, waiting...');
+          // Wait a bit more for simulation
+          return;
+        }
         
         setTxError(null);
         setTxStartTime(Date.now());
         
-        // joinQueue fonksiyonunu çağır - aynı betAmount'u seçen oyuncular eşleşecek
-        // If there's already a player waiting, match will happen immediately
-        // Note: writeContract doesn't return a promise, it updates the hook state
-        // In Wagmi v3, we pass the parameters directly, not simulateData.request
-        console.log('📤 Calling writeContract with params');
-        writeContract({
-          address: CONTRACT_ADDRESS as `0x${string}`,
-          abi: CONTRACT_ABI,
-          functionName: 'joinQueue' as const,
-          args: [betAmount],
-          value: betAmount,
-        });
+        // Use simulateData.request if available (Wagmi v3 way)
+        // This includes all gas parameters needed for wallet popup to show correct fee
+        if (simulateData && (simulateData as any).request) {
+          // Use the request from simulation which includes gas estimates
+          console.log('📤 Using simulateData.request for gas parameters');
+          console.log('Simulate request:', (simulateData as any).request);
+          writeContract((simulateData as any).request);
+        } else {
+          // Fallback: send without gas params (wallet will estimate)
+          console.log('📤 Calling writeContract (wallet will estimate gas)');
+          writeContract({
+            address: CONTRACT_ADDRESS as `0x${string}`,
+            abi: CONTRACT_ABI,
+            functionName: 'joinQueue' as const,
+            args: [betAmount],
+            value: betAmount,
+          });
+        }
         
         console.log('📤 Transaction request sent, waiting for wallet approval and hash...');
         console.log('Current status:', status);
@@ -320,11 +331,19 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
       }
     };
     
-    // Send transaction immediately - don't wait for simulation
-    // Simulation is optional and might delay the transaction
+    // Wait for simulation to be ready before sending
+    // This ensures gas parameters are available for wallet popup
+    if (!simulateData && !simulateError) {
+      // Simulation is still loading, wait a bit
+      console.log('⏳ Waiting for simulation to complete...');
+      const timeoutId = setTimeout(sendTransaction, 500);
+      return () => clearTimeout(timeoutId);
+    }
+    
+    // Send transaction when simulation is ready or has non-critical error
     const timeoutId = setTimeout(sendTransaction, 200);
     return () => clearTimeout(timeoutId);
-  }, [isConnected, writeContract, betAmount, hasJoinedQueue, address, status]);
+  }, [isConnected, writeContract, betAmount, hasJoinedQueue, address, status, simulateData, simulateError]);
 
   // Poll game status as fallback if event doesn't fire
   // This handles cases where event listener might miss the event
