@@ -55,12 +55,19 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
   }, [writeError, selectedChoice]);
   
   // Handle successful transaction
+  const [showApproved, setShowApproved] = useState(false);
+  
   useEffect(() => {
-    if (hash && selectedChoice) {
-      console.log('Transaction sent successfully:', hash);
-      // Don't reset selectedChoice here - let the game logic handle it
+    if (isTxSuccess && hash && selectedChoice) {
+      console.log('Transaction confirmed:', hash);
+      setShowApproved(true);
+      // Hide after 3 seconds
+      const timer = setTimeout(() => {
+        setShowApproved(false);
+      }, 3000);
+      return () => clearTimeout(timer);
     }
-  }, [hash, selectedChoice]);
+  }, [isTxSuccess, hash, selectedChoice]);
   const { data: gameData, isLoading: isLoadingGame } = useReadContract({
     address: CONTRACT_ADDRESS as `0x${string}`,
     abi: CONTRACT_ABI,
@@ -311,6 +318,33 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
           );
         })}
       </div>
+
+      {/* Transaction Approved Notification */}
+      {showApproved && (
+        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 animate-fade-in">
+          <div className="relative bg-black/95 backdrop-blur-lg px-8 py-6 rounded-xl shadow-[0_0_60px_rgba(34,211,238,1)] border-2 border-cyan-400">
+            <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/20 via-blue-500/20 to-green-500/20 blur-xl"></div>
+            <div className="relative flex items-center gap-4">
+              <div className="text-5xl animate-bounce drop-shadow-[0_0_30px_rgba(34,211,238,1)]">✅</div>
+              <div>
+                <h3 className="text-2xl font-black mb-1 bg-gradient-to-r from-cyan-400 via-blue-400 to-green-400 bg-clip-text text-transparent drop-shadow-[0_0_20px_rgba(34,211,238,0.8)]">
+                  TRANSACTION APPROVED
+                </h3>
+                <p className="text-cyan-300 font-mono font-bold uppercase tracking-wider text-sm">
+                  Choice submitted successfully
+                </p>
+              </div>
+            </div>
+            {/* Japanese Corner Accents with Neon */}
+            <div className="absolute top-2 left-2 w-6 h-6 border-t-2 border-l-2 border-cyan-400 shadow-[0_0_10px_rgba(34,211,238,1)]"></div>
+            <div className="absolute top-2 right-2 w-6 h-6 border-t-2 border-r-2 border-cyan-400 shadow-[0_0_10px_rgba(34,211,238,1)]"></div>
+            <div className="absolute bottom-2 left-2 w-6 h-6 border-b-2 border-l-2 border-cyan-400 shadow-[0_0_10px_rgba(34,211,238,1)]"></div>
+            <div className="absolute bottom-2 right-2 w-6 h-6 border-b-2 border-r-2 border-cyan-400 shadow-[0_0_10px_rgba(34,211,238,1)]"></div>
+            {/* Pulse effect */}
+            <div className="absolute inset-0 border-2 border-cyan-400 rounded-xl animate-ping opacity-20"></div>
+          </div>
+        </div>
+      )}
 
       {/* Status Messages */}
       {(isPending || isConfirming) && (
