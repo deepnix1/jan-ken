@@ -111,7 +111,24 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
       setHasJoinedQueue(false);
       setTxStartTime(null);
     }
-  }, [status, isPending, hash, writeError]);
+    
+    // CRITICAL: If status goes from pending to idle without hash or error, something is wrong
+    // This happens when wallet popup doesn't appear or transaction is silently rejected
+    if (status === 'idle' && !hash && !writeError && hasJoinedQueue && !isPending) {
+      console.error('❌ CRITICAL: Transaction status went from pending to idle without hash or error!');
+      console.error('This means wallet popup did not appear or transaction was silently rejected');
+      console.error('Status:', status);
+      console.error('isPending:', isPending);
+      console.error('hash:', hash);
+      console.error('writeError:', writeError);
+      console.error('hasJoinedQueue:', hasJoinedQueue);
+      
+      // Reset state to allow retry
+      setHasJoinedQueue(false);
+      setTxError('Transaction was not sent. Wallet popup may not have appeared. Please check your wallet connection and try again.');
+      resetWriteContract?.();
+    }
+  }, [status, isPending, hash, writeError, hasJoinedQueue, resetWriteContract]);
   
   // Handle writeError from useWriteContract
   useEffect(() => {
