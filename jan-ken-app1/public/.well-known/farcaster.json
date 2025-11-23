@@ -1,0 +1,18 @@
+{
+  "accountAssociation": {
+    "header": "PLACEHOLDER_HEADER",
+    "payload": "PLACEHOLDER_PAYLOAD",
+    "signature": "PLACEHOLDER_SIGNATURE"
+  },
+  "frame": {
+    "version": "1",
+    "name": "JaN KeN!",
+    "iconUrl": "https://YOUR_DOMAIN.com/new_logo.png",
+    "homeUrl": "https://YOUR_DOMAIN.com",
+    "imageUrl": "https://YOUR_DOMAIN.com/new_logo.png",
+    "buttonTitle": "Play JaN KeN!",
+    "splashImageUrl": "https://YOUR_DOMAIN.com/new_logo.png",
+    "splashBackgroundColor": "#000000"
+  }
+}
+

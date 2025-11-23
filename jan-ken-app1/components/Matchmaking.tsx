@@ -851,7 +851,23 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
             });
             
             console.log('📤 Calling writeContract with simulation request...');
-            writeContract(simRequest);
+            try {
+              writeContract(simRequest);
+              console.log('✅ writeContract called successfully (with simulation request)');
+            } catch (writeErr: any) {
+              console.error('❌ Error calling writeContract with simulation request:', writeErr);
+              // Safely extract error message
+              let errorMsg = '';
+              try {
+                errorMsg = writeErr?.message || (writeErr as any)?.shortMessage || String(writeErr);
+              } catch (e) {
+                errorMsg = 'Unknown error';
+              }
+              setTxError(`Failed to send transaction: ${errorMsg}`);
+              setHasJoinedQueue(false);
+              setTxStartTime(null);
+              return;
+            }
           } else {
             console.log('📤 Sending transaction directly (wallet will estimate gas)');
             console.log('Calling writeContract with params:', {
@@ -861,10 +877,25 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
               value: txParams.value.toString(),
             });
             console.log('📤 Calling writeContract...');
-            writeContract(txParams);
+            try {
+              writeContract(txParams);
+              console.log('✅ writeContract called successfully (direct)');
+            } catch (writeErr: any) {
+              console.error('❌ Error calling writeContract directly:', writeErr);
+              // Safely extract error message
+              let errorMsg = '';
+              try {
+                errorMsg = writeErr?.message || (writeErr as any)?.shortMessage || String(writeErr);
+              } catch (e) {
+                errorMsg = 'Unknown error';
+              }
+              setTxError(`Failed to send transaction: ${errorMsg}`);
+              setHasJoinedQueue(false);
+              setTxStartTime(null);
+              return;
+            }
           }
           
-          console.log('✅ writeContract called successfully');
           console.log('Current status after call:', status);
           console.log('isPending after call:', isPending);
           console.log('Waiting for wallet popup...');

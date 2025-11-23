@@ -18,6 +18,27 @@ const sourceCodePro = Source_Code_Pro({
   subsets: ["latin"],
 });
 
+// Farcaster Mini App embed metadata
+// Per Farcaster docs: https://miniapps.farcaster.xyz/docs/guides/agents-checklist
+// IMPORTANT: Set NEXT_PUBLIC_APP_URL in .env.local with your production domain
+// Example: NEXT_PUBLIC_APP_URL=https://jan-ken.vercel.app
+const domain = process.env.NEXT_PUBLIC_APP_URL || "https://YOUR_DOMAIN.com";
+
+const farcasterFrame = {
+  version: "1", // Must be "1", not "next" (per Farcaster docs)
+  imageUrl: `${domain}/new_logo.png`, // 3:2 aspect ratio recommended
+  button: {
+    title: "Play JaN KeN!", // Max 32 characters
+    action: {
+      type: "launch_frame",
+      name: "JaN KeN!",
+      url: domain, // Optional, defaults to current URL
+      splashImageUrl: `${domain}/new_logo.png`, // 200x200px recommended
+      splashBackgroundColor: "#000000"
+    }
+  }
+};
+
 export const metadata: Metadata = {
   title: "JaN KeN! - Rock Paper Scissors",
   description: "Rock Paper Scissors game on Base Network. Play against other players and win ETH!",
@@ -25,6 +46,17 @@ export const metadata: Metadata = {
   icons: {
     icon: '/new_logo.png',
     apple: '/new_logo.png',
+  },
+  openGraph: {
+    title: "JaN KeN! - Rock Paper Scissors",
+    description: "Rock Paper Scissors game on Base Network. Play against other players and win ETH!",
+    images: ['/new_logo.png'],
+  },
+  // Farcaster Mini App embed metadata
+  // Per Farcaster docs: Use fc:miniapp (NOT fc:frame for new implementations)
+  // See: https://miniapps.farcaster.xyz/docs/guides/agents-checklist
+  other: {
+    "fc:miniapp": JSON.stringify(farcasterFrame),
   },
 };
 
