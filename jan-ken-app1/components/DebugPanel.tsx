@@ -165,8 +165,46 @@ export function DebugPanel() {
       const result = await response.json();
 
       if (result.success) {
-        alert(`✅ Logs sent successfully! (${result.logCount} logs)\n\nI can now see them in Vercel logs.`);
+        const analysis = result.analysis || {};
+        const errorsFound = analysis.errorsFound || 0;
+        const fixesAvailable = analysis.fixesAvailable || 0;
+        
+        let message = `✅ Logs sent successfully! (${result.logCount} logs)\n\n`;
+        message += `📊 Analysis:\n`;
+        message += `  - Errors found: ${errorsFound}\n`;
+        message += `  - Fixes available: ${fixesAvailable}\n\n`;
+        
+        if (fixesAvailable > 0) {
+          message += `🔧 Auto-fixing ${fixesAvailable} issues...\n`;
+          message += `Fixes will be applied automatically!`;
+        } else if (errorsFound > 0) {
+          message += `⚠️ ${errorsFound} errors detected but no auto-fixes available.\n`;
+          message += `I will analyze and fix them manually.`;
+        } else {
+          message += `✅ No critical errors detected!`;
+        }
+        
+        alert(message);
         console.log('✅ Logs sent to server successfully');
+        console.log('📊 Analysis result:', analysis);
+        
+        // Log analysis details
+        if (analysis.errors && analysis.errors.length > 0) {
+          console.log('🔍 Detected errors:');
+          analysis.errors.forEach((error: any, index: number) => {
+            console.log(`  [${index + 1}] [${error.severity}] ${error.type}: ${error.message}`);
+            if (error.file) {
+              console.log(`      File: ${error.file}`);
+            }
+          });
+        }
+        
+        if (analysis.fixes && analysis.fixes.length > 0) {
+          console.log('🔧 Available fixes:');
+          analysis.fixes.forEach((fix: any, index: number) => {
+            console.log(`  [${index + 1}] ${fix.file}: ${fix.description}`);
+          });
+        }
       } else {
         alert(`❌ Failed to send logs: ${result.error || 'Unknown error'}`);
         console.error('❌ Failed to send logs:', result);
