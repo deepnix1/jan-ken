@@ -75,8 +75,8 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
       console.error('❌ WriteContract error:', writeError);
       console.error('Error details:', {
         message: writeError?.message,
-        shortMessage: writeError?.shortMessage,
-        cause: writeError?.cause,
+        shortMessage: (writeError as any)?.shortMessage,
+        cause: (writeError as any)?.cause,
         name: writeError?.name,
         stack: writeError?.stack,
       });
@@ -223,16 +223,14 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
         // If there's already a player waiting, match will happen immediately
         // Note: writeContract doesn't return a promise, it updates the hook state
         // In Wagmi v3, we pass the parameters directly, not simulateData.request
-        const writeParams = {
+        console.log('📤 Calling writeContract with params');
+        writeContract({
           address: CONTRACT_ADDRESS as `0x${string}`,
           abi: CONTRACT_ABI,
-          functionName: 'joinQueue',
+          functionName: 'joinQueue' as const,
           args: [betAmount],
           value: betAmount,
-        };
-        
-        console.log('📤 Calling writeContract with params:', writeParams);
-        writeContract(writeParams);
+        });
         
         console.log('📤 Transaction request sent, waiting for wallet approval and hash...');
         console.log('Current status:', status);
