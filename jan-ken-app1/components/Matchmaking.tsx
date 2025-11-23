@@ -221,8 +221,8 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
         // joinQueue fonksiyonunu çağır - aynı betAmount'u seçen oyuncular eşleşecek
         // If there's already a player waiting, match will happen immediately
         // Note: writeContract doesn't return a promise, it updates the hook state
-        // Use simulateData.request if available (Wagmi v3)
-        const writeParams: any = {
+        // In Wagmi v3, we pass the parameters directly, not simulateData.request
+        const writeParams = {
           address: CONTRACT_ADDRESS as `0x${string}`,
           abi: CONTRACT_ABI,
           functionName: 'joinQueue',
@@ -230,12 +230,8 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
           value: betAmount,
         };
         
-        // If simulation data is available, use it
-        if (simulateData?.request) {
-          writeContract(simulateData.request);
-        } else {
-          writeContract(writeParams);
-        }
+        console.log('📤 Calling writeContract with params:', writeParams);
+        writeContract(writeParams);
         
         console.log('📤 Transaction request sent, waiting for wallet approval and hash...');
         console.log('Current status:', status);
