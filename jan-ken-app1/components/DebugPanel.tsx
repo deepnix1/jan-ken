@@ -112,6 +112,71 @@ export function DebugPanel() {
     setLogs([]);
   };
 
+  const sendLogsToServer = async () => {
+    if (logs.length === 0) {
+      alert('No logs to send');
+      return;
+    }
+
+    try {
+      // Prepare logs for sending (safely serialize BigInt)
+      const logsToSend = logs.map(log => {
+        let safeData = null;
+        if (log.data) {
+          try {
+            // Try to serialize data, handling BigInt
+            safeData = JSON.parse(JSON.stringify(log.data, (key, value) => {
+              if (typeof value === 'bigint') {
+                return value.toString() + 'n';
+              }
+              return value;
+            }));
+          } catch (e) {
+            safeData = '[Could not serialize]';
+          }
+        }
+        return {
+          id: log.id,
+          timestamp: log.timestamp,
+          level: log.level,
+          message: log.message,
+          data: safeData,
+        };
+      });
+
+      const payload = {
+        logs: logsToSend,
+        address: address || 'N/A',
+        chainId: chainId || 'N/A',
+        userAgent: typeof window !== 'undefined' ? window.navigator.userAgent : 'N/A',
+        timestamp: Date.now(),
+      };
+
+      console.log('📤 Sending logs to server...', { logCount: logsToSend.length });
+
+      const response = await fetch('/api/logs', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        alert(`✅ Logs sent successfully! (${result.logCount} logs)\n\nI can now see them in Vercel logs.`);
+        console.log('✅ Logs sent to server successfully');
+      } else {
+        alert(`❌ Failed to send logs: ${result.error || 'Unknown error'}`);
+        console.error('❌ Failed to send logs:', result);
+      }
+    } catch (error: any) {
+      console.error('❌ Error sending logs:', error);
+      alert(`❌ Error sending logs: ${error.message || 'Unknown error'}\n\nPlease copy logs manually and send them to me.`);
+    }
+  };
+
   const getLogColor = (level: LogEntry['level']) => {
     switch (level) {
       case 'error': return 'text-red-400';
@@ -272,36 +337,45 @@ export function DebugPanel() {
           />
           Auto-scroll
         </label>
-        <button
-          onClick={() => {
-            try {
-              const logText = logs.map(l => {
-                let dataText = '';
-                if (l.data) {
-                  try {
-                    dataText = '\n  Data: ' + JSON.stringify(l.data, (key, value) => {
-                      if (typeof value === 'bigint') {
-                        return value.toString() + 'n';
-                      }
-                      return value;
-                    }, 2);
-                  } catch (e) {
-                    dataText = '\n  Data: [Could not serialize]';
+        <div className="flex gap-2">
+          <button
+            onClick={sendLogsToServer}
+            className="px-2 py-1 bg-green-500/20 border border-green-400 rounded text-green-300 text-xs hover:bg-green-500/30"
+            title="Send logs to server (I can read them)"
+          >
+            📤 Send Logs
+          </button>
+          <button
+            onClick={() => {
+              try {
+                const logText = logs.map(l => {
+                  let dataText = '';
+                  if (l.data) {
+                    try {
+                      dataText = '\n  Data: ' + JSON.stringify(l.data, (key, value) => {
+                        if (typeof value === 'bigint') {
+                          return value.toString() + 'n';
+                        }
+                        return value;
+                      }, 2);
+                    } catch (e) {
+                      dataText = '\n  Data: [Could not serialize]';
+                    }
                   }
-                }
-                return `[${l.level.toUpperCase()}] ${new Date(l.timestamp).toISOString()}\n${l.message}${dataText}`;
-              }).join('\n\n');
-              navigator.clipboard.writeText(logText);
-              alert(`Copied ${logs.length} logs to clipboard!`);
-            } catch (e) {
-              console.error('Error copying logs:', e);
-              alert('Error copying logs. Please try again.');
-            }
-          }}
-          className="px-2 py-1 bg-purple-500/20 border border-purple-400 rounded text-purple-300 text-xs hover:bg-purple-500/30"
-        >
-          Copy Logs ({logs.length})
-        </button>
+                  return `[${l.level.toUpperCase()}] ${new Date(l.timestamp).toISOString()}\n${l.message}${dataText}`;
+                }).join('\n\n');
+                navigator.clipboard.writeText(logText);
+                alert(`Copied ${logs.length} logs to clipboard!`);
+              } catch (e) {
+                console.error('Error copying logs:', e);
+                alert('Error copying logs. Please try again.');
+              }
+            }}
+            className="px-2 py-1 bg-purple-500/20 border border-purple-400 rounded text-purple-300 text-xs hover:bg-purple-500/30"
+          >
+            📋 Copy ({logs.length})
+          </button>
+        </div>
       </div>
     </div>
   );
