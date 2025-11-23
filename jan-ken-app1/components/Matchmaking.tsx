@@ -495,41 +495,50 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
         
         // CRITICAL: Wait for simulation to complete before sending transaction
         // Per Wagmi best practices, we should use simulateData.request for gas estimation
-        // But if simulation takes too long, we can fallback to direct transaction
         if (simulateStatus === 'pending') {
           console.warn('⚠️ Simulation is still pending, waiting for it to complete...');
-          console.warn('⚠️ This might take a few seconds. If it takes too long, we will send transaction without simulation.');
-          
-          // Wait up to 10 seconds for simulation, then fallback to direct transaction
-          // This prevents the app from getting stuck if simulation fails
-          const simulationWaitStart = Date.now();
-          const checkSimulation = setInterval(() => {
-            const elapsed = Date.now() - simulationWaitStart;
-            if (elapsed > 10000) { // 10 seconds timeout
-              clearInterval(checkSimulation);
-              console.warn('⚠️ Simulation timeout after 10 seconds, proceeding with direct transaction (wallet will estimate gas)');
-              // Continue to send transaction without simulation
-            } else if (simulateStatus !== 'pending') {
-              clearInterval(checkSimulation);
-              console.log('✅ Simulation completed, proceeding with transaction');
-            }
-          }, 500);
-          
-          // For now, return and let the useEffect retry when simulation completes
-          // The useEffect will be triggered again when simulateStatus changes
-          return () => clearInterval(checkSimulation);
+          console.warn('⚠️ This might take a few seconds. The useEffect will retry when simulation completes.');
+          return; // Wait for simulation to complete - useEffect will retry when simulateStatus changes
         }
         
-        if (simulateStatus === 'error' && simulateError) {
-          const errorMsg = simulateError?.message || (simulateError as any)?.shortMessage || String(simulateError);
-          if (errorMsg.includes('insufficient funds') || errorMsg.includes('Insufficient')) {
+        if (simulateStatus === 'error') {
+          // Log detailed error information
+          console.error('❌ Simulation error detected');
+          console.error('Simulate error object:', simulateError);
+          console.error('Error type:', typeof simulateError);
+          console.error('Error constructor:', simulateError?.constructor?.name);
+          
+          // Try to extract error message safely
+          let errorMsg = 'Unknown simulation error';
+          try {
+            if (simulateError) {
+              errorMsg = simulateError?.message || 
+                        (simulateError as any)?.shortMessage || 
+                        (simulateError as any)?.cause?.message ||
+                        String(simulateError);
+            }
+          } catch (e) {
+            console.warn('Could not extract error message:', e);
+          }
+          
+          console.error('Error message:', errorMsg);
+          
+          // Only block if it's a critical error (insufficient funds)
+          if (errorMsg.includes('insufficient funds') || 
+              errorMsg.includes('Insufficient') ||
+              errorMsg.includes('insufficient balance')) {
             console.error('❌ Simulation error: Insufficient funds');
             setHasJoinedQueue(false);
             setTxStartTime(null);
             setTxError('Insufficient funds. Please add more ETH to your wallet.');
             return;
           }
-          console.warn('⚠️ Simulation error (non-critical), proceeding with direct transaction:', errorMsg);
+          
+          // For other simulation errors, log but continue (might be false positive)
+          // Common non-critical errors: RPC timeout, network issues, etc.
+          console.warn('⚠️ Simulation error (non-critical), proceeding with direct transaction');
+          console.warn('⚠️ Error details:', errorMsg);
+          console.warn('⚠️ Wallet will estimate gas instead');
           // Continue to send transaction even if simulation failed (non-critical error)
         }
         
