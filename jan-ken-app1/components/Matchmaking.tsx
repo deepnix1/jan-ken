@@ -409,7 +409,26 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
         // Check Wagmi connector client
         console.log('🔍 Wagmi connector client check:');
         console.log('  - Connector client available:', !!connectorClient);
-        if (connectorClient) {
+        console.log('  - isConnected:', isConnected);
+        console.log('  - address:', address);
+        
+        if (!connectorClient) {
+          console.error('  - ❌ CRITICAL: Connector client is not available!');
+          console.error('  - This means Wagmi cannot send transactions.');
+          console.error('  - isConnected:', isConnected);
+          console.error('  - address:', address);
+          console.error('  - Farcaster provider available:', !!farcasterProvider);
+          
+          // If connected but no client, this is a critical issue
+          if (isConnected && address) {
+            console.error('  - ⚠️ Wallet is connected but connector client is missing!');
+            console.error('  - This usually means connector needs to be reconnected.');
+            setTxError('Wallet connection issue. Please disconnect and reconnect your wallet.');
+            setHasJoinedQueue(false);
+            setTxStartTime(null);
+            return;
+          }
+        } else {
           console.log('  - Connector client account:', connectorClient.account);
           console.log('  - Connector client chain:', connectorClient.chain);
           console.log('  - Connector client transport:', !!connectorClient.transport);
