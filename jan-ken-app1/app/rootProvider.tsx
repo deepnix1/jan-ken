@@ -77,7 +77,11 @@ export function RootProvider({ children }: { children: ReactNode }) {
     return createConfig({
       chains: [baseSepolia],
       transports: {
-        [baseSepolia.id]: http(),
+        [baseSepolia.id]: http('https://sepolia.base.org', {
+          timeout: 30000, // 30 second timeout
+          retryCount: 3,
+          retryDelay: 1000,
+        }),
       },
       connectors,
       ssr: false, // Disable SSR for wagmi
@@ -156,7 +160,11 @@ export function RootProvider({ children }: { children: ReactNode }) {
     return createConfig({
       chains: [baseSepolia],
       transports: {
-        [baseSepolia.id]: http(),
+        [baseSepolia.id]: http('https://sepolia.base.org', {
+          timeout: 30000,
+          retryCount: 3,
+          retryDelay: 1000,
+        }),
       },
       connectors: [], // Empty connectors for SSR/initial render
       ssr: typeof window === 'undefined' || !mounted, // Enable SSR for server-side or before mount

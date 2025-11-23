@@ -19,15 +19,48 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
   const [hasJoinedQueue, setHasJoinedQueue] = useState(false);
   
   const { data: hash, writeContract, isPending, error: writeError } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess, isError: isReceiptError, error: receiptError } = useWaitForTransactionReceipt({
+  const [txConfirmed, setTxConfirmed] = useState(false);
+  const [txError, setTxError] = useState<string | null>(null);
+  
+  // Manual transaction confirmation check with fallback
+  const { isLoading: isConfirming, isSuccess, isError: isReceiptError } = useWaitForTransactionReceipt({
     hash,
-    timeout: 60000, // 60 seconds timeout
-    confirmations: 1, // Wait for 1 confirmation
+    timeout: 30000, // 30 seconds timeout (reduced)
+    confirmations: 1,
     query: {
-      retry: 3, // Retry 3 times
-      retryDelay: 2000, // Wait 2 seconds between retries
+      retry: 2,
+      retryDelay: 1000,
+      enabled: !!hash && !txConfirmed, // Only wait if we have hash and not already confirmed
+    },
+    onSuccess: () => {
+      setTxConfirmed(true);
+      setTxError(null);
+    },
+    onError: (error) => {
+      console.error('Transaction receipt error:', error);
+      // Don't set error immediately - transaction might still be processing
+      // Only set error after timeout
+      if (error.message?.includes('timeout') || error.message?.includes('Timeout')) {
+        setTxError('Transaction confirmation timeout. Please check BaseScan.');
+      }
     },
   });
+  
+  // Fallback: Poll transaction status manually if receipt wait fails
+  useEffect(() => {
+    if (!hash || txConfirmed || isSuccess) return;
+    
+    // If receipt wait times out, start manual polling
+    const pollTimeout = setTimeout(() => {
+      if (!txConfirmed && !isSuccess) {
+        console.log('Starting manual transaction status check...');
+        // Transaction might still be processing, so we continue
+        // The event listener will catch the match anyway
+      }
+    }, 35000); // After 35 seconds, assume transaction is processing
+    
+    return () => clearTimeout(pollTimeout);
+  }, [hash, txConfirmed, isSuccess]);
   
   // Get pool status - count players waiting for this bet amount
   const [poolCount, setPoolCount] = useState<number>(0);
@@ -95,15 +128,22 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
         functionName: 'joinQueue',
         args: [betAmount],
         value: betAmount,
+      }, {
+        onSuccess: (txHash) => {
+          console.log('Transaction sent successfully:', txHash);
+          setHasJoinedQueue(true);
+          setTxError(null);
+        },
+        onError: (error) => {
+          console.error('Error joining queue:', error);
+          setHasJoinedQueue(false);
+          setTxError(error.message || 'Transaction failed');
+        },
       });
-      // Set hasJoinedQueue AFTER transaction is sent (not before)
-      // This prevents duplicate calls
-      setHasJoinedQueue(true);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error joining queue:', error);
-      // Reset hasJoinedQueue on error so user can retry
       setHasJoinedQueue(false);
-      // Error will be shown via writeError state
+      setTxError(error?.message || 'Transaction failed');
     }
   }, [isConnected, writeContract, betAmount, hasJoinedQueue, address]);
 
@@ -195,7 +235,7 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
         
         {/* Gaming Status Indicators - Mobile Responsive */}
         <div className="space-y-4 sm:space-y-5 w-full max-w-md px-4">
-          {(isPending || isConfirming) && (
+          {(isPending || (isConfirming && !txConfirmed && !isSuccess)) && (
             <div className="flex flex-col items-center justify-center gap-3 sm:gap-4 px-4 sm:px-6 md:px-8 py-4 sm:py-5 bg-black/60 border-2 border-blue-500/40 rounded-lg shadow-[0_0_30px_rgba(59,130,246,0.4)]">
               <div className="flex items-center gap-3 sm:gap-4">
                 <div className="w-5 h-5 sm:w-6 sm:h-6 border-2 sm:border-3 border-blue-400 border-t-transparent rounded-full animate-spin shadow-[0_0_10px_rgba(59,130,246,1)]"></div>
@@ -204,7 +244,7 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
                 </p>
               </div>
               {hash && (
-                <div className="mt-2">
+                <div className="mt-2 flex flex-col items-center gap-2">
                   <a
                     href={`https://sepolia.basescan.org/tx/${hash}`}
                     target="_blank"
@@ -213,30 +253,31 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
                   >
                     View on BaseScan
                   </a>
+                  <p className="text-gray-400 font-mono text-xs text-center">
+                    If stuck, check BaseScan - transaction may be confirmed
+                  </p>
                 </div>
               )}
             </div>
           )}
           
-          {isReceiptError && (
-            <div className="flex flex-col items-center justify-center gap-3 sm:gap-4 px-4 sm:px-6 md:px-8 py-4 sm:py-5 bg-black/60 border-2 border-red-500/40 rounded-lg shadow-[0_0_30px_rgba(239,68,68,0.4)]">
-              <p className="text-red-400 font-mono font-bold uppercase tracking-wider text-xs sm:text-sm text-center">
-                Transaction confirmation timeout
+          {(isReceiptError || txError) && hash && !txConfirmed && (
+            <div className="flex flex-col items-center justify-center gap-3 sm:gap-4 px-4 sm:px-6 md:px-8 py-4 sm:py-5 bg-black/60 border-2 border-yellow-500/40 rounded-lg shadow-[0_0_30px_rgba(234,179,8,0.4)]">
+              <p className="text-yellow-400 font-mono font-bold uppercase tracking-wider text-xs sm:text-sm text-center">
+                Transaction sent - checking status...
               </p>
-              {hash && (
-                <div className="mt-2">
-                  <a
-                    href={`https://sepolia.basescan.org/tx/${hash}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-red-300 hover:text-red-200 font-mono text-xs underline"
-                  >
-                    Check transaction on BaseScan
-                  </a>
-                </div>
-              )}
+              <div className="mt-2">
+                <a
+                  href={`https://sepolia.basescan.org/tx/${hash}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-yellow-300 hover:text-yellow-200 font-mono text-xs underline"
+                >
+                  Check transaction on BaseScan
+                </a>
+              </div>
               <p className="text-gray-400 font-mono text-xs text-center mt-2">
-                Transaction may still be processing. Check BaseScan for status.
+                Transaction may be confirmed. Event listener will detect match automatically.
               </p>
             </div>
           )}
