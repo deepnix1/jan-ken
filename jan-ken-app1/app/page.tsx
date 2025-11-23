@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
-import { useAccount, useConnect, useDisconnect } from 'wagmi';
+import { useAccount, useConnect, useDisconnect, useConnectorClient } from 'wagmi';
 import { sdk } from '@farcaster/miniapp-sdk';
 import { BetSelector } from '@/components/BetSelector';
 import { Matchmaking } from '@/components/Matchmaking';
@@ -19,6 +19,7 @@ export default function Home() {
   const { isConnected, address } = useAccount();
   const { connect, connectors, isPending, error: connectError } = useConnect();
   const { disconnect } = useDisconnect();
+  const { data: connectorClient } = useConnectorClient();
   const [gameState, setGameState] = useState<'select' | 'matching' | 'playing' | 'result'>('select');
   const [selectedBet, setSelectedBet] = useState<bigint | null>(null);
   const [gameId, setGameId] = useState<string | null>(null);
@@ -190,6 +191,35 @@ export default function Home() {
 
     handleWalletChange();
   }, [appReady, address, connectors, connect, disconnect]);
+  
+  // Monitor connector client creation and auto-reconnect if needed
+  useEffect(() => {
+    if (isConnected && address && !connectorClient) {
+      console.warn('⚠️ Connected but connector client not available - attempting reconnect...');
+      // Wait a bit for connector client to be created
+      const timeout = setTimeout(() => {
+        if (!connectorClient) {
+          console.error('❌ Connector client still not available after wait - reconnecting...');
+          disconnect();
+          setTimeout(() => {
+            const farcasterConnector = connectors.find(c => c.name === 'Farcaster Mini App' || c.name?.includes('Farcaster'));
+            if (farcasterConnector) {
+              console.log('🔄 Reconnecting with Farcaster connector...');
+              connect({ connector: farcasterConnector });
+            }
+          }, 500);
+        }
+      }, 2000);
+      return () => clearTimeout(timeout);
+    }
+    
+    if (isConnected && address && connectorClient) {
+      console.log('✅ Connector client available:', {
+        account: connectorClient.account?.address,
+        chain: connectorClient.chain?.id,
+      });
+    }
+  }, [isConnected, address, connectorClient, connectors, connect, disconnect]);
 
   // Also watch for address changes via useAccount
   useEffect(() => {
