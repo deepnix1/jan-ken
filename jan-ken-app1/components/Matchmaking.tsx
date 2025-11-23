@@ -142,14 +142,15 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
     console.log('Sending transaction - wallet approval required');
     
     // Small delay to ensure UI is ready before showing wallet popup
-    const sendTransaction = async () => {
+    const sendTransaction = () => {
       try {
         console.log('Attempting to send transaction...');
         setTxError(null);
         
         // joinQueue fonksiyonunu çağır - aynı betAmount'u seçen oyuncular eşleşecek
         // If there's already a player waiting, match will happen immediately
-        const result = await writeContract({
+        // Note: writeContract doesn't return a promise, it updates the hook state
+        writeContract({
           address: CONTRACT_ADDRESS as `0x${string}`,
           abi: CONTRACT_ABI,
           functionName: 'joinQueue',
@@ -157,16 +158,18 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
           value: betAmount,
         });
         
-        // If writeContract returns a hash directly (some versions do)
-        if (result && typeof result === 'string') {
-          console.log('Transaction hash received directly:', result);
-          setTxHash(result);
-          setHasJoinedQueue(true);
-          setTxError(null);
-        } else {
-          // Otherwise, hash will come from useWriteContract hook
-          console.log('Transaction sent, waiting for hash...');
-        }
+        console.log('Transaction request sent, waiting for wallet approval and hash...');
+        
+        // Set a timeout to detect if transaction gets stuck
+        const timeoutId = setTimeout(() => {
+          if (!hash && isPending) {
+            console.warn('Transaction seems stuck - no hash received after 30 seconds');
+            // Don't show error immediately - might still be processing
+            // The writeError will handle actual errors
+          }
+        }, 30000); // 30 seconds
+        
+        return () => clearTimeout(timeoutId);
       } catch (error: any) {
         console.error('Error joining queue:', error);
         setHasJoinedQueue(false);
