@@ -399,10 +399,29 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
           if (simulateData && (simulateData as any).request) {
             console.log('📤 Using simulation data for gas estimation');
             console.log('Simulation request:', (simulateData as any).request);
-            writeContract((simulateData as any).request);
+            
+            // Log simulation request details
+            const simRequest = (simulateData as any).request;
+            console.log('Simulation request details:', {
+              address: simRequest.address,
+              functionName: simRequest.functionName,
+              args: simRequest.args?.map((a: any) => a?.toString()),
+              value: simRequest.value?.toString(),
+              gas: simRequest.gas?.toString(),
+              gasPrice: simRequest.gasPrice?.toString(),
+              maxFeePerGas: simRequest.maxFeePerGas?.toString(),
+              maxPriorityFeePerGas: simRequest.maxPriorityFeePerGas?.toString(),
+            });
+            
+            writeContract(simRequest);
           } else {
             console.log('📤 Sending transaction directly (wallet will estimate gas)');
-            console.log('Calling writeContract with params:', txParams);
+            console.log('Calling writeContract with params:', {
+              address: txParams.address,
+              functionName: txParams.functionName,
+              args: txParams.args.map(a => a.toString()),
+              value: txParams.value.toString(),
+            });
             writeContract(txParams);
           }
           
@@ -410,6 +429,20 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
           console.log('Current status after call:', status);
           console.log('isPending after call:', isPending);
           console.log('Waiting for wallet popup...');
+          
+          // Check if wallet popup should appear
+          setTimeout(() => {
+            console.log('⏰ 2 seconds after writeContract call:');
+            console.log('  Status:', status);
+            console.log('  isPending:', isPending);
+            console.log('  Hash:', hash);
+            console.log('  Error:', writeError);
+            
+            if (!hash && !writeError && isPending) {
+              console.warn('⚠️ No hash and no error after 2 seconds - wallet popup might not have appeared');
+            }
+          }, 2000);
+          
         } catch (err: any) {
           console.error('❌ Error calling writeContract:', err);
           console.error('Error details:', {

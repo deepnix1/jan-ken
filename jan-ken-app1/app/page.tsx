@@ -9,6 +9,7 @@ import { Matchmaking } from '@/components/Matchmaking';
 import { GameBoard } from '@/components/GameBoard';
 import { Result } from '@/components/Result';
 import { MatchFoundAnimation } from '@/components/MatchFoundAnimation';
+import { DebugPanel } from '@/components/DebugPanel';
 
 // Disable SSR for this page (Wagmi doesn't work with SSR)
 export const dynamic = 'force-dynamic';
@@ -389,6 +390,8 @@ export default function Home() {
       </div>
           </main>
           
+          {/* Debug Panel - Always visible for mobile debugging */}
+          {typeof window !== 'undefined' && <DebugPanel />}
           </>
         );
       }
