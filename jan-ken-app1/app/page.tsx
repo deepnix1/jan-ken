@@ -393,11 +393,11 @@ export default function Home() {
           
           {/* Contract Monitor - Testing Tool (enable with NEXT_PUBLIC_ENABLE_MONITOR=true) */}
           {typeof window !== 'undefined' && (process.env.NEXT_PUBLIC_ENABLE_MONITOR === 'true' || process.env.NODE_ENV === 'development') && (
-            <>
-              <ContractMonitor />
-              <WalletMonitor />
-            </>
+            <ContractMonitor />
           )}
+          
+          {/* Wallet Monitor - Always visible for transaction monitoring */}
+          {typeof window !== 'undefined' && <WalletMonitor />}
           </>
         );
       }

@@ -132,23 +132,24 @@ export function WalletMonitor() {
         <div className="flex gap-2">
           <button
             onClick={() => {
+              console.log('🔄 Check Now button clicked - loading transactions...');
               loadTransactions();
               loadBalance();
             }}
             disabled={isLoading}
-            className="px-3 py-1 bg-purple-500/20 border border-purple-400 rounded text-purple-400 text-sm hover:bg-purple-500/30 disabled:opacity-50"
+            className="px-4 py-2 bg-purple-500/30 border-2 border-purple-400 rounded-lg text-purple-300 font-bold text-sm hover:bg-purple-500/40 hover:border-purple-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_10px_rgba(168,85,247,0.3)] transition-all"
           >
-            {isLoading ? 'Loading...' : 'Check Now'}
+            {isLoading ? '⏳ Loading...' : '🔄 Check Now'}
           </button>
           <button
             onClick={startMonitoring}
-            className={`px-3 py-1 border rounded text-sm ${
+            className={`px-4 py-2 border-2 rounded-lg text-sm font-bold shadow-[0_0_10px_rgba(34,197,94,0.3)] transition-all ${
               isMonitoring
-                ? 'bg-red-500/20 border-red-400 text-red-400 hover:bg-red-500/30'
-                : 'bg-green-500/20 border-green-400 text-green-400 hover:bg-green-500/30'
+                ? 'bg-red-500/30 border-red-400 text-red-300 hover:bg-red-500/40 hover:border-red-300'
+                : 'bg-green-500/30 border-green-400 text-green-300 hover:bg-green-500/40 hover:border-green-300'
             }`}
           >
-            {isMonitoring ? 'Stop' : 'Monitor'}
+            {isMonitoring ? '⏹️ Stop' : '▶️ Monitor'}
           </button>
         </div>
       </div>
