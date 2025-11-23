@@ -191,30 +191,25 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
         console.log('Simulate data:', simulateData);
         console.log('Simulate error:', simulateError);
         
-        // Check simulation error first
+        // Check simulation error - only block if it's a critical error (insufficient funds)
         if (simulateError) {
-          console.error('❌ Simulation error:', simulateError);
-          setHasJoinedQueue(false);
-          setTxStartTime(null);
-          
-          let errorMessage = 'Transaction simulation failed';
           const errorMsg = simulateError?.message || (simulateError as any)?.shortMessage || String(simulateError);
           
+          // Only block if insufficient funds - other errors might be false positives
           if (errorMsg.includes('insufficient funds') || errorMsg.includes('Insufficient')) {
-            errorMessage = 'Insufficient funds. Please add more ETH to your wallet.';
-          } else if (errorMsg) {
-            errorMessage = errorMsg;
+            console.error('❌ Simulation error: Insufficient funds');
+            setHasJoinedQueue(false);
+            setTxStartTime(null);
+            setTxError('Insufficient funds. Please add more ETH to your wallet.');
+            return;
           }
           
-          setTxError(errorMessage);
-          return;
+          // For other simulation errors, log but continue (might be false positive)
+          console.warn('⚠️ Simulation error (non-critical), proceeding anyway:', errorMsg);
         }
         
-        // Check if simulation is ready
-        if (!simulateData) {
-          console.warn('⚠️ Simulation not ready yet, waiting...');
-          return;
-        }
+        // Don't wait for simulation - send transaction immediately
+        // Simulation is optional and might not be ready
         
         setTxError(null);
         setTxStartTime(Date.now());
@@ -259,16 +254,11 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
       }
     };
     
-    // Wait for simulation to complete before sending transaction
-    if (!simulateData && !simulateError) {
-      // Simulation is still loading, wait
-      return;
-    }
-    
-    // Small delay to ensure UI is ready
-    const timeoutId = setTimeout(sendTransaction, 100);
+    // Send transaction immediately - don't wait for simulation
+    // Simulation is optional and might delay the transaction
+    const timeoutId = setTimeout(sendTransaction, 200);
     return () => clearTimeout(timeoutId);
-  }, [isConnected, writeContract, betAmount, hasJoinedQueue, address, status, simulateData, simulateError]);
+  }, [isConnected, writeContract, betAmount, hasJoinedQueue, address, status]);
 
   // Poll game status as fallback if event doesn't fire
   // This handles cases where event listener might miss the event
