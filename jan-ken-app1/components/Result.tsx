@@ -47,26 +47,26 @@ export function Result({ onPlayAgain, onTieRematch }: ResultProps) {
             setResult('win');
             setPrize((Number(betAmount) * 2 / 1e18).toFixed(4));
             
-            // Create fireworks - spread from center
-            const newFireworks: Array<{ id: number; x: number; y: number; color: string; tx: number; ty: number }> = [];
-            const colors = ['#ff0066', '#00ffff', '#ffaa00', '#ff0066', '#00ffff', '#ff00ff', '#00ff00'];
-            const centerX = 50;
-            const centerY = 50;
-            for (let i = 0; i < 80; i++) {
-              const angle = (Math.PI * 2 * i) / 80;
-              const distance = 30 + Math.random() * 40;
-              const tx = Math.cos(angle) * distance;
-              const ty = Math.sin(angle) * distance;
-              newFireworks.push({
-                id: i,
-                x: centerX,
-                y: centerY,
-                color: colors[Math.floor(Math.random() * colors.length)],
-                tx,
-                ty,
-              });
-            }
-            setFireworks(newFireworks);
+              // Create fireworks - spread from center
+              const newFireworks: Array<{ id: number; x: number; y: number; color: string; tx: number; ty: number }> = [];
+              const colors = ['#ff0066', '#00ffff', '#ffaa00', '#ff0066', '#00ffff', '#ff00ff', '#00ff00'];
+              const centerX = 50;
+              const centerY = 50;
+              for (let i = 0; i < 80; i++) {
+                const angle = (Math.PI * 2 * i) / 80;
+                const distance = 30 + Math.random() * 40;
+                const tx = Math.cos(angle) * distance;
+                const ty = Math.sin(angle) * distance;
+                newFireworks.push({
+                  id: i,
+                  x: centerX,
+                  y: centerY,
+                  color: colors[Math.floor(Math.random() * colors.length)],
+                  tx: tx,
+                  ty: ty,
+                });
+              }
+              setFireworks(newFireworks);
             
             // Create sakura petals
             const newSakura: Array<{ id: number; x: number; delay: number; duration: number }> = [];
