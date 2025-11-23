@@ -25,23 +25,75 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
   const [gameFinished, setGameFinished] = useState(false);
   // TEST MODE: Wallet check temporarily disabled
 
-  const { data: hash, writeContract, isPending, error: writeError, reset: resetWriteContract } = useWriteContract();
+  const { data: hash, writeContract, isPending, error: writeError, reset: resetWriteContract, status } = useWriteContract();
+  const [txStartTime, setTxStartTime] = useState<number | null>(null);
+  
   const { isLoading: isConfirming, isSuccess: isTxSuccess, isError: isReceiptError } = useWaitForTransactionReceipt({
     hash,
-    timeout: 60000, // 60 seconds timeout
+    timeout: 120000, // 120 second timeout (increased for slow networks)
     confirmations: 1,
     query: {
-      retry: 3,
-      retryDelay: 2000,
+      retry: 5, // More retries
+      retryDelay: 2000, // Longer delay between retries
+      enabled: !!hash, // Only wait if we have hash
     },
   });
   
+  // Monitor status changes and hash
+  useEffect(() => {
+    console.log('📊 GameBoard transaction status:', {
+      status,
+      isPending,
+      hash,
+      hasError: !!writeError,
+      selectedChoice,
+      timestamp: new Date().toISOString(),
+    });
+
+    // If status is 'success' but no hash yet, wait a bit
+    if (status === 'success' && !hash) {
+      console.log('⚠️ Status is success but hash not received yet, waiting...');
+    }
+
+    // If status is 'error', handle it
+    if (status === 'error' && !writeError && selectedChoice) {
+      console.error('❌ Transaction status is error but no writeError');
+      setSelectedChoice(null);
+      alert('Transaction failed. Please try again.');
+    }
+  }, [status, isPending, hash, writeError, selectedChoice]);
+
+  // Monitor transaction status and detect stuck transactions
+  useEffect(() => {
+    if (isPending && !hash && txStartTime) {
+      const elapsed = Date.now() - txStartTime;
+      
+      // Log progress every 5 seconds
+      if (elapsed % 5000 < 100) {
+        console.log(`⏳ Waiting for transaction hash... (${Math.floor(elapsed / 1000)}s)`, {
+          status,
+          isPending,
+          hasError: !!writeError,
+        });
+      }
+      
+      // After 60 seconds, reset and show error
+      if (elapsed > 60000) {
+        console.error('❌ Transaction timeout - no hash received after 60 seconds');
+        setSelectedChoice(null);
+        alert('Transaction timeout. Please check your wallet and try again.');
+        resetWriteContract?.();
+      }
+    }
+  }, [isPending, hash, txStartTime, status, writeError, resetWriteContract]);
+
   // Handle writeError for makeChoice
   useEffect(() => {
     if (writeError && selectedChoice) {
       console.error('Error making choice:', writeError);
       // Reset selection on error
       setSelectedChoice(null);
+      setTxStartTime(null);
       
       // Show user-friendly error
       // Type assertion needed because shortMessage is not in the type definition
@@ -61,6 +113,7 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
     if (isTxSuccess && hash && selectedChoice) {
       console.log('Transaction confirmed:', hash);
       setShowApproved(true);
+      setTxStartTime(null);
       // Hide after 3 seconds
       const timer = setTimeout(() => {
         setShowApproved(false);
@@ -68,6 +121,14 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
       return () => clearTimeout(timer);
     }
   }, [isTxSuccess, hash, selectedChoice]);
+
+  // Store hash when received
+  useEffect(() => {
+    if (hash && selectedChoice) {
+      console.log('✅ Transaction hash received:', hash);
+      setTxStartTime(null);
+    }
+  }, [hash, selectedChoice]);
   const { data: gameData, isLoading: isLoadingGame } = useReadContract({
     address: CONTRACT_ADDRESS as `0x${string}`,
     abi: CONTRACT_ABI,
@@ -119,17 +180,19 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
     }
 
     setSelectedChoice(choiceId);
+    setTxStartTime(Date.now());
     
     try {
       // Send choice to contract - PRODUCTION MODE
       // Note: Wagmi v3 doesn't support callbacks - use hook state instead
+      console.log('📤 Sending makeChoice transaction for choice:', choiceId);
       writeContract({
         address: CONTRACT_ADDRESS as `0x${string}`,
         abi: CONTRACT_ABI,
         functionName: 'makeChoice',
         args: [choiceId],
       });
-      console.log('Transaction request sent for choice:', choiceId);
+      console.log('Transaction request sent, waiting for wallet approval and hash...');
     } catch (error: any) {
       console.error('Error making choice:', error);
       // Reset selection on error
@@ -353,9 +416,14 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
             <div className="flex items-center gap-4">
               <div className="w-6 h-6 border-3 border-blue-400 border-t-transparent rounded-full animate-spin shadow-[0_0_10px_rgba(59,130,246,1)]"></div>
               <p className="text-blue-400 font-mono font-bold uppercase tracking-wider">
-                {isPending ? 'Sending Transaction...' : 'Confirming transaction...'}
+                {isPending && !hash ? (status === 'pending' ? 'Waiting for wallet approval...' : 'Sending Transaction...') : 'Confirming transaction...'}
               </p>
             </div>
+            {txStartTime && !hash && (
+              <p className="text-gray-400 font-mono text-xs text-center mt-2">
+                Waiting {Math.floor((Date.now() - txStartTime) / 1000)}s...
+              </p>
+            )}
             {hash && (
               <a
                 href={`https://sepolia.basescan.org/tx/${hash}`}

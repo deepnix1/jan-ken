@@ -39,13 +39,13 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
   // This prevents UI from getting stuck on "confirming transaction"
   // Event listener will catch the match regardless of receipt status
   // Note: Wagmi v3 doesn't support onSuccess/onError callbacks in useWaitForTransactionReceipt
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
+  const { isLoading: isConfirming, isSuccess, isError: isReceiptError } = useWaitForTransactionReceipt({
     hash,
-    timeout: 15000, // Short timeout - 15 seconds
+    timeout: 120000, // 120 second timeout (increased for slow networks)
     confirmations: 1,
     query: {
-      retry: 1,
-      retryDelay: 1000,
+      retry: 5, // More retries
+      retryDelay: 2000, // Longer delay between retries
       enabled: !!hash, // Only wait if we have hash
     },
   });
@@ -76,6 +76,37 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
       console.log('Transaction status:', status);
     }
   }, [hash, status]);
+
+  // Monitor status changes - hash might come after status changes
+  useEffect(() => {
+    console.log('📊 Transaction status changed:', {
+      status,
+      isPending,
+      hash,
+      hasError: !!writeError,
+      timestamp: new Date().toISOString(),
+    });
+
+    // If status is 'success' but no hash yet, wait a bit
+    if (status === 'success' && !hash) {
+      console.log('⚠️ Status is success but hash not received yet, waiting...');
+      // Hash should come soon, give it 2 seconds
+      const timer = setTimeout(() => {
+        if (!hash) {
+          console.warn('⚠️ Hash still not received after status success');
+        }
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+
+    // If status is 'error', handle it
+    if (status === 'error' && !writeError) {
+      console.error('❌ Transaction status is error but no writeError');
+      setTxError('Transaction failed. Please try again.');
+      setHasJoinedQueue(false);
+      setTxStartTime(null);
+    }
+  }, [status, isPending, hash, writeError]);
   
   // Handle writeError from useWriteContract
   useEffect(() => {
@@ -114,17 +145,39 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
   useEffect(() => {
     if (isPending && !hash && txStartTime) {
       const elapsed = Date.now() - txStartTime;
-      if (elapsed > 45000) { // 45 seconds
-        console.warn('⚠️ Transaction seems stuck - no hash received after 45 seconds');
+      
+      // Log progress every 5 seconds
+      if (elapsed % 5000 < 100) {
+        console.log(`⏳ Waiting for transaction hash... (${Math.floor(elapsed / 1000)}s)`, {
+          status,
+          isPending,
+          hasError: !!writeError,
+        });
+      }
+      
+      // After 30 seconds, show warning but don't reset (transaction might still be processing)
+      if (elapsed > 30000 && elapsed < 60000) {
+        console.warn('⚠️ Transaction taking longer than expected - no hash received after 30 seconds');
         console.warn('Status:', status);
         console.warn('isPending:', isPending);
         console.warn('writeError:', writeError);
-        setTxError('Transaction is taking too long. Please check your wallet and try again.');
+        // Don't reset yet, just show warning
+        if (!txError) {
+          setTxError('Transaction is taking longer than expected. Please wait or check your wallet.');
+        }
+      }
+      
+      // After 60 seconds, reset and show error
+      if (elapsed > 60000) {
+        console.error('❌ Transaction timeout - no hash received after 60 seconds');
+        setTxError('Transaction timeout. Please check your wallet and try again.');
         setHasJoinedQueue(false);
         setTxStartTime(null);
+        // Reset writeContract to allow retry
+        resetWriteContract?.();
       }
     }
-  }, [isPending, hash, txStartTime, status, writeError]);
+  }, [isPending, hash, txStartTime, status, writeError, txError, resetWriteContract]);
   
   // Get pool status - count players waiting for this bet amount
   const [poolCount, setPoolCount] = useState<number>(0);
@@ -238,6 +291,11 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
         console.log('📤 Transaction request sent, waiting for wallet approval and hash...');
         console.log('Current status:', status);
         console.log('isPending:', isPending);
+        console.log('writeContract function:', typeof writeContract);
+        
+        // Set up a listener for status changes
+        // Note: In Wagmi v3, status changes are tracked via the hook
+        // We'll monitor it via useEffect above
       } catch (error: any) {
         console.error('❌ Error joining queue:', error);
         setHasJoinedQueue(false);
@@ -383,17 +441,22 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
         
         {/* Gaming Status Indicators - Mobile Responsive */}
         <div className="space-y-4 sm:space-y-5 w-full max-w-md px-4">
-          {isPending && (
+          {isPending && !hash && (
             <div className="flex flex-col items-center justify-center gap-3 sm:gap-4 px-4 sm:px-6 md:px-8 py-4 sm:py-5 bg-black/60 border-2 border-blue-500/40 rounded-lg shadow-[0_0_30px_rgba(59,130,246,0.4)]">
               <div className="flex items-center gap-3 sm:gap-4">
                 <div className="w-5 h-5 sm:w-6 sm:h-6 border-2 sm:border-3 border-blue-400 border-t-transparent rounded-full animate-spin shadow-[0_0_10px_rgba(59,130,246,1)]"></div>
                 <p className="text-blue-400 font-mono font-bold uppercase tracking-wider text-xs sm:text-sm md:text-base">
-                  Sending transaction...
+                  {status === 'pending' ? 'Waiting for wallet approval...' : 'Sending transaction...'}
                 </p>
               </div>
               <p className="text-gray-400 font-mono text-xs text-center mt-2">
-                Check your wallet for gas fee details
+                {txStartTime ? `Waiting ${Math.floor((Date.now() - txStartTime) / 1000)}s...` : 'Check your wallet for gas fee details'}
               </p>
+              {txStartTime && Date.now() - txStartTime > 30000 && (
+                <p className="text-yellow-400 font-mono text-xs text-center mt-1">
+                  Taking longer than expected. Please check your wallet.
+                </p>
+              )}
             </div>
           )}
           
