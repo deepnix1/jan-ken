@@ -10,6 +10,11 @@ import { GameBoard } from '@/components/GameBoard';
 import { Result } from '@/components/Result';
 import { MatchFoundAnimation } from '@/components/MatchFoundAnimation';
 
+// Disable SSR for this page (Wagmi doesn't work with SSR)
+export const dynamic = 'force-dynamic';
+export const dynamicParams = true;
+export const revalidate = 0;
+
 export default function Home() {
   const { isConnected, address } = useAccount();
   const { connect, connectors, isPending, error: connectError } = useConnect();
