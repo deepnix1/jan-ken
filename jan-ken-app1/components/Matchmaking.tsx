@@ -21,7 +21,46 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
   const [hasJoinedQueue, setHasJoinedQueue] = useState(false);
   const [txError, setTxError] = useState<string | null>(null);
   
-  const { data: hash, writeContract, isPending, error: writeError, reset: resetWriteContract, status } = useWriteContract();
+  const { data: hash, writeContract, isPending, error: writeError, reset: resetWriteContract, status } = useWriteContract({
+    mutation: {
+      onError: (error) => {
+        console.error('❌ writeContract mutation error (onError callback):', error);
+        console.error('Error details:', {
+          message: error?.message,
+          name: error?.name,
+          cause: (error as any)?.cause,
+          code: (error as any)?.code,
+          shortMessage: (error as any)?.shortMessage,
+        });
+        setTxError(`Transaction failed: ${error?.message || 'Unknown error'}`);
+        setHasJoinedQueue(false);
+        setTxStartTime(null);
+      },
+      onSuccess: (data) => {
+        console.log('✅ writeContract mutation success (onSuccess callback):', data);
+        console.log('Transaction hash from callback:', data);
+        if (data) {
+          setTxHash(data);
+          setHasJoinedQueue(true);
+          setTxError(null);
+        }
+      },
+      onMutate: (variables) => {
+        console.log('🔄 writeContract mutation started (onMutate callback):', variables);
+        console.log('This means writeContract was called and is processing...');
+      },
+      onSettled: (data, error) => {
+        console.log('🏁 writeContract mutation settled (onSettled callback):', {
+          data,
+          error: error ? {
+            message: error?.message,
+            name: error?.name,
+            code: (error as any)?.code,
+          } : null,
+        });
+      },
+    },
+  });
   const { data: connectorClient } = useConnectorClient();
   const [txHash, setTxHash] = useState<string | null>(null);
   const [txStartTime, setTxStartTime] = useState<number | null>(null);
@@ -455,13 +494,31 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
           
           // Try to get provider from connector client
           try {
+            // In Wagmi v3, connector client uses transport, not direct provider
+            // Provider is accessed via connector client's transport or account
             const connectorProvider = (connectorClient as any).provider;
-            console.log('  - Connector provider:', !!connectorProvider);
+            const connectorTransport = connectorClient.transport;
+            const connectorAccount = connectorClient.account;
+            
+            console.log('  - Connector provider (direct):', !!connectorProvider);
+            console.log('  - Connector transport:', !!connectorTransport);
+            console.log('  - Connector account:', !!connectorAccount);
+            
+            // Try to get provider from transport
+            if (connectorTransport) {
+              const transportProvider = (connectorTransport as any).value?.provider || (connectorTransport as any).provider;
+              console.log('  - Transport provider:', !!transportProvider);
+              if (transportProvider) {
+                console.log('  - Transport provider chainId:', transportProvider.chainId);
+              }
+            }
+            
             if (connectorProvider) {
               console.log('  - Connector provider chainId:', connectorProvider.chainId);
               console.log('  - Connector provider is same as Farcaster provider:', connectorProvider === farcasterProvider);
             } else {
               console.warn('  - ⚠️ Connector provider is not available in connector client');
+              console.warn('  - This is normal for Wagmi v3 - provider is accessed via transport');
             }
           } catch (err) {
             console.warn('  - Could not get connector provider:', err);
