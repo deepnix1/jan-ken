@@ -24,15 +24,34 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
   const { data: hash, writeContract, isPending, error: writeError, reset: resetWriteContract, status } = useWriteContract({
     mutation: {
       onError: (error) => {
-        console.error('❌ writeContract mutation error (onError callback):', error);
-        console.error('Error details:', {
+        // Safely extract error details (avoid BigInt serialization issues)
+        const errorDetails: any = {
           message: error?.message,
           name: error?.name,
-          cause: (error as any)?.cause,
           code: (error as any)?.code,
           shortMessage: (error as any)?.shortMessage,
-        });
-        setTxError(`Transaction failed: ${error?.message || 'Unknown error'}`);
+        };
+        
+        // Try to extract cause safely
+        try {
+          const cause = (error as any)?.cause;
+          if (cause) {
+            errorDetails.cause = {
+              message: cause?.message,
+              name: cause?.name,
+              code: cause?.code,
+            };
+          }
+        } catch (e) {
+          // Ignore cause extraction errors
+        }
+        
+        console.error('❌ writeContract mutation error (onError callback):', errorDetails);
+        console.error('Full error object:', error);
+        
+        // Extract user-friendly error message
+        const errorMessage = error?.message || (error as any)?.shortMessage || 'Transaction failed';
+        setTxError(`Transaction failed: ${errorMessage}`);
         setHasJoinedQueue(false);
         setTxStartTime(null);
       },
@@ -46,18 +65,34 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
         }
       },
       onMutate: (variables) => {
-        console.log('🔄 writeContract mutation started (onMutate callback):', variables);
+        // Convert BigInt values to string for logging (JSON.stringify can't serialize BigInt)
+        const variablesForLog = variables ? {
+          ...variables,
+          args: variables.args ? variables.args.map((arg: any) => 
+            typeof arg === 'bigint' ? arg.toString() : arg
+          ) : variables.args,
+          value: variables.value ? (typeof variables.value === 'bigint' ? variables.value.toString() : variables.value) : variables.value,
+        } : variables;
+        console.log('🔄 writeContract mutation started (onMutate callback):', variablesForLog);
         console.log('This means writeContract was called and is processing...');
       },
-      onSettled: (data, error) => {
-        console.log('🏁 writeContract mutation settled (onSettled callback):', {
-          data,
-          error: error ? {
+      onSettled: (data: any, error: any) => {
+        // Safely log settled state (avoid BigInt serialization issues)
+        const settledData: any = {
+          data: data ? (typeof data === 'bigint' ? data.toString() : String(data)) : data,
+          error: null,
+        };
+        
+        if (error) {
+          settledData.error = {
             message: error?.message,
             name: error?.name,
             code: (error as any)?.code,
-          } : null,
-        });
+            shortMessage: (error as any)?.shortMessage,
+          };
+        }
+        
+        console.log('🏁 writeContract mutation settled (onSettled callback):', settledData);
       },
     },
   });
