@@ -177,51 +177,31 @@ export default function Home() {
           <div className="relative bg-black/60 backdrop-blur-xl rounded-2xl sm:rounded-3xl border-2 border-cyan-400/30 shadow-[0_0_60px_rgba(34,211,238,0.2)] p-4 sm:p-6 md:p-8 lg:p-12 min-h-[50vh] sm:min-h-[60vh] flex items-center justify-center">
             {!isConnected ? (
               <div className="flex flex-col items-center gap-8 py-16">
-                <div className="text-center space-y-4">
-                  <h2 className="text-4xl sm:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400 drop-shadow-[0_0_20px_rgba(34,211,238,0.6)]">
-                    START YOUR GAME
-                  </h2>
-                  <p className="text-lg sm:text-xl text-gray-300 text-center max-w-lg font-medium leading-relaxed">
-                    Connect your wallet to begin playing Rock Paper Scissors on Base Network.
-                    <br />
-                    <span className="text-gray-400 text-base">Ensure you&apos;re connected to Base Sepolia network.</span>
-                  </p>
-                </div>
-                {connectors.length > 0 ? (
-                  <div className="space-y-4">
-                    <button
-                      onClick={handleConnect}
-                      disabled={isPending}
-                      className="relative px-8 py-4 bg-gradient-to-r from-cyan-500 to-purple-500 text-black font-black rounded-lg hover:from-cyan-400 hover:to-purple-400 transition-all transform hover:scale-105 shadow-[0_0_40px_rgba(34,211,238,0.6)] hover:shadow-[0_0_60px_rgba(34,211,238,0.8)] text-lg uppercase tracking-wider border-2 border-cyan-400/50 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-                    >
-                      <span className="relative z-10">{isPending ? 'Connecting...' : 'Connect Wallet'}</span>
-                      <div className="absolute inset-0 bg-cyan-400/20 blur-xl"></div>
-                    </button>
-                    {connectError && (
-                      <div className="mt-4 p-3 sm:p-4 bg-red-500/20 border border-red-500/50 rounded-lg w-full">
-                        <p className="text-red-400 text-xs sm:text-sm font-mono">
-                          Connection error: {
-                            (connectError && typeof connectError === 'object' && 'shortMessage' in connectError) 
-                              ? (connectError as any).shortMessage
-                              : (connectError && typeof connectError === 'object' && 'message' in connectError)
-                              ? (connectError as any).message
-                              : (typeof connectError === 'string')
-                              ? connectError
-                              : 'Unknown error'
-                          }
-                        </p>
-                        <p className="text-red-300 text-xs mt-2">
-                          Note: Farcaster Mini App connector only works in Farcaster client. For testing in browser, please install MetaMask extension.
-                        </p>
-                      </div>
-                    )}
+                  <div className="text-center space-y-4">
+                    <h2 className="text-4xl sm:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400 drop-shadow-[0_0_20px_rgba(34,211,238,0.6)]">
+                      WAITING FOR WALLET
+                    </h2>
+                    <p className="text-lg sm:text-xl text-gray-300 text-center max-w-lg font-medium leading-relaxed">
+                      Please connect your wallet to begin playing Rock Paper Scissors on Base Network.
+                      <br />
+                      <span className="text-gray-400 text-base">Ensure you&apos;re connected to Base Sepolia network.</span>
+                    </p>
                   </div>
-                ) : (
-                  <div className="mt-4 flex items-center gap-2 text-gray-400">
-                    <div className="w-3 h-3 bg-yellow-400 rounded-full animate-pulse shadow-[0_0_10px_rgba(234,179,8,0.8)]"></div>
-                    <span className="text-sm font-mono uppercase tracking-wider">Initializing wallet connector...</span>
-                  </div>
-                )}
+                 {connectError && (
+                   <div className="mt-4 p-3 sm:p-4 bg-red-500/20 border border-red-500/50 rounded-lg w-full max-w-md">
+                     <p className="text-red-400 text-xs sm:text-sm font-mono">
+                       Connection error: {
+                         (connectError && typeof connectError === 'object' && 'shortMessage' in connectError) 
+                           ? (connectError as any).shortMessage
+                           : (connectError && typeof connectError === 'object' && 'message' in connectError)
+                           ? (connectError as any).message
+                           : (typeof connectError === 'string')
+                           ? connectError
+                           : 'Unknown error'
+                       }
+                     </p>
+                   </div>
+                 )}
               </div>
             ) : (
               <>
