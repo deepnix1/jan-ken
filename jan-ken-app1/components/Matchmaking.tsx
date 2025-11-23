@@ -339,9 +339,35 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
             console.log('  - Farcaster provider:', !!farcasterProvider);
             if (farcasterProvider) {
               const providerAny = farcasterProvider as any;
-              console.log('  - Provider chainId:', providerAny.chainId);
-              console.log('  - Provider networkVersion:', providerAny.networkVersion);
-              console.log('  - Provider isConnected:', providerAny.isConnected);
+              
+              // Get chainId via request method (EIP-1193)
+              try {
+                const chainIdHex = await providerAny.request({ method: 'eth_chainId' });
+                const chainId = chainIdHex ? parseInt(chainIdHex, 16) : undefined;
+                console.log('  - Provider chainId (via request):', chainId);
+                console.log('  - Provider chainId (direct):', providerAny.chainId);
+                
+                if (chainId && chainId !== 84532) {
+                  console.error('  - ❌ Wrong chain ID! Expected 84532 (Base Sepolia), got:', chainId);
+                  setTxError(`Wrong network. Please switch to Base Sepolia (Chain ID: 84532). Current: ${chainId}`);
+                  setHasJoinedQueue(false);
+                  setTxStartTime(null);
+                  return;
+                }
+              } catch (err) {
+                console.warn('  - Could not get chainId from provider:', err);
+              }
+              
+              // Get network version
+              try {
+                const networkVersion = await providerAny.request({ method: 'net_version' });
+                console.log('  - Provider networkVersion (via request):', networkVersion);
+              } catch (err) {
+                console.warn('  - Could not get networkVersion from provider:', err);
+              }
+              
+              console.log('  - Provider networkVersion (direct):', providerAny.networkVersion);
+              console.log('  - Provider isConnected (direct):', providerAny.isConnected);
               console.log('  - Provider has request method:', typeof providerAny.request === 'function');
               console.log('  - Provider has send method:', typeof providerAny.send === 'function');
               
@@ -443,6 +469,27 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
             return;
           }
           
+          // Verify provider chainId matches expected network
+          if (farcasterProvider) {
+            try {
+              const providerAny = farcasterProvider as any;
+              const chainIdHex = await providerAny.request({ method: 'eth_chainId' });
+              const providerChainId = chainIdHex ? parseInt(chainIdHex, 16) : undefined;
+              
+              if (providerChainId && providerChainId !== 84532) {
+                console.error('❌ Provider chainId mismatch! Expected 84532, got:', providerChainId);
+                setTxError(`Wrong network. Please switch to Base Sepolia (Chain ID: 84532). Current: ${providerChainId}`);
+                setHasJoinedQueue(false);
+                setTxStartTime(null);
+                return;
+              }
+              
+              console.log('✅ Provider chainId verified:', providerChainId);
+            } catch (err) {
+              console.warn('⚠️ Could not verify provider chainId, proceeding anyway:', err);
+            }
+          }
+          
           // Use simulation data if available for better gas estimation
           if (simulateData && (simulateData as any).request) {
             console.log('📤 Using simulation data for gas estimation');
@@ -504,13 +551,27 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
                 
                 // Try to get more info from Farcaster SDK
                 if (sdk && sdk.wallet) {
-                  sdk.wallet.getEthereumProvider().then(provider => {
+                  sdk.wallet.getEthereumProvider().then(async (provider) => {
                     if (provider) {
                       const providerAny = provider as any;
-                      console.log('Provider state:', {
-                        chainId: providerAny.chainId,
-                        isConnected: providerAny.isConnected,
-                      });
+                      try {
+                        const chainIdHex = await providerAny.request({ method: 'eth_chainId' });
+                        const chainId = chainIdHex ? parseInt(chainIdHex, 16) : undefined;
+                        const accounts = await providerAny.request({ method: 'eth_accounts' });
+                        console.log('Provider state:', {
+                          chainId: chainId,
+                          chainIdDirect: providerAny.chainId,
+                          accounts: accounts,
+                          isConnected: providerAny.isConnected,
+                          hasRequest: typeof providerAny.request === 'function',
+                        });
+                      } catch (err) {
+                        console.error('Could not get provider state details:', err);
+                        console.log('Provider state (basic):', {
+                          chainId: providerAny.chainId,
+                          isConnected: providerAny.isConnected,
+                        });
+                      }
                     } else {
                       console.warn('Provider is null/undefined');
                     }
