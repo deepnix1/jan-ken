@@ -94,70 +94,84 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
     // Security: Validate inputs before sending transaction
     if (!isValidBetAmount(betAmount)) {
       console.error('Invalid bet amount:', betAmount);
+      setTxError('Invalid bet amount.');
       return;
     }
     
     if (!address || !isValidAddress(address)) {
       console.error('Invalid wallet address');
+      setTxError('Invalid wallet address.');
       return;
     }
     
     if (!CONTRACT_ADDRESS || !isValidAddress(CONTRACT_ADDRESS)) {
       console.error('Invalid contract address');
+      setTxError('Invalid contract address.');
       return;
     }
     
     // Show notification that wallet approval is needed
     console.log('Sending transaction - wallet approval required');
     
-    try {
-      // joinQueue fonksiyonunu çağır - aynı betAmount'u seçen oyuncular eşleşecek
-      // If there's already a player waiting, match will happen immediately
-      writeContract({
-        address: CONTRACT_ADDRESS as `0x${string}`,
-        abi: CONTRACT_ABI,
-        functionName: 'joinQueue',
-        args: [betAmount],
-        value: betAmount,
-      }, {
-        onSuccess: (txHash) => {
-          console.log('Transaction sent successfully:', txHash);
-          setHasJoinedQueue(true);
-          setTxError(null);
-          setTxHash(txHash);
-        },
-        onError: (error: any) => {
-          console.error('Error joining queue:', error);
-          setHasJoinedQueue(false);
-          
-          // User-friendly error messages
-          let errorMessage = 'Transaction failed';
-          if (error?.message?.includes('rejected') || error?.message?.includes('Rejected') || error?.message?.includes('User rejected')) {
-            errorMessage = 'Transaction was rejected. Please check your wallet and approve the transaction.';
-          } else if (error?.message?.includes('insufficient funds') || error?.message?.includes('Insufficient')) {
-            errorMessage = 'Insufficient funds. Please add more ETH to your wallet.';
-          } else if (error?.message?.includes('user rejected') || error?.message?.includes('User rejected')) {
-            errorMessage = 'Transaction was rejected. Please try again and approve in your wallet.';
-          } else if (error?.message) {
-            errorMessage = error.message;
-          }
-          
-          setTxError(errorMessage);
-        },
-      });
-    } catch (error: any) {
-      console.error('Error joining queue:', error);
-      setHasJoinedQueue(false);
-      
-      let errorMessage = 'Transaction failed';
-      if (error?.message?.includes('rejected') || error?.message?.includes('Rejected') || error?.message?.includes('User rejected')) {
-        errorMessage = 'Transaction was rejected. Please check your wallet and approve the transaction.';
-      } else if (error?.message) {
-        errorMessage = error.message;
+    // Small delay to ensure UI is ready before showing wallet popup
+    const sendTransaction = async () => {
+      try {
+        // joinQueue fonksiyonunu çağır - aynı betAmount'u seçen oyuncular eşleşecek
+        // If there's already a player waiting, match will happen immediately
+        writeContract({
+          address: CONTRACT_ADDRESS as `0x${string}`,
+          abi: CONTRACT_ABI,
+          functionName: 'joinQueue',
+          args: [betAmount],
+          value: betAmount,
+        }, {
+          onSuccess: (txHash) => {
+            console.log('Transaction sent successfully:', txHash);
+            setHasJoinedQueue(true);
+            setTxError(null);
+            setTxHash(txHash);
+          },
+          onError: (error: any) => {
+            console.error('Error joining queue:', error);
+            setHasJoinedQueue(false);
+            
+            // User-friendly error messages
+            let errorMessage = 'Transaction failed';
+            const errorMsg = error?.message || error?.shortMessage || String(error);
+            
+            if (errorMsg.includes('rejected') || errorMsg.includes('Rejected') || errorMsg.includes('User rejected') || errorMsg.includes('user rejected')) {
+              errorMessage = 'Transaction was rejected. Please check your wallet and approve the transaction when the popup appears.';
+            } else if (errorMsg.includes('insufficient funds') || errorMsg.includes('Insufficient')) {
+              errorMessage = 'Insufficient funds. Please add more ETH to your wallet.';
+            } else if (errorMsg.includes('denied') || errorMsg.includes('Denied')) {
+              errorMessage = 'Transaction was denied. Please approve in your wallet.';
+            } else if (errorMsg) {
+              errorMessage = errorMsg;
+            }
+            
+            setTxError(errorMessage);
+          },
+        });
+      } catch (error: any) {
+        console.error('Error joining queue:', error);
+        setHasJoinedQueue(false);
+        
+        let errorMessage = 'Transaction failed';
+        const errorMsg = error?.message || error?.shortMessage || String(error);
+        
+        if (errorMsg.includes('rejected') || errorMsg.includes('Rejected') || errorMsg.includes('User rejected') || errorMsg.includes('user rejected')) {
+          errorMessage = 'Transaction was rejected. Please check your wallet and approve the transaction when the popup appears.';
+        } else if (errorMsg) {
+          errorMessage = errorMsg;
+        }
+        
+        setTxError(errorMessage);
       }
-      
-      setTxError(errorMessage);
-    }
+    };
+    
+    // Small delay to ensure UI is ready
+    const timeoutId = setTimeout(sendTransaction, 100);
+    return () => clearTimeout(timeoutId);
   }, [isConnected, writeContract, betAmount, hasJoinedQueue, address]);
 
   // Poll game status as fallback if event doesn't fire
