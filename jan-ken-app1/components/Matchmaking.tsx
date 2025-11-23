@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useWriteContract, useWaitForTransactionReceipt, useAccount, useWatchContractEvent } from 'wagmi';
+import { useWriteContract, useWaitForTransactionReceipt, useAccount, useWatchContractEvent, useSimulateContract } from 'wagmi';
 import { formatEther } from 'viem';
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from '@/lib/contract';
 import { isValidBetAmount, isValidAddress } from '@/lib/security';
@@ -22,6 +22,18 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
   const { data: hash, writeContract, isPending, error: writeError, reset: resetWriteContract, status } = useWriteContract();
   const [txHash, setTxHash] = useState<string | null>(null);
   const [txStartTime, setTxStartTime] = useState<number | null>(null);
+  
+  // Simulate contract call before sending transaction
+  const { data: simulateData, error: simulateError } = useSimulateContract({
+    address: CONTRACT_ADDRESS as `0x${string}`,
+    abi: CONTRACT_ABI,
+    functionName: 'joinQueue',
+    args: [betAmount],
+    value: betAmount,
+    query: {
+      enabled: isConnected && !!address && !!betAmount && !hasJoinedQueue,
+    },
+  });
   
   // Don't wait for receipt - rely on event listener instead
   // This prevents UI from getting stuck on "confirming transaction"
@@ -175,19 +187,55 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
         console.log('Contract address:', CONTRACT_ADDRESS);
         console.log('Bet amount:', betAmount.toString());
         console.log('Address:', address);
+        console.log('Simulate data:', simulateData);
+        console.log('Simulate error:', simulateError);
+        
+        // Check simulation error first
+        if (simulateError) {
+          console.error('❌ Simulation error:', simulateError);
+          setHasJoinedQueue(false);
+          setTxStartTime(null);
+          
+          let errorMessage = 'Transaction simulation failed';
+          const errorMsg = simulateError?.message || simulateError?.shortMessage || String(simulateError);
+          
+          if (errorMsg.includes('insufficient funds') || errorMsg.includes('Insufficient')) {
+            errorMessage = 'Insufficient funds. Please add more ETH to your wallet.';
+          } else if (errorMsg) {
+            errorMessage = errorMsg;
+          }
+          
+          setTxError(errorMessage);
+          return;
+        }
+        
+        // Check if simulation is ready
+        if (!simulateData) {
+          console.warn('⚠️ Simulation not ready yet, waiting...');
+          return;
+        }
+        
         setTxError(null);
         setTxStartTime(Date.now());
         
         // joinQueue fonksiyonunu çağır - aynı betAmount'u seçen oyuncular eşleşecek
         // If there's already a player waiting, match will happen immediately
         // Note: writeContract doesn't return a promise, it updates the hook state
-        writeContract({
+        // Use simulateData.request if available (Wagmi v3)
+        const writeParams: any = {
           address: CONTRACT_ADDRESS as `0x${string}`,
           abi: CONTRACT_ABI,
           functionName: 'joinQueue',
           args: [betAmount],
           value: betAmount,
-        });
+        };
+        
+        // If simulation data is available, use it
+        if (simulateData?.request) {
+          writeContract(simulateData.request);
+        } else {
+          writeContract(writeParams);
+        }
         
         console.log('📤 Transaction request sent, waiting for wallet approval and hash...');
         console.log('Current status:', status);
@@ -216,10 +264,16 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
       }
     };
     
+    // Wait for simulation to complete before sending transaction
+    if (!simulateData && !simulateError) {
+      // Simulation is still loading, wait
+      return;
+    }
+    
     // Small delay to ensure UI is ready
     const timeoutId = setTimeout(sendTransaction, 100);
     return () => clearTimeout(timeoutId);
-  }, [isConnected, writeContract, betAmount, hasJoinedQueue, address, status]);
+  }, [isConnected, writeContract, betAmount, hasJoinedQueue, address, status, simulateData, simulateError]);
 
   // Poll game status as fallback if event doesn't fire
   // This handles cases where event listener might miss the event
