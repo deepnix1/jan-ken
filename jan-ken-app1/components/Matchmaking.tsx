@@ -107,6 +107,9 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
       return;
     }
     
+    // Show notification that wallet approval is needed
+    console.log('Sending transaction - wallet approval required');
+    
     try {
       // joinQueue fonksiyonunu çağır - aynı betAmount'u seçen oyuncular eşleşecek
       // If there's already a player waiting, match will happen immediately
@@ -129,8 +132,8 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
           
           // User-friendly error messages
           let errorMessage = 'Transaction failed';
-          if (error?.message?.includes('rejected') || error?.message?.includes('Rejected')) {
-            errorMessage = 'Transaction was rejected. Please approve in your wallet.';
+          if (error?.message?.includes('rejected') || error?.message?.includes('Rejected') || error?.message?.includes('User rejected')) {
+            errorMessage = 'Transaction was rejected. Please check your wallet and approve the transaction.';
           } else if (error?.message?.includes('insufficient funds') || error?.message?.includes('Insufficient')) {
             errorMessage = 'Insufficient funds. Please add more ETH to your wallet.';
           } else if (error?.message?.includes('user rejected') || error?.message?.includes('User rejected')) {
@@ -147,8 +150,8 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
       setHasJoinedQueue(false);
       
       let errorMessage = 'Transaction failed';
-      if (error?.message?.includes('rejected') || error?.message?.includes('Rejected')) {
-        errorMessage = 'Transaction was rejected. Please approve in your wallet.';
+      if (error?.message?.includes('rejected') || error?.message?.includes('Rejected') || error?.message?.includes('User rejected')) {
+        errorMessage = 'Transaction was rejected. Please check your wallet and approve the transaction.';
       } else if (error?.message) {
         errorMessage = error.message;
       }
