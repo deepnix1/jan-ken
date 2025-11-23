@@ -196,37 +196,22 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
     setTxStartTime(Date.now());
     
     try {
-      // Prepare transaction parameters
-      const txParams: any = {
-        address: CONTRACT_ADDRESS as `0x${string}`,
-        abi: CONTRACT_ABI,
-        functionName: 'makeChoice',
-        args: [choiceId],
-      };
-      
-      // Add gas parameters from simulateData if available
-      // This helps wallet show correct fee estimate
-      if (simulateData) {
-        const simData = simulateData as any;
-        if (simData.gas) {
-          txParams.gas = simData.gas;
-        }
-        if (simData.maxFeePerGas) {
-          txParams.maxFeePerGas = simData.maxFeePerGas;
-        }
-        if (simData.maxPriorityFeePerGas) {
-          txParams.maxPriorityFeePerGas = simData.maxPriorityFeePerGas;
-        }
-        if (simData.gasPrice) {
-          txParams.gasPrice = simData.gasPrice;
-        }
-        console.log('📤 Using gas parameters from simulation');
+      // Wagmi v3 best practice: Use simulateData.request if available
+      // This includes all gas parameters and ensures wallet shows correct fee
+      if (simulateData && (simulateData as any).request) {
+        console.log('📤 Using simulateData.request for makeChoice (Wagmi v3 best practice)');
+        // Use the request object directly - it includes all necessary parameters
+        writeContract((simulateData as any).request);
       } else {
+        // Fallback: send without simulation data (wallet will estimate)
         console.log('📤 Sending makeChoice transaction (wallet will estimate gas)');
+        writeContract({
+          address: CONTRACT_ADDRESS as `0x${string}`,
+          abi: CONTRACT_ABI,
+          functionName: 'makeChoice',
+          args: [choiceId],
+        });
       }
-      
-      // Send transaction - wallet will show popup
-      writeContract(txParams);
       console.log('Transaction request sent, waiting for wallet approval and hash...');
     } catch (error: any) {
       console.error('Error making choice:', error);
