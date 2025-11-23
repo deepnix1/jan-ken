@@ -9,8 +9,6 @@ import { Matchmaking } from '@/components/Matchmaking';
 import { GameBoard } from '@/components/GameBoard';
 import { Result } from '@/components/Result';
 import { MatchFoundAnimation } from '@/components/MatchFoundAnimation';
-import { ContractMonitor } from '@/components/ContractMonitor';
-import { WalletMonitor } from '@/components/WalletMonitor';
 
 // Disable SSR for this page (Wagmi doesn't work with SSR)
 export const dynamic = 'force-dynamic';
@@ -391,13 +389,6 @@ export default function Home() {
       </div>
           </main>
           
-          {/* Contract Monitor - Testing Tool (enable with NEXT_PUBLIC_ENABLE_MONITOR=true) */}
-          {typeof window !== 'undefined' && (process.env.NEXT_PUBLIC_ENABLE_MONITOR === 'true' || process.env.NODE_ENV === 'development') && (
-            <ContractMonitor />
-          )}
-          
-          {/* Wallet Monitor - Always visible for transaction monitoring */}
-          {typeof window !== 'undefined' && <WalletMonitor />}
           </>
         );
       }

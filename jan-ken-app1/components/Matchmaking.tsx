@@ -1,12 +1,10 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useWriteContract, useWaitForTransactionReceipt, useAccount, useWatchContractEvent, useSimulateContract } from 'wagmi';
 import { formatEther } from 'viem';
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from '@/lib/contract';
 import { isValidBetAmount, isValidAddress } from '@/lib/security';
-import { useTransactionMonitor } from '@/hooks/useTransactionMonitor';
-import { verifyTransaction } from '@/lib/contractTest';
 
 interface MatchmakingProps {
   betAmount: bigint;
@@ -24,27 +22,6 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
   const { data: hash, writeContract, isPending, error: writeError, reset: resetWriteContract, status } = useWriteContract();
   const [txHash, setTxHash] = useState<string | null>(null);
   const [txStartTime, setTxStartTime] = useState<number | null>(null);
-  const txIdRef = useRef<string | null>(null);
-  
-  // Transaction monitoring system
-  const { startTransaction, updateTransaction, getTransaction } = useTransactionMonitor({
-    enableAutoRetry: true,
-    pendingTimeout: 30000,
-    sendingTimeout: 60000,
-    logLevel: 'info',
-    onRetry: (id, state) => {
-      console.log('🔄 Auto-retry triggered for transaction:', id, state);
-      // Reset state to allow retry
-      setHasJoinedQueue(false);
-      setTxError(null);
-      setTxStartTime(null);
-      resetWriteContract?.();
-    },
-    onStuck: (id, state, reason) => {
-      console.warn('⚠️ Transaction stuck:', id, reason, state);
-      setTxError(`Transaction stuck in ${reason}. Auto-recovery will attempt retry.`);
-    },
-  });
   
   // Simulate contract call before sending transaction
   const { data: simulateData, error: simulateError } = useSimulateContract({
@@ -77,15 +54,9 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
   const [showApproved, setShowApproved] = useState(false);
   
   useEffect(() => {
-    if (isSuccess && hash && txIdRef.current) {
+    if (isSuccess && hash) {
       console.log('Transaction confirmed:', hash);
       setShowApproved(true);
-      
-      // Update monitoring system
-      updateTransaction(txIdRef.current, {
-        status: 'confirmed',
-        hash: hash as `0x${string}`,
-      });
       
       // Hide after 3 seconds
       const timer = setTimeout(() => {
@@ -93,53 +64,20 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
       }, 3000);
       return () => clearTimeout(timer);
     }
-  }, [isSuccess, hash, updateTransaction]);
+  }, [isSuccess, hash]);
   
   // Store hash when transaction is sent and update state
   useEffect(() => {
-    if (hash && txIdRef.current) {
+    if (hash) {
       setTxHash(hash);
       setHasJoinedQueue(true);
       setTxError(null);
       setTxStartTime(null);
       console.log('✅ Transaction hash received:', hash);
       console.log('Transaction status:', status);
-      
-      // Update monitoring system
-      updateTransaction(txIdRef.current, {
-        status: 'sent',
-        hash: hash as `0x${string}`,
-      });
-      
-      // Verify transaction was sent to contract
-      verifyTransaction(hash as `0x${string}`, 'joinQueue', CONTRACT_ADDRESS as `0x${string}`)
-        .then((result) => {
-          if (result.success) {
-            console.log('✅ Transaction verified - sent to contract:', result.data);
-            updateTransaction(txIdRef.current!, {
-              metadata: {
-                ...getTransaction(txIdRef.current!)?.metadata,
-                verified: true,
-                blockNumber: result.data?.blockNumber,
-                gasUsed: result.data?.gasUsed,
-              },
-            });
-          } else {
-            console.error('❌ Transaction verification failed:', result.message, result.error);
-            updateTransaction(txIdRef.current!, {
-              metadata: {
-                ...getTransaction(txIdRef.current!)?.metadata,
-                verified: false,
-                verificationError: result.error || result.message,
-              },
-            });
-          }
-        })
-        .catch((error) => {
-          console.error('❌ Error verifying transaction:', error);
-        });
+      console.log('✅ Transaction sent to contract:', CONTRACT_ADDRESS);
     }
-  }, [hash, status, updateTransaction, getTransaction]);
+  }, [hash, status]);
 
   // Monitor status changes - hash might come after status changes
   useEffect(() => {
@@ -151,25 +89,6 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
       timestamp: new Date().toISOString(),
     });
 
-    // Update monitoring system with status changes
-    if (txIdRef.current) {
-      const txState = getTransaction(txIdRef.current);
-      if (txState) {
-        if (status === 'pending' && txState.status !== 'pending') {
-          updateTransaction(txIdRef.current, { status: 'pending' });
-        } else if (status === 'success' && hash && txState.status !== 'sent') {
-          updateTransaction(txIdRef.current, {
-            status: 'sent',
-            hash: hash as `0x${string}`,
-          });
-        } else if (status === 'error') {
-          updateTransaction(txIdRef.current, {
-            status: 'failed',
-            error: writeError?.message || 'Transaction failed',
-          });
-        }
-      }
-    }
 
     // If status is 'success' but no hash yet, wait a bit
     if (status === 'success' && !hash) {
@@ -189,14 +108,8 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
       setTxError('Transaction failed. Please try again.');
       setHasJoinedQueue(false);
       setTxStartTime(null);
-      if (txIdRef.current) {
-        updateTransaction(txIdRef.current, {
-          status: 'failed',
-          error: 'Transaction failed',
-        });
-      }
     }
-  }, [status, isPending, hash, writeError, updateTransaction, getTransaction]);
+  }, [status, isPending, hash, writeError]);
   
   // Handle writeError from useWriteContract
   useEffect(() => {
@@ -379,48 +292,26 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
         setTxError(null);
         setTxStartTime(Date.now());
         
-        // Start transaction monitoring
-        const txId = `joinQueue-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-        txIdRef.current = txId;
-        startTransaction(
-          txId,
-          'joinQueue',
-          CONTRACT_ADDRESS as `0x${string}`,
-          [betAmount],
-          betAmount,
-          {
-            betAmount: betAmount.toString(),
-            address,
-            contractAddress: CONTRACT_ADDRESS,
-          }
-        );
-        updateTransaction(txId, { status: 'pending' });
+        // Send transaction directly - don't wait for simulation
+        // This ensures transaction is sent immediately
+        console.log('📤 Sending transaction to contract...');
+        console.log('Contract:', CONTRACT_ADDRESS);
+        console.log('Function: joinQueue');
+        console.log('Args:', [betAmount]);
+        console.log('Value:', betAmount.toString());
         
-        // Wagmi v3 best practice: Use simulateData.request if available
-        // This includes all gas parameters and ensures wallet shows correct fee
-        if (simulateData && (simulateData as any).request) {
-          console.log('📤 Using simulateData.request (Wagmi v3 best practice)');
-          console.log('Simulate request:', (simulateData as any).request);
-          // Use the request object directly - it includes all necessary parameters
-          writeContract((simulateData as any).request);
-          updateTransaction(txId, { status: 'sending' });
-        } else {
-          // Fallback: send without simulation data (wallet will estimate)
-          console.log('📤 Sending transaction without simulation (wallet will estimate gas)');
-          writeContract({
-            address: CONTRACT_ADDRESS as `0x${string}`,
-            abi: CONTRACT_ABI,
-            functionName: 'joinQueue' as const,
-            args: [betAmount],
-            value: betAmount,
-          });
-          updateTransaction(txId, { status: 'sending' });
-        }
+        // Direct call - no simulation dependency
+        writeContract({
+          address: CONTRACT_ADDRESS as `0x${string}`,
+          abi: CONTRACT_ABI,
+          functionName: 'joinQueue' as const,
+          args: [betAmount],
+          value: betAmount,
+        });
         
         console.log('📤 Transaction request sent, waiting for wallet approval and hash...');
         console.log('Current status:', status);
         console.log('isPending:', isPending);
-        console.log('Transaction ID:', txId);
         
         // Set up a listener for status changes
         // Note: In Wagmi v3, status changes are tracked via the hook
@@ -446,37 +337,14 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
         }
         
         setTxError(errorMessage);
-        
-        // Update monitoring system
-        if (txIdRef.current) {
-          updateTransaction(txIdRef.current, {
-            status: 'failed',
-            error: errorMessage,
-          });
-        }
       }
     };
     
-    // Wait for simulation to be ready before sending (if enabled)
-    // This ensures gas parameters are available for wallet popup
-    // But don't wait too long - if simulation fails, send anyway
-    if (simulateData && (simulateData as any).request) {
-      // Simulation is ready, send immediately
-      const timeoutId = setTimeout(sendTransaction, 100);
-      return () => clearTimeout(timeoutId);
-    } else if (simulateError && !simulateError.message?.includes('insufficient funds')) {
-      // Simulation failed but not critical, send anyway (wallet will estimate)
-      const timeoutId = setTimeout(sendTransaction, 200);
-      return () => clearTimeout(timeoutId);
-    } else {
-      // Wait a bit for simulation to complete (max 2 seconds)
-      const timeoutId = setTimeout(() => {
-        // If simulation still not ready, send anyway
-        sendTransaction();
-      }, 2000);
-      return () => clearTimeout(timeoutId);
-    }
-  }, [isConnected, writeContract, betAmount, hasJoinedQueue, address, status, simulateData, simulateError]);
+    // Send transaction immediately - don't wait for simulation
+    // Simulation is optional, wallet will estimate gas if needed
+    const timeoutId = setTimeout(sendTransaction, 100);
+    return () => clearTimeout(timeoutId);
+  }, [isConnected, writeContract, betAmount, hasJoinedQueue, address]);
 
   // Poll game status as fallback if event doesn't fire
   // This handles cases where event listener might miss the event
