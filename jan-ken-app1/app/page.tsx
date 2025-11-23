@@ -26,27 +26,45 @@ export default function Home() {
   const previousAddressRef = useRef<string | undefined>(undefined);
 
   // Call sdk.actions.ready() when app is fully loaded (per Farcaster docs)
+  // This must be called as early as possible to hide the splash screen
   useEffect(() => {
     const initApp = async () => {
       try {
-        // Wait for app to be fully loaded before calling ready()
-        if (typeof window !== 'undefined' && sdk && typeof sdk.actions !== 'undefined') {
-          // Ensure all components are mounted and ready
+        // Wait for SDK to be available (with retries)
+        let retries = 0;
+        const maxRetries = 10;
+        
+        while (retries < maxRetries) {
+          if (typeof window !== 'undefined' && sdk && typeof sdk.actions !== 'undefined' && typeof sdk.actions.ready === 'function') {
+            try {
+              await sdk.actions.ready();
+              setAppReady(true);
+              console.log('✅ Farcaster SDK ready() called successfully - splash screen hidden');
+              return;
+            } catch (readyError) {
+              console.error('Error calling sdk.actions.ready():', readyError);
+              // Continue anyway
+              setAppReady(true);
+              return;
+            }
+          }
+          
+          // Wait a bit and retry
           await new Promise(resolve => setTimeout(resolve, 100));
-          await sdk.actions.ready();
-          setAppReady(true);
-          console.log('App ready - splash screen hidden');
-        } else {
-          // Not in Farcaster environment, continue anyway
-          setAppReady(true);
+          retries++;
         }
+        
+        // If SDK not available after retries, continue anyway
+        console.warn('⚠️ Farcaster SDK not available after retries, continuing anyway');
+        setAppReady(true);
       } catch (error) {
-        console.error('Error calling sdk.actions.ready():', error);
+        console.error('Error initializing app:', error);
         // Continue anyway - might be running outside Farcaster
         setAppReady(true);
       }
     };
     
+    // Call immediately, don't wait
     initApp();
   }, []);
 

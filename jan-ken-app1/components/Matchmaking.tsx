@@ -391,6 +391,9 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
                   Sending transaction...
                 </p>
               </div>
+              <p className="text-gray-400 font-mono text-xs text-center mt-2">
+                Check your wallet for gas fee details
+              </p>
             </div>
           )}
           
