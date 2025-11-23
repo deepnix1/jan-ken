@@ -25,7 +25,7 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
   const [gameFinished, setGameFinished] = useState(false);
   // TEST MODE: Wallet check temporarily disabled
 
-  const { data: hash, writeContract, isPending, error: writeError } = useWriteContract();
+  const { data: hash, writeContract, isPending, error: writeError, reset: resetWriteContract } = useWriteContract();
   const { isLoading: isConfirming, isSuccess: isTxSuccess, isError: isReceiptError } = useWaitForTransactionReceipt({
     hash,
     timeout: 60000, // 60 seconds timeout
@@ -35,6 +35,31 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
       retryDelay: 2000,
     },
   });
+  
+  // Handle writeError for makeChoice
+  useEffect(() => {
+    if (writeError && selectedChoice) {
+      console.error('Error making choice:', writeError);
+      // Reset selection on error
+      setSelectedChoice(null);
+      
+      // Show user-friendly error
+      const errorMsg = writeError?.message || writeError?.shortMessage || String(writeError);
+      if (errorMsg.includes('rejected') || errorMsg.includes('Rejected') || errorMsg.includes('User rejected')) {
+        alert('Transaction was rejected. Please approve in your wallet and try again.');
+      } else {
+        alert(`Transaction failed: ${errorMsg}`);
+      }
+    }
+  }, [writeError, selectedChoice]);
+  
+  // Handle successful transaction
+  useEffect(() => {
+    if (hash && selectedChoice) {
+      console.log('Transaction sent successfully:', hash);
+      // Don't reset selectedChoice here - let the game logic handle it
+    }
+  }, [hash, selectedChoice]);
   const { data: gameData, isLoading: isLoadingGame } = useReadContract({
     address: CONTRACT_ADDRESS as `0x${string}`,
     abi: CONTRACT_ABI,
