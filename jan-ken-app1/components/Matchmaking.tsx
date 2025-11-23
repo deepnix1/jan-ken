@@ -100,15 +100,18 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
   const [txHash, setTxHash] = useState<string | null>(null);
   const [txStartTime, setTxStartTime] = useState<number | null>(null);
   
-  // Simulate contract call before sending transaction
-  const { data: simulateData, error: simulateError } = useSimulateContract({
+  // Simulate contract call before sending transaction (per Wagmi best practices)
+  // This validates the transaction and provides gas estimation
+  const { data: simulateData, error: simulateError, status: simulateStatus } = useSimulateContract({
     address: CONTRACT_ADDRESS as `0x${string}`,
     abi: CONTRACT_ABI,
     functionName: 'joinQueue',
     args: [betAmount],
     value: betAmount,
     query: {
-      enabled: isConnected && !!address && !!betAmount && !hasJoinedQueue,
+      enabled: isConnected && !!address && !!betAmount && !hasJoinedQueue && !!connectorClient,
+      retry: 3,
+      retryDelay: 1000,
     },
   });
   
@@ -486,8 +489,33 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
         console.log('Address:', address);
         console.log('Chain ID:', chainId);
         console.log('Is connected:', isConnected);
+        console.log('Simulate status:', simulateStatus);
         console.log('Simulate data:', simulateData);
         console.log('Simulate error:', simulateError);
+        
+        // CRITICAL: Wait for simulation to complete before sending transaction
+        // Per Wagmi best practices, we should use simulateData.request for gas estimation
+        if (simulateStatus === 'pending') {
+          console.warn('⚠️ Simulation is still pending, waiting for it to complete...');
+          return; // Wait for simulation to complete
+        }
+        
+        if (simulateStatus === 'error' && simulateError) {
+          const errorMsg = simulateError?.message || (simulateError as any)?.shortMessage || String(simulateError);
+          if (errorMsg.includes('insufficient funds') || errorMsg.includes('Insufficient')) {
+            console.error('❌ Simulation error: Insufficient funds');
+            setHasJoinedQueue(false);
+            setTxStartTime(null);
+            setTxError('Insufficient funds. Please add more ETH to your wallet.');
+            return;
+          }
+          console.warn('⚠️ Simulation error (non-critical), proceeding anyway:', errorMsg);
+        }
+        
+        if (!simulateData && simulateStatus !== 'error') {
+          console.warn('⚠️ Simulation data not available yet, waiting...');
+          return; // Wait for simulation to complete
+        }
         
         // Check Wagmi connector client - CRITICAL CHECK
         console.log('🔍 Wagmi connector client check:');
