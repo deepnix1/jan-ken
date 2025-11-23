@@ -25,47 +25,34 @@ export default function Home() {
   const [appReady, setAppReady] = useState(false);
   const previousAddressRef = useRef<string | undefined>(undefined);
 
-  // Call sdk.actions.ready() when app is fully loaded (per Farcaster docs)
-  // This must be called as early as possible to hide the splash screen
+  // Call sdk.actions.ready() when interface is ready (per Farcaster docs)
+  // https://miniapps.farcaster.xyz/docs/guides/loading
+  // "You should call ready as soon as possible while avoiding jitter and content reflows"
   useEffect(() => {
-    const initApp = async () => {
+    // Check if we're in a Farcaster Mini App environment
+    if (typeof window === 'undefined') return;
+    
+    // Call ready when interface is loaded
+    // Use a small delay to ensure DOM is ready and avoid jitter
+    const timer = setTimeout(() => {
       try {
-        // Wait for SDK to be available (with retries)
-        let retries = 0;
-        const maxRetries = 10;
-        
-        while (retries < maxRetries) {
-          if (typeof window !== 'undefined' && sdk && typeof sdk.actions !== 'undefined' && typeof sdk.actions.ready === 'function') {
-            try {
-              await sdk.actions.ready();
-              setAppReady(true);
-              console.log('✅ Farcaster SDK ready() called successfully - splash screen hidden');
-              return;
-            } catch (readyError) {
-              console.error('Error calling sdk.actions.ready():', readyError);
-              // Continue anyway
-              setAppReady(true);
-              return;
-            }
-          }
-          
-          // Wait a bit and retry
-          await new Promise(resolve => setTimeout(resolve, 100));
-          retries++;
+        if (sdk && typeof sdk.actions !== 'undefined' && typeof sdk.actions.ready === 'function') {
+          sdk.actions.ready();
+          setAppReady(true);
+          console.log('✅ Farcaster SDK ready() called - splash screen hidden');
+        } else {
+          // Not in Farcaster environment, continue anyway
+          console.log('Not in Farcaster Mini App environment');
+          setAppReady(true);
         }
-        
-        // If SDK not available after retries, continue anyway
-        console.warn('⚠️ Farcaster SDK not available after retries, continuing anyway');
-        setAppReady(true);
       } catch (error) {
-        console.error('Error initializing app:', error);
+        console.error('Error calling sdk.actions.ready():', error);
         // Continue anyway - might be running outside Farcaster
         setAppReady(true);
       }
-    };
+    }, 0); // Call as soon as possible after mount
     
-    // Call immediately, don't wait
-    initApp();
+    return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {
