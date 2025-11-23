@@ -13,7 +13,7 @@ export function Result({ onPlayAgain, onTieRematch }: ResultProps) {
   const { address } = useAccount();
   const [result, setResult] = useState<'win' | 'lose' | 'tie' | 'loading'>('loading');
   const [prize, setPrize] = useState<string>('0');
-  const [fireworks, setFireworks] = useState<Array<{ id: number; x: number; y: number; color: string }>>([]);
+  const [fireworks, setFireworks] = useState<Array<{ id: number; x: number; y: number; color: string; tx: number; ty: number }>>([]);
   const [sakura, setSakura] = useState<Array<{ id: number; x: number; delay: number; duration: number }>>([]);
 
   const { data: gameData } = useReadContract({
