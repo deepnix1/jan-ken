@@ -14,6 +14,7 @@
     "@farcaster/miniapp-wagmi-connector": "^1.1.0",
     "@metamask/sdk": "^0.34.0",
     "@tanstack/react-query": "^5.81.5",
+    "@wagmi/core": "^2.15.0",
     "next": "^14.2.18",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
