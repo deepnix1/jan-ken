@@ -1243,8 +1243,8 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
     functionName: 'getWaitingPlayersCount',
     args: [betAmount],
     query: {
-      enabled: isConnected && !!address && !!betAmount && hasJoinedQueue,
-      refetchInterval: 3000, // Refetch every 3 seconds when enabled
+      enabled: isConnected && !!address && !!betAmount && (hasJoinedQueue || isMatching), // Enable when matching too
+      refetchInterval: 2000, // Refetch every 2 seconds when enabled (more aggressive)
     },
   });
 
@@ -1270,9 +1270,10 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
     });
     
     let pollCount = 0;
-    const maxPolls = 30; // Poll for 60 seconds (30 * 2 seconds) - increased for better reliability
+    const maxPolls = 60; // Poll for 120 seconds (60 * 2 seconds) - increased for better reliability
     
     // Poll every 2 seconds to check if game was created
+    // More aggressive polling for matchmaking
     const pollInterval = setInterval(async () => {
       pollCount++;
       console.log(`🔄 Polling game status (attempt ${pollCount}/${maxPolls})...`);
@@ -1287,9 +1288,22 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
         // Log queue count
         if (queueData?.data !== undefined) {
           const count = Number(queueData.data);
-          console.log('👥 Queue count for bet level:', count);
+          console.log('👥 Queue count for bet level:', count, 'betAmount:', betAmount.toString());
           if (count >= 2 && isMatching) {
             console.warn('⚠️ Queue has 2+ players but no match yet - contract might have an issue');
+            console.warn('⚠️ This could mean:');
+            console.warn('   - Transaction\'lar farklı block\'larda onaylandı');
+            console.warn('   - _matchPlayers içinde bir hata oldu (E18 - bet amounts don\'t match?)');
+            console.warn('   - Contract state güncellenmedi');
+            // Force a more aggressive check
+            console.log('🔄 Forcing immediate game status check...');
+            setTimeout(() => {
+              refetchGame();
+            }, 500);
+          } else if (count === 1 && isMatching) {
+            console.log('⏳ Queue has 1 player (us) - waiting for another player...');
+          } else if (count === 0 && isMatching) {
+            console.warn('⚠️ Queue is empty but we think we\'re matching - might be a state issue');
           }
         }
         
@@ -1346,8 +1360,12 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
         
         // Stop polling after max attempts
         if (pollCount >= maxPolls) {
-          console.warn('⚠️ Polling timeout - no match found after 60 seconds');
+          console.warn('⚠️ Polling timeout - no match found after 120 seconds');
           console.warn('⚠️ This might indicate a problem with matchmaking');
+          console.warn('⚠️ Possible causes:');
+          console.warn('   - No other players in queue');
+          console.warn('   - Contract matchmaking logic issue');
+          console.warn('   - Network/RPC issues');
           clearInterval(pollInterval);
         }
       } catch (error) {
@@ -1356,11 +1374,11 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
       }
     }, 2000); // Poll every 2 seconds
     
-    // Stop polling after 60 seconds (match should happen by then)
+    // Stop polling after 120 seconds (match should happen by then)
     const timeout = setTimeout(() => {
-      console.log('⏰ Polling timeout reached (60 seconds)');
+      console.log('⏰ Polling timeout reached (120 seconds)');
       clearInterval(pollInterval);
-    }, 60000); // Increased to 60 seconds
+    }, 120000); // Increased to 120 seconds
     
     return () => {
       console.log('🛑 Stopping game status polling');
