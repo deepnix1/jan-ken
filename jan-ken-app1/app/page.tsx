@@ -29,30 +29,63 @@ export default function Home() {
   // https://miniapps.farcaster.xyz/docs/guides/loading
   // "You should call ready as soon as possible while avoiding jitter and content reflows"
   useEffect(() => {
-    // Check if we're in a Farcaster Mini App environment
     if (typeof window === 'undefined') return;
     
-    // Call ready when interface is loaded
-    // Use a small delay to ensure DOM is ready and avoid jitter
-    const timer = setTimeout(() => {
+    let mounted = true;
+    
+    // Function to call ready() when SDK is available
+    const callReady = () => {
       try {
-        if (sdk && typeof sdk.actions !== 'undefined' && typeof sdk.actions.ready === 'function') {
+        // Check if SDK is available
+        if (sdk && sdk.actions && typeof sdk.actions.ready === 'function') {
           sdk.actions.ready();
-          setAppReady(true);
-          console.log('✅ Farcaster SDK ready() called - splash screen hidden');
-        } else {
-          // Not in Farcaster environment, continue anyway
-          console.log('Not in Farcaster Mini App environment');
-          setAppReady(true);
+          if (mounted) {
+            setAppReady(true);
+            console.log('✅ Farcaster SDK ready() called - splash screen hidden');
+          }
+          return true;
         }
+        return false;
       } catch (error) {
         console.error('Error calling sdk.actions.ready():', error);
-        // Continue anyway - might be running outside Farcaster
-        setAppReady(true);
+        if (mounted) {
+          setAppReady(true);
+        }
+        return false;
       }
-    }, 0); // Call as soon as possible after mount
+    };
     
-    return () => clearTimeout(timer);
+    // Try immediately
+    if (callReady()) {
+      return;
+    }
+    
+    // If SDK not ready, wait for it with polling
+    let attempts = 0;
+    const maxAttempts = 50; // 5 seconds max (50 * 100ms)
+    
+    const checkSDK = setInterval(() => {
+      attempts++;
+      
+      if (callReady()) {
+        clearInterval(checkSDK);
+        return;
+      }
+      
+      if (attempts >= maxAttempts) {
+        clearInterval(checkSDK);
+        // SDK not available, continue anyway
+        console.warn('⚠️ Farcaster SDK not available after waiting');
+        if (mounted) {
+          setAppReady(true);
+        }
+      }
+    }, 100); // Check every 100ms
+    
+    return () => {
+      mounted = false;
+      clearInterval(checkSDK);
+    };
   }, []);
 
   useEffect(() => {
