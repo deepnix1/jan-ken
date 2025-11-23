@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useWriteContract, useWaitForTransactionReceipt, useAccount, useWatchContractEvent, useSimulateContract, useChainId, useConnectorClient } from 'wagmi';
+import { useWriteContract, useWaitForTransactionReceipt, useAccount, useWatchContractEvent, useSimulateContract, useChainId, useConnectorClient, useReadContract } from 'wagmi';
 import { sdk } from '@farcaster/miniapp-sdk';
 import { formatEther } from 'viem';
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from '@/lib/contract';
@@ -144,6 +144,19 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
   const { data: connectorClient } = useConnectorClient();
   const [txHash, setTxHash] = useState<string | null>(null);
   const [txStartTime, setTxStartTime] = useState<number | null>(null);
+  
+  // Check user's current game status before joining queue
+  // This helps prevent E15 error (player already in queue)
+  const { data: currentGame, refetch: refetchGame } = useReadContract({
+    address: CONTRACT_ADDRESS as `0x${string}`,
+    abi: CONTRACT_ABI,
+    functionName: 'getMyGame',
+    args: address ? [address] : undefined,
+    query: {
+      enabled: isConnected && !!address,
+      retry: 2,
+    },
+  });
   
   // Simulate contract call before sending transaction (per Wagmi best practices)
   // This validates the transaction and provides gas estimation
@@ -614,7 +627,7 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
           console.error('❌ Simulation error short message:', errorShortMessage || 'none');
           console.error('❌ Simulation error code:', errorCode);
           
-          // Only block if it's a critical error (insufficient funds)
+          // Only block if it's a critical error (insufficient funds or E15 - player already in queue)
           if (errorMsg.includes('insufficient funds') || 
               errorMsg.includes('Insufficient') ||
               errorMsg.includes('insufficient balance')) {
@@ -622,6 +635,19 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
             setHasJoinedQueue(false);
             setTxStartTime(null);
             setTxError('Insufficient funds. Please add more ETH to your wallet.');
+            return;
+          }
+          
+          // E15 error: Player already in queue (player1 == player2 in _matchPlayers)
+          // This happens when user tries to join queue while already in queue
+          if (errorMsg.includes('E15') || errorMsg.includes('E5')) {
+            console.error('❌ Simulation error: Player already in queue (E15/E5) - BLOCKING transaction');
+            console.error('❌ User already has an active game or is already in queue');
+            setHasJoinedQueue(false);
+            setTxStartTime(null);
+            setTxError('You are already in the queue or have an active game. Please wait for a match or finish your current game.');
+            // Refetch game status to update UI
+            refetchGame();
             return;
           }
           
@@ -1053,7 +1079,7 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
       const timeoutId = setTimeout(sendTransaction, 500);
       return () => clearTimeout(timeoutId);
     }
-  }, [isConnected, writeContract, betAmount, hasJoinedQueue, address, simulateData, simulateStatus, simulateError, chainId, connectorClient, resetWriteContract]);
+  }, [isConnected, writeContract, betAmount, hasJoinedQueue, address, simulateData, simulateStatus, simulateError, chainId, connectorClient, resetWriteContract, currentGame, refetchGame]);
 
   // Poll game status as fallback if event doesn't fire
   // This handles cases where event listener might miss the event
