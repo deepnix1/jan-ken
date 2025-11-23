@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useWriteContract, useWaitForTransactionReceipt, useAccount, useWatchContractEvent, useSimulateContract, useChainId } from 'wagmi';
+import { useWriteContract, useWaitForTransactionReceipt, useAccount, useWatchContractEvent, useSimulateContract, useChainId, useConnectorClient } from 'wagmi';
 import { sdk } from '@farcaster/miniapp-sdk';
 import { formatEther } from 'viem';
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from '@/lib/contract';
@@ -22,6 +22,7 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
   const [txError, setTxError] = useState<string | null>(null);
   
   const { data: hash, writeContract, isPending, error: writeError, reset: resetWriteContract, status } = useWriteContract();
+  const { data: connectorClient } = useConnectorClient();
   const [txHash, setTxHash] = useState<string | null>(null);
   const [txStartTime, setTxStartTime] = useState<number | null>(null);
   
@@ -404,6 +405,27 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
         console.log('Is connected:', isConnected);
         console.log('Simulate data:', simulateData);
         console.log('Simulate error:', simulateError);
+        
+        // Check Wagmi connector client
+        console.log('🔍 Wagmi connector client check:');
+        console.log('  - Connector client available:', !!connectorClient);
+        if (connectorClient) {
+          console.log('  - Connector client account:', connectorClient.account);
+          console.log('  - Connector client chain:', connectorClient.chain);
+          console.log('  - Connector client transport:', !!connectorClient.transport);
+          
+          // Try to get provider from connector client
+          try {
+            const connectorProvider = (connectorClient as any).provider;
+            console.log('  - Connector provider:', !!connectorProvider);
+            if (connectorProvider) {
+              console.log('  - Connector provider chainId:', connectorProvider.chainId);
+              console.log('  - Connector provider is same as Farcaster provider:', connectorProvider === farcasterProvider);
+            }
+          } catch (err) {
+            console.warn('  - Could not get connector provider:', err);
+          }
+        }
         
         // Check simulation error - only block if it's a critical error (insufficient funds)
         if (simulateError) {
