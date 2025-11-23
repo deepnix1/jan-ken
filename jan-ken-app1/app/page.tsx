@@ -12,7 +12,6 @@ import { MatchFoundAnimation } from '@/components/MatchFoundAnimation';
 
 // Disable SSR for this page (Wagmi doesn't work with SSR)
 export const dynamic = 'force-dynamic';
-export const revalidate = false;
 
 export default function Home() {
   const { isConnected, address } = useAccount();
