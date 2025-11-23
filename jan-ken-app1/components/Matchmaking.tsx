@@ -38,6 +38,7 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
   // Don't wait for receipt - rely on event listener instead
   // This prevents UI from getting stuck on "confirming transaction"
   // Event listener will catch the match regardless of receipt status
+  // Note: Wagmi v3 doesn't support onSuccess/onError callbacks in useWaitForTransactionReceipt
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
     hash,
     timeout: 15000, // Short timeout - 15 seconds
@@ -47,14 +48,14 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
       retryDelay: 1000,
       enabled: !!hash, // Only wait if we have hash
     },
-    onSuccess: () => {
-      console.log('Transaction confirmed:', hash);
-    },
-    onError: (error) => {
-      console.log('Transaction receipt wait failed (continuing anyway):', error);
-      // Don't block UI - event listener will catch the match
-    },
   });
+  
+  // Handle transaction confirmation via useEffect
+  useEffect(() => {
+    if (isSuccess && hash) {
+      console.log('Transaction confirmed:', hash);
+    }
+  }, [isSuccess, hash]);
   
   // Store hash when transaction is sent and update state
   useEffect(() => {
