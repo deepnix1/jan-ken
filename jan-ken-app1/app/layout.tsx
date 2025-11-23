@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Source_Code_Pro } from "next/font/google";
 import dynamic from "next/dynamic";
+import { Analytics } from '@vercel/analytics/react';
 import "./globals.css";
 
 // Dynamically import RootProvider to avoid SSR issues with Wagmi
@@ -75,6 +76,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${inter.variable} ${sourceCodePro.variable}`} style={{ margin: 0, padding: 0, background: '#000' }}>
         <RootProvider>{children}</RootProvider>
+        <Analytics />
       </body>
     </html>
   );
