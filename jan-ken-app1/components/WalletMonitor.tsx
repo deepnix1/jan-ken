@@ -95,11 +95,11 @@ export function WalletMonitor() {
     loadTransactions();
     loadBalance();
     
-    // Refresh every 10 seconds
+    // Refresh every 5 seconds (more frequent for better monitoring)
     const interval = setInterval(() => {
       loadTransactions();
       loadBalance();
-    }, 10000);
+    }, 5000);
 
     return () => {
       clearInterval(interval);
@@ -108,6 +108,17 @@ export function WalletMonitor() {
       }
     };
   }, []);
+
+  // Auto-refresh when monitoring is active
+  useEffect(() => {
+    if (isMonitoring) {
+      const interval = setInterval(() => {
+        loadTransactions();
+        loadBalance();
+      }, 3000); // Even more frequent when monitoring
+      return () => clearInterval(interval);
+    }
+  }, [isMonitoring]);
 
   return (
     <div className="fixed bottom-4 left-4 w-[500px] max-h-[80vh] overflow-y-auto bg-black/95 backdrop-blur-lg border-2 border-purple-400/50 rounded-lg p-4 shadow-[0_0_30px_rgba(168,85,247,0.4)] z-50">
@@ -120,11 +131,14 @@ export function WalletMonitor() {
         </div>
         <div className="flex gap-2">
           <button
-            onClick={loadTransactions}
+            onClick={() => {
+              loadTransactions();
+              loadBalance();
+            }}
             disabled={isLoading}
             className="px-3 py-1 bg-purple-500/20 border border-purple-400 rounded text-purple-400 text-sm hover:bg-purple-500/30 disabled:opacity-50"
           >
-            {isLoading ? 'Loading...' : 'Refresh'}
+            {isLoading ? 'Loading...' : 'Check Now'}
           </button>
           <button
             onClick={startMonitoring}
@@ -146,6 +160,11 @@ export function WalletMonitor() {
         <div className="text-xs text-gray-400 mt-1">
           {transactions.length} transactions found
         </div>
+        {transactions.length > 0 && transactions[0].isContractCall && (
+          <div className="text-xs text-green-400 mt-2 font-bold">
+            ✅ Latest transaction sent to contract!
+          </div>
+        )}
       </div>
 
       <div className="border-t border-purple-400/30 pt-4 mb-4">
