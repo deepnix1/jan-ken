@@ -44,7 +44,7 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
       setSelectedChoice(null);
       
       // Show user-friendly error
-      const errorMsg = writeError?.message || writeError?.shortMessage || String(writeError);
+      const errorMsg = writeError?.message || (writeError as any)?.shortMessage || String(writeError);
       if (errorMsg.includes('rejected') || errorMsg.includes('Rejected') || errorMsg.includes('User rejected')) {
         alert('Transaction was rejected. Please approve in your wallet and try again.');
       } else {

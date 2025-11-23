@@ -83,7 +83,7 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
       setTxStartTime(null);
       
       let errorMessage = 'Transaction failed';
-      const errorMsg = writeError?.message || writeError?.shortMessage || writeError?.cause?.message || String(writeError);
+      const errorMsg = writeError?.message || (writeError as any)?.shortMessage || (writeError as any)?.cause?.message || String(writeError);
       
       if (errorMsg.includes('rejected') || errorMsg.includes('Rejected') || errorMsg.includes('User rejected') || errorMsg.includes('user rejected')) {
         errorMessage = 'Transaction was rejected. Please check your wallet and approve the transaction when the popup appears.';
@@ -197,7 +197,7 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
           setTxStartTime(null);
           
           let errorMessage = 'Transaction simulation failed';
-          const errorMsg = simulateError?.message || simulateError?.shortMessage || String(simulateError);
+          const errorMsg = simulateError?.message || (simulateError as any)?.shortMessage || String(simulateError);
           
           if (errorMsg.includes('insufficient funds') || errorMsg.includes('Insufficient')) {
             errorMessage = 'Insufficient funds. Please add more ETH to your wallet.';
