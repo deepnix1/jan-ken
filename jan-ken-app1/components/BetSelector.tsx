@@ -2,15 +2,17 @@
 
 import { useState, useEffect } from 'react';
 import { parseEther } from 'viem';
-import { getEthPrice, calculateEthAmount } from '@/lib/ethPrice';
+import { getEthPrice } from '@/lib/ethPrice';
 
-const USD_BET_LEVELS = [
-  { level: 1, usd: 5, emoji: '💵', color: 'from-green-500 to-emerald-600' },
-  { level: 2, usd: 10, emoji: '💶', color: 'from-blue-500 to-cyan-600' },
-  { level: 3, usd: 50, emoji: '💷', color: 'from-purple-500 to-pink-600' },
-  { level: 4, usd: 100, emoji: '💴', color: 'from-orange-500 to-red-600' },
-  { level: 5, usd: 500, emoji: '💰', color: 'from-yellow-500 to-amber-600' },
-  { level: 6, usd: 1000, emoji: '💎', color: 'from-indigo-500 to-violet-600' },
+// Contract'taki sabit BET_LEVEL'lar (RockPaperScissors.sol)
+// Bu değerler contract'taki BET_LEVEL_1-6 ile tam olarak eşleşmeli!
+const CONTRACT_BET_LEVELS = [
+  { level: 1, eth: '0.0015', emoji: '💵', color: 'from-green-500 to-emerald-600' }, // BET_LEVEL_1 = 0.0015 ether
+  { level: 2, eth: '0.003', emoji: '💶', color: 'from-blue-500 to-cyan-600' },    // BET_LEVEL_2 = 0.003 ether
+  { level: 3, eth: '0.015', emoji: '💷', color: 'from-purple-500 to-pink-600' },   // BET_LEVEL_3 = 0.015 ether
+  { level: 4, eth: '0.03', emoji: '💴', color: 'from-orange-500 to-red-600' },   // BET_LEVEL_4 = 0.03 ether
+  { level: 5, eth: '0.15', emoji: '💰', color: 'from-yellow-500 to-amber-600' },   // BET_LEVEL_5 = 0.15 ether
+  { level: 6, eth: '0.3', emoji: '💎', color: 'from-indigo-500 to-violet-600' },   // BET_LEVEL_6 = 0.3 ether
 ];
 
 interface BetSelectorProps {
@@ -22,7 +24,7 @@ export function BetSelector({ onSelect }: BetSelectorProps) {
   const [ethPrice, setEthPrice] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Fetch ETH price on mount and update every minute
+  // Fetch ETH price on mount and update every minute (for display only)
   useEffect(() => {
     const fetchPrice = async () => {
       try {
@@ -47,27 +49,23 @@ export function BetSelector({ onSelect }: BetSelectorProps) {
   const handleSelect = (level: number, ethAmount: string) => {
     // Wallet connection is enforced at page level
     setSelectedLevel(level);
+    // Use contract's exact bet level (must match contract BET_LEVEL_1-6)
     const betAmount = parseEther(ethAmount);
     onSelect(betAmount);
   };
 
-  // Calculate bet levels based on current ETH price
-  const betLevels = ethPrice
-    ? USD_BET_LEVELS.map((bet) => {
-        const ethAmount = calculateEthAmount(bet.usd, ethPrice);
-        return {
-          ...bet,
-          amount: ethAmount,
-          label: `$${bet.usd}`,
-          eth: `${parseFloat(ethAmount).toFixed(6)} ETH`,
-        };
-      })
-    : USD_BET_LEVELS.map((bet) => ({
-        ...bet,
-        amount: '0',
-        label: `$${bet.usd}`,
-        eth: 'Loading...',
-      }));
+  // Use contract's fixed bet levels (must match contract BET_LEVEL_1-6 exactly)
+  // Calculate USD equivalent for display only
+  const betLevels = CONTRACT_BET_LEVELS.map((bet) => {
+    const ethAmount = parseFloat(bet.eth);
+    const usdAmount = ethPrice ? (ethAmount * ethPrice).toFixed(2) : '...';
+    return {
+      ...bet,
+      amount: bet.eth, // Use contract's exact ETH amount
+      label: ethPrice ? `$${usdAmount}` : `~$${usdAmount}`,
+      eth: `${bet.eth} ETH`,
+    };
+  });
 
   const getGamingColor = (level: number) => {
     // Japanese/Logo-inspired colors: Red, Blue, Yellow/Orange, Purple, Yellow, Indigo
