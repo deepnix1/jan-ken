@@ -85,6 +85,10 @@ export function RootProvider({ children }: { children: ReactNode }) {
       },
       connectors,
       ssr: false, // Disable SSR for wagmi
+      // Enable batch for better performance
+      batch: {
+        multicall: true,
+      },
     });
   }, [mounted, metaMaskConnector]);
 

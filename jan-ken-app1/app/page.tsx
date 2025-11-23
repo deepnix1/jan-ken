@@ -194,30 +194,49 @@ export default function Home() {
   
   // Monitor connector client creation and auto-reconnect if needed
   useEffect(() => {
-    if (isConnected && address && !connectorClient) {
-      console.warn('⚠️ Connected but connector client not available - attempting reconnect...');
-      // Wait a bit for connector client to be created
-      const timeout = setTimeout(() => {
-        if (!connectorClient) {
-          console.error('❌ Connector client still not available after wait - reconnecting...');
-          disconnect();
-          setTimeout(() => {
-            const farcasterConnector = connectors.find(c => c.name === 'Farcaster Mini App' || c.name?.includes('Farcaster'));
-            if (farcasterConnector) {
-              console.log('🔄 Reconnecting with Farcaster connector...');
-              connect({ connector: farcasterConnector });
-            }
-          }, 500);
-        }
-      }, 2000);
-      return () => clearTimeout(timeout);
-    }
-    
-    if (isConnected && address && connectorClient) {
-      console.log('✅ Connector client available:', {
-        account: connectorClient.account?.address,
-        chain: connectorClient.chain?.id,
+    if (isConnected && address) {
+      console.log('🔍 Connector client status check:', {
+        isConnected,
+        address,
+        connectorClientAvailable: !!connectorClient,
+        connectorClientAccount: connectorClient?.account?.address,
+        connectorClientChain: connectorClient?.chain?.id,
+        connectorsCount: connectors.length,
+        connectorNames: connectors.map(c => c.name),
       });
+      
+      // If connected but no connector client, wait a bit then reconnect
+      if (!connectorClient) {
+        console.warn('⚠️ Connected but connector client not available - waiting 2 seconds...');
+        const timeout = setTimeout(() => {
+          if (!connectorClient) {
+            console.error('❌ Connector client still not available after 2 seconds');
+            console.error('Attempting to reconnect...');
+            
+            // Get active connector
+            const activeConnector = connectors.find(c => c.name === 'Farcaster Mini App' || c.name?.includes('Farcaster'));
+            if (activeConnector) {
+              console.log('🔄 Disconnecting and reconnecting with Farcaster connector...');
+              disconnect();
+              setTimeout(() => {
+                console.log('🔄 Reconnecting...');
+                connect({ connector: activeConnector });
+              }, 1000);
+            } else {
+              console.error('❌ Farcaster connector not found for reconnect');
+            }
+          } else {
+            console.log('✅ Connector client created after wait');
+          }
+        }, 2000);
+        return () => clearTimeout(timeout);
+      } else {
+        console.log('✅ Connector client is available:', {
+          account: connectorClient.account?.address,
+          chain: connectorClient.chain?.id,
+          chainName: connectorClient.chain?.name,
+        });
+      }
     }
   }, [isConnected, address, connectorClient, connectors, connect, disconnect]);
 
