@@ -45,7 +45,7 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
       
       // Show user-friendly error
       // Type assertion needed because shortMessage is not in the type definition
-      const errorMsg = writeError?.message || (writeError as any)?.shortMessage || String(writeError);
+      const errorMsg = (writeError?.message) || ((writeError as any)?.shortMessage) || String(writeError);
       if (errorMsg.includes('rejected') || errorMsg.includes('Rejected') || errorMsg.includes('User rejected')) {
         alert('Transaction was rejected. Please approve in your wallet and try again.');
       } else {
