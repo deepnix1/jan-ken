@@ -1,5 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  output: 'standalone',
+  // Disable static optimization for dynamic content
+  experimental: {
+    serverComponentsExternalPackages: ['viem', 'wagmi', '@farcaster/miniapp-sdk', '@farcaster/miniapp-wagmi-connector'],
+  },
   // Security: Force HTTPS in production
   async headers() {
     return [
