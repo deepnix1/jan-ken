@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useWriteContract, useWaitForTransactionReceipt, useAccount, useWatchContractEvent, useSimulateContract } from 'wagmi';
+import { useWriteContract, useWaitForTransactionReceipt, useAccount, useWatchContractEvent, useSimulateContract, useChainId } from 'wagmi';
 import { formatEther } from 'viem';
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from '@/lib/contract';
 import { isValidBetAmount, isValidAddress } from '@/lib/security';
@@ -15,6 +15,7 @@ interface MatchmakingProps {
 
 export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound = false }: MatchmakingProps) {
   const { address, isConnected } = useAccount();
+  const chainId = useChainId();
   const [isMatching, setIsMatching] = useState(true);
   const [hasJoinedQueue, setHasJoinedQueue] = useState(false);
   const [txError, setTxError] = useState<string | null>(null);
@@ -129,18 +130,29 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
       const errorMsg = writeError?.message || (writeError as any)?.shortMessage || (writeError as any)?.cause?.message || String(writeError);
       
       if (errorMsg.includes('rejected') || errorMsg.includes('Rejected') || errorMsg.includes('User rejected') || errorMsg.includes('user rejected')) {
-        errorMessage = 'Transaction was rejected. Please check your wallet and approve the transaction when the popup appears.';
+        errorMessage = 'Transaction was rejected. Please check your wallet popup and approve the transaction. Make sure you are on Base Sepolia network (Chain ID: 84532).';
+        // Reset state to allow retry
+        resetWriteContract?.();
       } else if (errorMsg.includes('insufficient funds') || errorMsg.includes('Insufficient')) {
         errorMessage = 'Insufficient funds. Please add more ETH to your wallet.';
       } else if (errorMsg.includes('denied') || errorMsg.includes('Denied')) {
         errorMessage = 'Transaction was denied. Please approve in your wallet.';
       } else if (errorMsg.includes('timeout') || errorMsg.includes('Timeout')) {
         errorMessage = 'Transaction timeout. Please try again.';
+      } else if (errorMsg.includes('network') || errorMsg.includes('Network')) {
+        errorMessage = 'Network error. Please check your connection and try again.';
       } else if (errorMsg) {
-        errorMessage = errorMsg;
+        errorMessage = `Transaction failed: ${errorMsg}`;
       }
       
       setTxError(errorMessage);
+      console.error('Transaction error details:', {
+        error: writeError,
+        errorMessage,
+        contract: CONTRACT_ADDRESS,
+        betAmount: betAmount.toString(),
+        address,
+      });
     }
   }, [writeError]);
   
@@ -240,6 +252,13 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
   useEffect(() => {
     if (!isConnected || !writeContract || hasJoinedQueue) return;
     
+    // Check network - Base Sepolia chain ID is 84532
+    if (chainId !== 84532) {
+      console.error('Wrong network! Current chain ID:', chainId, 'Expected: 84532 (Base Sepolia)');
+      setTxError('Please switch to Base Sepolia network. Current network is not supported.');
+      return;
+    }
+    
     // Security: Validate inputs before sending transaction
     if (!isValidBetAmount(betAmount)) {
       console.error('Invalid bet amount:', betAmount);
@@ -292,22 +311,42 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
         setTxError(null);
         setTxStartTime(Date.now());
         
-        // Send transaction directly - don't wait for simulation
-        // This ensures transaction is sent immediately
+        // Send transaction with proper gas estimation
         console.log('📤 Sending transaction to contract...');
         console.log('Contract:', CONTRACT_ADDRESS);
         console.log('Function: joinQueue');
-        console.log('Args:', [betAmount]);
-        console.log('Value:', betAmount.toString());
+        console.log('Args:', [betAmount.toString()]);
+        console.log('Value:', betAmount.toString(), 'wei =', (Number(betAmount) / 1e18).toFixed(6), 'ETH');
+        console.log('From:', address);
         
-        // Direct call - no simulation dependency
-        writeContract({
-          address: CONTRACT_ADDRESS as `0x${string}`,
-          abi: CONTRACT_ABI,
-          functionName: 'joinQueue' as const,
-          args: [betAmount],
-          value: betAmount,
-        });
+        // Use simulation data if available for better gas estimation
+        // Otherwise send directly and let wallet estimate
+        if (simulateData && (simulateData as any).request) {
+          console.log('📤 Using simulation data for gas estimation');
+          try {
+            writeContract((simulateData as any).request);
+          } catch (err: any) {
+            console.error('Error using simulation request, falling back to direct call:', err);
+            // Fallback to direct call
+            writeContract({
+              address: CONTRACT_ADDRESS as `0x${string}`,
+              abi: CONTRACT_ABI,
+              functionName: 'joinQueue' as const,
+              args: [betAmount],
+              value: betAmount,
+            });
+          }
+        } else {
+          console.log('📤 Sending transaction directly (wallet will estimate gas)');
+          // Direct call - wallet will estimate gas
+          writeContract({
+            address: CONTRACT_ADDRESS as `0x${string}`,
+            abi: CONTRACT_ABI,
+            functionName: 'joinQueue' as const,
+            args: [betAmount],
+            value: betAmount,
+          });
+        }
         
         console.log('📤 Transaction request sent, waiting for wallet approval and hash...');
         console.log('Current status:', status);
@@ -340,11 +379,18 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
       }
     };
     
-    // Send transaction immediately - don't wait for simulation
-    // Simulation is optional, wallet will estimate gas if needed
-    const timeoutId = setTimeout(sendTransaction, 100);
-    return () => clearTimeout(timeoutId);
-  }, [isConnected, writeContract, betAmount, hasJoinedQueue, address]);
+    // Wait a bit for simulation to complete if available
+    // This helps with gas estimation but don't wait too long
+    if (simulateData && (simulateData as any).request) {
+      // Simulation ready, send immediately
+      const timeoutId = setTimeout(sendTransaction, 200);
+      return () => clearTimeout(timeoutId);
+    } else {
+      // Wait max 1 second for simulation, then send anyway
+      const timeoutId = setTimeout(sendTransaction, 1000);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [isConnected, writeContract, betAmount, hasJoinedQueue, address, simulateData, chainId]);
 
   // Poll game status as fallback if event doesn't fire
   // This handles cases where event listener might miss the event
@@ -510,16 +556,22 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
                 {txError || writeError?.message || 'Transaction failed'}
               </p>
               {(txError?.includes('rejected') || writeError?.message?.includes('rejected')) && (
-                <div className="mt-2 text-center">
+                <div className="mt-2 text-center space-y-3">
                   <p className="text-gray-400 font-mono text-xs mb-2">
-                    Please check your wallet and approve the transaction.
+                    Transaction was rejected. Please:
                   </p>
+                  <ul className="text-gray-400 font-mono text-xs text-left space-y-1 mb-3 max-w-md mx-auto">
+                    <li>1. ✓ Check your wallet popup is open</li>
+                    <li>2. ✓ Make sure you are on Base Sepolia network</li>
+                    <li>3. ✓ Approve the transaction in your wallet</li>
+                    <li>4. ✓ Ensure you have enough ETH for gas fees</li>
+                  </ul>
                   <button
                     onClick={() => {
                       setHasJoinedQueue(false);
                       setTxError(null);
                       resetWriteContract?.(); // Reset writeContract state
-                      // Retry transaction
+                      // Component will automatically retry via useEffect
                     }}
                     className="px-6 py-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400 font-mono text-sm hover:bg-red-500/30 transition-colors font-bold uppercase tracking-wider"
                   >
