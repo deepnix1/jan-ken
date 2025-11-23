@@ -398,6 +398,34 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
   // PRODUCTION: Real matchmaking using smart contract
   // No test mode - wallet connection is required
 
+  // Watch for PlayerJoinedQueue event - track when players join queue
+  // This helps us detect if 2 players are in queue but match hasn't happened
+  useWatchContractEvent({
+    address: CONTRACT_ADDRESS as `0x${string}`,
+    abi: CONTRACT_ABI,
+    eventName: 'PlayerJoinedQueue',
+    enabled: isConnected && !!address && hasJoinedQueue, // Only watch when we're in queue
+    onLogs(logs) {
+      console.log('👥 PlayerJoinedQueue event received:', logs.length, 'events');
+      logs.forEach((log: any) => {
+        console.log('👥 Player joined queue:', {
+          player: log.args?.player,
+          betLevel: log.args?.betLevel?.toString(),
+          transactionHash: log.transactionHash,
+        });
+      });
+      
+      // If we're waiting for a match and someone joined, check if we should match
+      if (isMatching && hasJoinedQueue) {
+        console.log('👥 Someone joined queue, checking if match should happen...');
+        // Trigger a game status check after a short delay
+        setTimeout(() => {
+          refetchGame();
+        }, 1000);
+      }
+    },
+  });
+
   // Watch for GameCreated event - this means a match was found
   // IMPORTANT: Event listener should be active even before transaction completes
   // because match can happen when another player joins after us
@@ -1208,6 +1236,18 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
     }
   }, [isConnected, writeContract, betAmount, hasJoinedQueue, address, simulateData, simulateStatus, simulateError, chainId, connectorClient, resetWriteContract, currentGame, refetchGame]);
 
+  // Read queue count for this bet level
+  const { data: queueCount, refetch: refetchQueueCount } = useReadContract({
+    address: CONTRACT_ADDRESS as `0x${string}`,
+    abi: CONTRACT_ABI,
+    functionName: 'getWaitingPlayersCount',
+    args: [betAmount],
+    query: {
+      enabled: isConnected && !!address && !!betAmount && hasJoinedQueue,
+      refetchInterval: 3000, // Refetch every 3 seconds when enabled
+    },
+  });
+
   // Poll game status as fallback if event doesn't fire
   // This handles cases where event listener might miss the event
   // Also handles cases where user is already in queue (E5 error)
@@ -1226,6 +1266,7 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
       hasJoinedQueue,
       isMatching,
       address,
+      queueCount: queueCount?.toString(),
     });
     
     let pollCount = 0;
@@ -1237,8 +1278,20 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
       console.log(`🔄 Polling game status (attempt ${pollCount}/${maxPolls})...`);
       
       try {
-        // Refetch game status from contract
-        const gameData = await refetchGame();
+        // Refetch queue count and game status
+        const [gameData, queueData] = await Promise.all([
+          refetchGame(),
+          refetchQueueCount(),
+        ]);
+        
+        // Log queue count
+        if (queueData?.data !== undefined) {
+          const count = Number(queueData.data);
+          console.log('👥 Queue count for bet level:', count);
+          if (count >= 2 && isMatching) {
+            console.warn('⚠️ Queue has 2+ players but no match yet - contract might have an issue');
+          }
+        }
         
         if (gameData?.data) {
           const game = gameData.data;
@@ -1314,7 +1367,7 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
       clearInterval(pollInterval);
       clearTimeout(timeout);
     };
-  }, [isConnected, hasJoinedQueue, isMatching, address, refetchGame, onMatchFound, hash]);
+  }, [isConnected, hasJoinedQueue, isMatching, address, refetchGame, refetchQueueCount, onMatchFound, hash, queueCount]);
 
   return (
     <div className="relative">
