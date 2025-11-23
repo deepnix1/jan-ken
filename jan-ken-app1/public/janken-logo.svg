@@ -1,0 +1,81 @@
+<svg width="400" height="200" viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="400" height="200" fill="transparent"/>
+  
+  <!-- Shuriken Left -->
+  <g transform="translate(20, 100)">
+    <path d="M0,-15 L5,-5 L15,-5 L5,5 L0,15 L-5,5 L-15,-5 L-5,-5 Z" fill="black" stroke="#22d3ee" stroke-width="2" filter="url(#glow)"/>
+  </g>
+  
+  <!-- J - Rock (Fist) -->
+  <g transform="translate(60, 100)">
+    <path d="M-20,-30 Q-20,-40 -10,-40 Q0,-40 0,-30 Q0,-20 -10,-20 Q-20,-20 -20,-30 Z M0,-30 Q10,-30 15,-20 Q20,-10 15,0 Q10,10 0,10 Q-10,10 -15,0 Q-20,-10 -15,-20 Q-10,-30 0,-30" fill="black" stroke="#ef4444" stroke-width="3" filter="url(#glow)"/>
+    <!-- Circuit pattern inside J -->
+    <line x1="-10" y1="-20" x2="5" y2="-10" stroke="#22d3ee" stroke-width="1" opacity="0.6"/>
+    <line x1="-5" y1="0" x2="10" y2="5" stroke="#22d3ee" stroke-width="1" opacity="0.6"/>
+  </g>
+  
+  <!-- a -->
+  <g transform="translate(120, 100)">
+    <path d="M-15,-20 Q-15,-30 -5,-30 Q5,-30 5,-20 Q5,-10 -5,-10 Q-15,-10 -15,-20 M-5,-10 Q5,-10 5,0 Q5,10 -5,10 Q-15,10 -15,0" fill="black" stroke="#22d3ee" stroke-width="3" filter="url(#glow)"/>
+  </g>
+  
+  <!-- n -->
+  <g transform="translate(160, 100)">
+    <path d="M-15,-20 L-15,20 M-15,-10 Q-5,-10 5,0 Q15,10 15,20" fill="black" stroke="#22d3ee" stroke-width="3" filter="url(#glow)"/>
+  </g>
+  
+  <!-- Katana (behind a and n) -->
+  <g transform="translate(140, 100) rotate(15)">
+    <line x1="-30" y1="0" x2="30" y2="0" stroke="black" stroke-width="3"/>
+    <rect x="-35" y="-3" width="8" height="6" fill="black"/>
+  </g>
+  
+  <!-- K - Scissors (Peace Sign) -->
+  <g transform="translate(200, 100)">
+    <line x1="-15" y1="-20" x2="-15" y2="20" stroke="#22d3ee" stroke-width="3" filter="url(#glow)"/>
+    <path d="M-15,-10 Q-5,-10 5,0 M-15,0 Q-5,0 5,10" fill="black" stroke="#22d3ee" stroke-width="3" filter="url(#glow)"/>
+    <circle cx="8" cy="-5" r="3" fill="black" stroke="#22d3ee" stroke-width="2" filter="url(#glow)"/>
+    <circle cx="8" cy="5" r="3" fill="black" stroke="#22d3ee" stroke-width="2" filter="url(#glow)"/>
+  </g>
+  
+  <!-- e -->
+  <g transform="translate(240, 100)">
+    <path d="M-15,-20 Q-15,-30 -5,-30 Q5,-30 5,-20 M-15,-20 L-15,20 M-15,0 Q5,0 5,10 Q5,20 -5,20" fill="black" stroke="#f59e0b" stroke-width="3" filter="url(#glow)"/>
+  </g>
+  
+  <!-- N -->
+  <g transform="translate(280, 100)">
+    <line x1="-15" y1="-20" x2="-15" y2="20" stroke="#f59e0b" stroke-width="3" filter="url(#glow)"/>
+    <line x1="15" y1="-20" x2="15" y2="20" stroke="#f59e0b" stroke-width="3" filter="url(#glow)"/>
+    <line x1="-15" y1="-20" x2="15" y2="20" stroke="#f59e0b" stroke-width="3" filter="url(#glow)"/>
+  </g>
+  
+  <!-- ! - Paper (Open Palm) -->
+  <g transform="translate(320, 100)">
+    <line x1="0" y1="-20" x2="0" y2="0" stroke="#22d3ee" stroke-width="3" filter="url(#glow)"/>
+    <circle cx="0" cy="10" r="3" fill="black" stroke="#22d3ee" stroke-width="2" filter="url(#glow)"/>
+    <!-- Open palm shape -->
+    <path d="M-10,5 Q-10,15 0,15 Q10,15 10,5" fill="black" stroke="#22d3ee" stroke-width="2" filter="url(#glow)"/>
+    <!-- Circuit pattern inside ! -->
+    <line x1="-5" y1="8" x2="5" y2="12" stroke="#22d3ee" stroke-width="1" opacity="0.6"/>
+  </g>
+  
+  <!-- Shuriken Right -->
+  <g transform="translate(360, 100)">
+    <path d="M0,-15 L5,-5 L15,-5 L5,5 L0,15 L-5,5 L-15,-5 L-5,-5 Z" fill="black" stroke="#22d3ee" stroke-width="2" filter="url(#glow)"/>
+  </g>
+  
+  <!-- Glow Filter -->
+  <defs>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+</svg>
+
+

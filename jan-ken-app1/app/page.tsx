@@ -1,0 +1,259 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import Image from 'next/image';
+import { useAccount, useConnect } from 'wagmi';
+import { sdk } from '@farcaster/miniapp-sdk';
+import { BetSelector } from '@/components/BetSelector';
+import { Matchmaking } from '@/components/Matchmaking';
+import { GameBoard } from '@/components/GameBoard';
+import { Result } from '@/components/Result';
+import { MatchFoundAnimation } from '@/components/MatchFoundAnimation';
+
+export default function Home() {
+  const { isConnected, address } = useAccount();
+  const { connect, connectors, isPending, error: connectError } = useConnect();
+  const [gameState, setGameState] = useState<'select' | 'matching' | 'playing' | 'result'>('select');
+  const [selectedBet, setSelectedBet] = useState<bigint | null>(null);
+  const [gameId, setGameId] = useState<string | null>(null);
+  const [showMatchFound, setShowMatchFound] = useState(false);
+  const [appReady, setAppReady] = useState(false);
+
+  // Call sdk.actions.ready() when app is fully loaded (per Farcaster docs)
+  useEffect(() => {
+    const initApp = async () => {
+      try {
+        // Wait for app to be fully loaded before calling ready()
+        if (typeof window !== 'undefined' && sdk && typeof sdk.actions !== 'undefined') {
+          // Ensure all components are mounted and ready
+          await new Promise(resolve => setTimeout(resolve, 100));
+          await sdk.actions.ready();
+          setAppReady(true);
+          console.log('App ready - splash screen hidden');
+        } else {
+          // Not in Farcaster environment, continue anyway
+          setAppReady(true);
+        }
+      } catch (error) {
+        console.error('Error calling sdk.actions.ready():', error);
+        // Continue anyway - might be running outside Farcaster
+        setAppReady(true);
+      }
+    };
+    
+    initApp();
+  }, []);
+
+  useEffect(() => {
+    if (!isConnected) {
+      // Reset all game state when wallet disconnects
+      setGameState('select');
+      setSelectedBet(null);
+      setGameId(null);
+      setShowMatchFound(false);
+    }
+  }, [isConnected]);
+
+  const handleConnect = () => {
+    if (connectors.length === 0) {
+      console.error('No connectors available');
+      alert('No wallet connectors available. Please install MetaMask or use Farcaster.');
+      return;
+    }
+    
+    // Per Farcaster docs: In Mini Apps, connector automatically connects if user has wallet
+    // Try Farcaster Mini App connector first (it should be first in array)
+    const farcasterConnector = connectors.find(c => c.name === 'Farcaster Mini App' || c.name?.includes('Farcaster'));
+    const connector = farcasterConnector || connectors[0];
+    
+    // Per Farcaster docs: connect({ connector: connectors[0] })
+    connect({ connector });
+  };
+
+  const handleBetSelect = (betAmount: bigint) => {
+    // Wallet connection is already enforced at page level
+    setSelectedBet(betAmount);
+    setGameState('matching');
+    setShowMatchFound(false);
+  };
+
+  const handleMatchFound = (id: string) => {
+    setShowMatchFound(true);
+    setTimeout(() => {
+      setGameId(id);
+      setGameState('playing');
+    }, 2000);
+  };
+
+  const handleGameEnd = () => {
+    setGameState('result');
+  };
+
+  const handlePlayAgain = () => {
+    setGameState('select');
+    setSelectedBet(null);
+    setGameId(null);
+    setShowMatchFound(false);
+  };
+
+  const handleTieRematch = () => {
+    // Keep same players, same bet, start new game immediately
+    if (selectedBet && gameId) {
+      setGameState('playing');
+      setShowMatchFound(false);
+      // Generate new game ID for rematch
+      setGameId(`rematch-${Date.now()}`);
+    }
+  };
+
+  const handleCancelMatchmaking = () => {
+    // Return to bet selection
+    setGameState('select');
+    setSelectedBet(null);
+    setShowMatchFound(false);
+    // Note: In production, we would need to call a contract function to leave queue
+    // For now, we just reset the UI state
+  };
+
+  return (
+    <main className="min-h-screen bg-black relative overflow-hidden">
+      {/* Background Effects */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:50px_50px]"></div>
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-red-500/10 rounded-full filter blur-3xl animate-pulse"></div>
+        <div className="absolute top-1/2 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full filter blur-3xl animate-pulse animation-delay-2000"></div>
+        <div className="absolute bottom-0 left-1/2 w-96 h-96 bg-yellow-500/10 rounded-full filter blur-3xl animate-pulse animation-delay-4000"></div>
+        <div className="absolute inset-0 bg-[linear-gradient(transparent_50%,rgba(34,211,238,0.03)_50%)] bg-[length:100%_4px] animate-scanline"></div>
+      </div>
+
+      <div className="relative z-10 min-h-screen p-3 sm:p-4 md:p-6 lg:p-8">
+        <div className="w-full max-w-6xl mx-auto">
+          {/* Header */}
+          <header className="flex flex-col items-center mb-8 sm:mb-12 relative">
+            {/* Logo - Centered and Smaller - Mobile Optimized */}
+            <div className="relative w-full max-w-[200px] sm:max-w-[250px] md:max-w-[300px] mb-4 sm:mb-6 md:mb-8 flex justify-center">
+              <div className="absolute inset-0 bg-gradient-to-r from-red-500/20 via-blue-500/20 to-yellow-500/20 blur-3xl"></div>
+              <div className="relative z-10 flex items-center justify-center w-full" style={{ filter: 'drop-shadow(0 0 30px rgba(239,68,68,0.5))' }}>
+                <Image
+                  src="/new_logo.png"
+                  alt="JaN KeN!"
+                  width={300}
+                  height={100}
+                  className="object-contain w-full h-auto"
+                  priority
+                  unoptimized
+                />
+              </div>
+            </div>
+            
+            {/* Wallet - Below logo with proper spacing */}
+            <div className="relative mt-4">
+              <div className="absolute inset-0 bg-cyan-500/20 blur-xl"></div>
+              <div className="relative bg-black/60 backdrop-blur-lg rounded-full px-4 py-2 border border-cyan-400/50 shadow-[0_0_20px_rgba(34,211,238,0.4)]">
+                {isConnected ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                    <span className="text-cyan-400 font-mono text-sm">
+                      {address?.slice(0, 6)}...{address?.slice(-4)}
+                    </span>
+                  </div>
+                ) : (
+                  <button
+                    onClick={handleConnect}
+                    disabled={isPending || connectors.length === 0}
+                    className="text-cyan-400 hover:text-cyan-300 font-semibold text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isPending ? 'Connecting...' : 'Connect Wallet'}
+                  </button>
+                )}
+              </div>
+            </div>
+          </header>
+          
+          {/* Main Content - Mobile Optimized */}
+          <div className="relative bg-black/60 backdrop-blur-xl rounded-2xl sm:rounded-3xl border-2 border-cyan-400/30 shadow-[0_0_60px_rgba(34,211,238,0.2)] p-4 sm:p-6 md:p-8 lg:p-12 min-h-[50vh] sm:min-h-[60vh] flex items-center justify-center">
+            {!isConnected ? (
+              <div className="flex flex-col items-center gap-8 py-16">
+                <div className="text-center space-y-4">
+                  <h2 className="text-4xl sm:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400 drop-shadow-[0_0_20px_rgba(34,211,238,0.6)]">
+                    START YOUR GAME
+                  </h2>
+                  <p className="text-lg sm:text-xl text-gray-300 text-center max-w-lg font-medium leading-relaxed">
+                    Connect your wallet to begin playing Rock Paper Scissors on Base Network.
+                    <br />
+                    <span className="text-gray-400 text-base">Ensure you&apos;re connected to Base Sepolia network.</span>
+                  </p>
+                </div>
+                {connectors.length > 0 ? (
+                  <div className="space-y-4">
+                    <button
+                      onClick={handleConnect}
+                      disabled={isPending}
+                      className="relative px-8 py-4 bg-gradient-to-r from-cyan-500 to-purple-500 text-black font-black rounded-lg hover:from-cyan-400 hover:to-purple-400 transition-all transform hover:scale-105 shadow-[0_0_40px_rgba(34,211,238,0.6)] hover:shadow-[0_0_60px_rgba(34,211,238,0.8)] text-lg uppercase tracking-wider border-2 border-cyan-400/50 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                    >
+                      <span className="relative z-10">{isPending ? 'Connecting...' : 'Connect Wallet'}</span>
+                      <div className="absolute inset-0 bg-cyan-400/20 blur-xl"></div>
+                    </button>
+                    {connectError && (
+                      <div className="mt-4 p-3 sm:p-4 bg-red-500/20 border border-red-500/50 rounded-lg w-full">
+                        <p className="text-red-400 text-xs sm:text-sm font-mono">
+                          Connection error: {
+                            (connectError && typeof connectError === 'object' && 'shortMessage' in connectError) 
+                              ? (connectError as any).shortMessage
+                              : (connectError && typeof connectError === 'object' && 'message' in connectError)
+                              ? (connectError as any).message
+                              : (typeof connectError === 'string')
+                              ? connectError
+                              : 'Unknown error'
+                          }
+                        </p>
+                        <p className="text-red-300 text-xs mt-2">
+                          Note: Farcaster Mini App connector only works in Farcaster client. For testing in browser, please install MetaMask extension.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="mt-4 flex items-center gap-2 text-gray-400">
+                    <div className="w-3 h-3 bg-yellow-400 rounded-full animate-pulse shadow-[0_0_10px_rgba(234,179,8,0.8)]"></div>
+                    <span className="text-sm font-mono uppercase tracking-wider">Initializing wallet connector...</span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <>
+                {showMatchFound && (
+                  <MatchFoundAnimation />
+                )}
+                {gameState === 'select' && (
+                  <BetSelector onSelect={handleBetSelect} />
+                )}
+                
+                {gameState === 'matching' && selectedBet && (
+                  <Matchmaking 
+                    betAmount={selectedBet} 
+                    onMatchFound={handleMatchFound}
+                    onCancel={handleCancelMatchmaking}
+                    showMatchFound={showMatchFound}
+                  />
+                )}
+                
+                {gameState === 'playing' && selectedBet && gameId && (
+                  <GameBoard 
+                    betAmount={selectedBet}
+                    gameId={gameId}
+                    onGameEnd={handleGameEnd}
+                  />
+                )}
+                
+                {gameState === 'result' && (
+                  <Result onPlayAgain={handlePlayAgain} onTieRematch={handleTieRematch} />
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </main>
+  );
+}

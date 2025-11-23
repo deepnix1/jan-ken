@@ -1,0 +1,160 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { parseEther } from 'viem';
+import { getEthPrice, calculateEthAmount } from '@/lib/ethPrice';
+
+const USD_BET_LEVELS = [
+  { level: 1, usd: 5, emoji: '💵', color: 'from-green-500 to-emerald-600' },
+  { level: 2, usd: 10, emoji: '💶', color: 'from-blue-500 to-cyan-600' },
+  { level: 3, usd: 50, emoji: '💷', color: 'from-purple-500 to-pink-600' },
+  { level: 4, usd: 100, emoji: '💴', color: 'from-orange-500 to-red-600' },
+  { level: 5, usd: 500, emoji: '💰', color: 'from-yellow-500 to-amber-600' },
+  { level: 6, usd: 1000, emoji: '💎', color: 'from-indigo-500 to-violet-600' },
+];
+
+interface BetSelectorProps {
+  onSelect: (betAmount: bigint) => void;
+}
+
+export function BetSelector({ onSelect }: BetSelectorProps) {
+  const [selectedLevel, setSelectedLevel] = useState<number | null>(null);
+  const [ethPrice, setEthPrice] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch ETH price on mount and update every minute
+  useEffect(() => {
+    const fetchPrice = async () => {
+      try {
+        const priceData = await getEthPrice();
+        setEthPrice(priceData.price);
+        setLoading(false);
+      } catch (error) {
+        console.error('Error fetching ETH price:', error);
+        setEthPrice(3000); // Fallback price
+        setLoading(false);
+      }
+    };
+
+    fetchPrice();
+    
+    // Update price every minute
+    const interval = setInterval(fetchPrice, 60000);
+    
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleSelect = (level: number, ethAmount: string) => {
+    // Wallet connection is enforced at page level
+    setSelectedLevel(level);
+    const betAmount = parseEther(ethAmount);
+    onSelect(betAmount);
+  };
+
+  // Calculate bet levels based on current ETH price
+  const betLevels = ethPrice
+    ? USD_BET_LEVELS.map((bet) => {
+        const ethAmount = calculateEthAmount(bet.usd, ethPrice);
+        return {
+          ...bet,
+          amount: ethAmount,
+          label: `$${bet.usd}`,
+          eth: `${parseFloat(ethAmount).toFixed(6)} ETH`,
+        };
+      })
+    : USD_BET_LEVELS.map((bet) => ({
+        ...bet,
+        amount: '0',
+        label: `$${bet.usd}`,
+        eth: 'Loading...',
+      }));
+
+  const getGamingColor = (level: number) => {
+    // Japanese/Logo-inspired colors: Red, Blue, Yellow/Orange, Purple, Yellow, Indigo
+    const colors = [
+      'from-red-500/20 to-pink-600/20 border-red-500/40 text-red-400 shadow-[0_0_20px_rgba(239,68,68,0.4)]',
+      'from-blue-500/20 to-cyan-600/20 border-blue-500/40 text-blue-400 shadow-[0_0_20px_rgba(59,130,246,0.4)]',
+      'from-yellow-500/20 to-orange-600/20 border-yellow-500/40 text-yellow-400 shadow-[0_0_20px_rgba(234,179,8,0.4)]',
+      'from-purple-500/20 to-pink-600/20 border-purple-500/40 text-purple-400 shadow-[0_0_20px_rgba(168,85,247,0.4)]',
+      'from-yellow-500/20 to-amber-600/20 border-yellow-500/40 text-yellow-400 shadow-[0_0_20px_rgba(234,179,8,0.4)]',
+      'from-indigo-500/20 to-violet-600/20 border-indigo-500/40 text-indigo-400 shadow-[0_0_20px_rgba(99,102,241,0.4)]',
+    ];
+    return colors[level - 1] || colors[0];
+  };
+
+  return (
+    <div className="w-full">
+      <div className="text-center mb-8 sm:mb-10 md:mb-12">
+        <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-3 sm:mb-4">
+          <span className="bg-gradient-to-r from-red-400 via-blue-400 to-yellow-400 bg-clip-text text-transparent drop-shadow-[0_0_30px_rgba(239,68,68,0.8)]">
+            SELECT BET
+          </span>
+        </h2>
+        <p className="text-gray-400 text-base sm:text-lg font-mono uppercase tracking-wider px-4">
+          Winner Takes All
+        </p>
+      </div>
+      
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+        {betLevels.map((bet, index) => {
+          const isSelected = selectedLevel === bet.level;
+          const isDisabled = selectedLevel !== null && !isSelected;
+          
+          return (
+            <button
+              key={bet.level}
+              onClick={() => handleSelect(bet.level, bet.amount)}
+              disabled={isDisabled || loading || !ethPrice}
+              className={`group relative overflow-hidden rounded-lg p-6 sm:p-8 md:p-10 transition-all duration-300 transform ${
+                isSelected
+                  ? 'scale-105 shadow-[0_0_40px_rgba(34,211,238,0.6)] border-2 border-cyan-400'
+                  : isDisabled
+                  ? 'opacity-30 cursor-not-allowed'
+                  : 'hover:scale-105 hover:shadow-[0_0_30px_rgba(34,211,238,0.4)] cursor-pointer'
+              } bg-gradient-to-br ${getGamingColor(bet.level)} border-2 bg-black/40 backdrop-blur-sm`}
+              style={{ animationDelay: `${index * 100}ms` }}
+            >
+              {/* Corner Accents */}
+              <div className="absolute top-2 left-2 w-4 h-4 border-t-2 border-l-2 border-current opacity-50"></div>
+              <div className="absolute top-2 right-2 w-4 h-4 border-t-2 border-r-2 border-current opacity-50"></div>
+              <div className="absolute bottom-2 left-2 w-4 h-4 border-b-2 border-l-2 border-current opacity-50"></div>
+              <div className="absolute bottom-2 right-2 w-4 h-4 border-b-2 border-r-2 border-current opacity-50"></div>
+              
+              {/* Glow Effect */}
+              {isSelected && (
+                <div className="absolute inset-0 bg-cyan-400/10 blur-xl"></div>
+              )}
+              
+              <div className="relative z-10">
+                <div className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl mb-4 sm:mb-6 transform group-hover:scale-110 transition-transform drop-shadow-[0_0_20px_currentColor]">
+                  {bet.emoji}
+                </div>
+                <div className="text-3xl sm:text-4xl md:text-5xl font-black mb-2 sm:mb-3 drop-shadow-[0_0_10px_currentColor]">
+                  {bet.label}
+                </div>
+                <div className="text-base sm:text-lg md:text-xl font-mono font-semibold opacity-90">
+                  {bet.eth}
+                </div>
+              </div>
+              
+              {/* Scanline Effect */}
+              <div className="absolute inset-0 bg-[linear-gradient(transparent_50%,rgba(255,255,255,0.05)_50%)] bg-[length:100%_4px] opacity-0 group-hover:opacity-100 transition-opacity"></div>
+            </button>
+          );
+        })}
+      </div>
+      
+      {selectedLevel && (
+        <div className="mt-12 text-center">
+          <div className="inline-flex items-center gap-4 px-8 py-4 bg-black/60 border-2 border-red-500/40 rounded-lg shadow-[0_0_30px_rgba(239,68,68,0.4)]">
+            <div className="w-3 h-3 bg-red-400 rounded-full animate-pulse shadow-[0_0_10px_rgba(239,68,68,1)]"></div>
+            <p className="text-red-400 font-mono font-bold text-lg uppercase tracking-wider">
+              Searching for opponent...
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+

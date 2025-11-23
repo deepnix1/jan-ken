@@ -1,0 +1,50 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Build outputs
+.next/
+out/
+dist/
+build/
+*.log
+
+# Environment variables
+.env
+.env.local
+.env*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+coverage/
+.nyc_output/
+
+# Hardhat
+cache/
+artifacts/
+typechain/
+typechain-types/
+
+# Logs
+*.log
+dev.log
+monitor.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# Monitoring scripts (not needed in repo)
+monitor.ps1
+setup-env.ps1
+
