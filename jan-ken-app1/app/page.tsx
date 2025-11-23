@@ -33,18 +33,47 @@ export default function Home() {
     
     let mounted = true;
     
+    // Check if we're in Farcaster Mini App environment
+    // On PC (Debug Tool), SDK might be available via window object
+    const isFarcasterEnv = () => {
+      try {
+        // Check if SDK is imported and available
+        if (sdk && sdk.actions && typeof sdk.actions.ready === 'function') {
+          return true;
+        }
+        // Check if SDK is available via window (PC Debug Tool)
+        if ((window as any).farcaster?.sdk?.actions?.ready) {
+          return true;
+        }
+        return false;
+      } catch {
+        return false;
+      }
+    };
+    
     // Function to call ready() when SDK is available
     const callReady = () => {
       try {
-        // Check if SDK is available
+        // Try imported SDK first
         if (sdk && sdk.actions && typeof sdk.actions.ready === 'function') {
           sdk.actions.ready();
           if (mounted) {
             setAppReady(true);
-            console.log('✅ Farcaster SDK ready() called - splash screen hidden');
+            console.log('✅ Farcaster SDK ready() called (imported SDK) - splash screen hidden');
           }
           return true;
         }
+        
+        // Try window SDK (PC Debug Tool)
+        if ((window as any).farcaster?.sdk?.actions?.ready) {
+          (window as any).farcaster.sdk.actions.ready();
+          if (mounted) {
+            setAppReady(true);
+            console.log('✅ Farcaster SDK ready() called (window SDK) - splash screen hidden');
+          }
+          return true;
+        }
+        
         return false;
       } catch (error) {
         console.error('Error calling sdk.actions.ready():', error);
@@ -62,7 +91,7 @@ export default function Home() {
     
     // If SDK not ready, wait for it with polling
     let attempts = 0;
-    const maxAttempts = 50; // 5 seconds max (50 * 100ms)
+    const maxAttempts = 100; // 10 seconds max (100 * 100ms) - longer for PC
     
     const checkSDK = setInterval(() => {
       attempts++;
@@ -72,10 +101,21 @@ export default function Home() {
         return;
       }
       
+      // Log debug info every 10 attempts (1 second)
+      if (attempts % 10 === 0) {
+        console.log(`🔍 Checking for Farcaster SDK... (attempt ${attempts}/${maxAttempts})`, {
+          hasImportedSDK: !!sdk,
+          hasSDKActions: !!(sdk && sdk.actions),
+          hasReadyFunction: !!(sdk && sdk.actions && typeof sdk.actions.ready === 'function'),
+          hasWindowSDK: !!(window as any).farcaster?.sdk,
+          userAgent: navigator.userAgent,
+        });
+      }
+      
       if (attempts >= maxAttempts) {
         clearInterval(checkSDK);
-        // SDK not available, continue anyway
-        console.warn('⚠️ Farcaster SDK not available after waiting');
+        // SDK not available, continue anyway (PC might not have SDK)
+        console.warn('⚠️ Farcaster SDK not available after waiting - continuing anyway (might be PC Debug Tool)');
         if (mounted) {
           setAppReady(true);
         }
