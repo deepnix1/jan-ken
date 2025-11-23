@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useWriteContract, useWaitForTransactionReceipt, useAccount, useWatchContractEvent, useSimulateContract } from 'wagmi';
 import { formatEther } from 'viem';
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from '@/lib/contract';
 import { isValidBetAmount, isValidAddress } from '@/lib/security';
+import { useTransactionMonitor } from '@/hooks/useTransactionMonitor';
 
 interface MatchmakingProps {
   betAmount: bigint;
@@ -22,6 +23,27 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
   const { data: hash, writeContract, isPending, error: writeError, reset: resetWriteContract, status } = useWriteContract();
   const [txHash, setTxHash] = useState<string | null>(null);
   const [txStartTime, setTxStartTime] = useState<number | null>(null);
+  const txIdRef = useRef<string | null>(null);
+  
+  // Transaction monitoring system
+  const { startTransaction, updateTransaction, getTransaction } = useTransactionMonitor({
+    enableAutoRetry: true,
+    pendingTimeout: 30000,
+    sendingTimeout: 60000,
+    logLevel: 'info',
+    onRetry: (id, state) => {
+      console.log('🔄 Auto-retry triggered for transaction:', id, state);
+      // Reset state to allow retry
+      setHasJoinedQueue(false);
+      setTxError(null);
+      setTxStartTime(null);
+      resetWriteContract?.();
+    },
+    onStuck: (id, state, reason) => {
+      console.warn('⚠️ Transaction stuck:', id, reason, state);
+      setTxError(`Transaction stuck in ${reason}. Auto-recovery will attempt retry.`);
+    },
+  });
   
   // Simulate contract call before sending transaction
   const { data: simulateData, error: simulateError } = useSimulateContract({
@@ -54,28 +76,41 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
   const [showApproved, setShowApproved] = useState(false);
   
   useEffect(() => {
-    if (isSuccess && hash) {
+    if (isSuccess && hash && txIdRef.current) {
       console.log('Transaction confirmed:', hash);
       setShowApproved(true);
+      
+      // Update monitoring system
+      updateTransaction(txIdRef.current, {
+        status: 'confirmed',
+        hash: hash as `0x${string}`,
+      });
+      
       // Hide after 3 seconds
       const timer = setTimeout(() => {
         setShowApproved(false);
       }, 3000);
       return () => clearTimeout(timer);
     }
-  }, [isSuccess, hash]);
+  }, [isSuccess, hash, updateTransaction]);
   
   // Store hash when transaction is sent and update state
   useEffect(() => {
-    if (hash) {
+    if (hash && txIdRef.current) {
       setTxHash(hash);
       setHasJoinedQueue(true);
       setTxError(null);
       setTxStartTime(null);
       console.log('✅ Transaction hash received:', hash);
       console.log('Transaction status:', status);
+      
+      // Update monitoring system
+      updateTransaction(txIdRef.current, {
+        status: 'sent',
+        hash: hash as `0x${string}`,
+      });
     }
-  }, [hash, status]);
+  }, [hash, status, updateTransaction]);
 
   // Monitor status changes - hash might come after status changes
   useEffect(() => {
@@ -86,6 +121,26 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
       hasError: !!writeError,
       timestamp: new Date().toISOString(),
     });
+
+    // Update monitoring system with status changes
+    if (txIdRef.current) {
+      const txState = getTransaction(txIdRef.current);
+      if (txState) {
+        if (status === 'pending' && txState.status !== 'pending') {
+          updateTransaction(txIdRef.current, { status: 'pending' });
+        } else if (status === 'success' && hash && txState.status !== 'sent') {
+          updateTransaction(txIdRef.current, {
+            status: 'sent',
+            hash: hash as `0x${string}`,
+          });
+        } else if (status === 'error') {
+          updateTransaction(txIdRef.current, {
+            status: 'failed',
+            error: writeError?.message || 'Transaction failed',
+          });
+        }
+      }
+    }
 
     // If status is 'success' but no hash yet, wait a bit
     if (status === 'success' && !hash) {
@@ -105,8 +160,14 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
       setTxError('Transaction failed. Please try again.');
       setHasJoinedQueue(false);
       setTxStartTime(null);
+      if (txIdRef.current) {
+        updateTransaction(txIdRef.current, {
+          status: 'failed',
+          error: 'Transaction failed',
+        });
+      }
     }
-  }, [status, isPending, hash, writeError]);
+  }, [status, isPending, hash, writeError, updateTransaction, getTransaction]);
   
   // Handle writeError from useWriteContract
   useEffect(() => {
@@ -289,6 +350,23 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
         setTxError(null);
         setTxStartTime(Date.now());
         
+        // Start transaction monitoring
+        const txId = `joinQueue-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        txIdRef.current = txId;
+        startTransaction(
+          txId,
+          'joinQueue',
+          CONTRACT_ADDRESS as `0x${string}`,
+          [betAmount],
+          betAmount,
+          {
+            betAmount: betAmount.toString(),
+            address,
+            contractAddress: CONTRACT_ADDRESS,
+          }
+        );
+        updateTransaction(txId, { status: 'pending' });
+        
         // Wagmi v3 best practice: Use simulateData.request if available
         // This includes all gas parameters and ensures wallet shows correct fee
         if (simulateData && (simulateData as any).request) {
@@ -296,6 +374,7 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
           console.log('Simulate request:', (simulateData as any).request);
           // Use the request object directly - it includes all necessary parameters
           writeContract((simulateData as any).request);
+          updateTransaction(txId, { status: 'sending' });
         } else {
           // Fallback: send without simulation data (wallet will estimate)
           console.log('📤 Sending transaction without simulation (wallet will estimate gas)');
@@ -306,11 +385,13 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
             args: [betAmount],
             value: betAmount,
           });
+          updateTransaction(txId, { status: 'sending' });
         }
         
         console.log('📤 Transaction request sent, waiting for wallet approval and hash...');
         console.log('Current status:', status);
         console.log('isPending:', isPending);
+        console.log('Transaction ID:', txId);
         
         // Set up a listener for status changes
         // Note: In Wagmi v3, status changes are tracked via the hook
@@ -336,6 +417,14 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
         }
         
         setTxError(errorMessage);
+        
+        // Update monitoring system
+        if (txIdRef.current) {
+          updateTransaction(txIdRef.current, {
+            status: 'failed',
+            error: errorMessage,
+          });
+        }
       }
     };
     
