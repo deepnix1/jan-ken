@@ -822,25 +822,49 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
         // Note: In Wagmi v3, status changes are tracked via the hook
         // We'll monitor it via useEffect above
       } catch (error: any) {
-        console.error('❌ Error joining queue:', error);
+        // Safely extract error details (avoid serialization issues)
+        console.error('❌ Error joining queue - Full error object:', error);
+        console.error('❌ Error type:', typeof error);
+        console.error('❌ Error constructor:', error?.constructor?.name);
+        console.error('❌ Error keys:', error ? Object.keys(error) : 'null/undefined');
+        
+        // Try to extract error message safely
+        let errorMessage = 'Transaction failed';
+        let errorMsg = '';
+        
+        try {
+          errorMsg = error?.message || 
+                    (error as any)?.shortMessage || 
+                    (error as any)?.cause?.message ||
+                    (error as any)?.reason ||
+                    String(error);
+        } catch (e) {
+          console.warn('Could not extract error message:', e);
+          errorMsg = 'Unknown error (could not extract message)';
+        }
+        
+        console.error('❌ Extracted error message:', errorMsg);
+        console.error('❌ Error code:', (error as any)?.code);
+        console.error('❌ Error name:', error?.name);
+        
         setHasJoinedQueue(false);
         setTxStartTime(null);
         
-        let errorMessage = 'Transaction failed';
-        const errorMsg = error?.message || error?.shortMessage || error?.cause?.message || String(error);
-        
-        if (errorMsg.includes('rejected') || errorMsg.includes('Rejected') || errorMsg.includes('User rejected') || errorMsg.includes('user rejected')) {
+        if (errorMsg.includes('rejected') || errorMsg.includes('Rejected') || errorMsg.includes('User rejected') || errorMsg.includes('user rejected') || errorMsg.includes('ACTION_REJECTED')) {
           errorMessage = 'Transaction was rejected. Please check your wallet and approve the transaction when the popup appears.';
-        } else if (errorMsg.includes('insufficient funds') || errorMsg.includes('Insufficient')) {
+        } else if (errorMsg.includes('insufficient funds') || errorMsg.includes('Insufficient') || errorMsg.includes('insufficient balance')) {
           errorMessage = 'Insufficient funds. Please add more ETH to your wallet.';
         } else if (errorMsg.includes('denied') || errorMsg.includes('Denied')) {
           errorMessage = 'Transaction was denied. Please approve in your wallet.';
         } else if (errorMsg.includes('timeout') || errorMsg.includes('Timeout')) {
           errorMessage = 'Transaction timeout. Please try again.';
-        } else if (errorMsg) {
+        } else if (errorMsg && errorMsg !== 'Unknown error (could not extract message)') {
           errorMessage = errorMsg;
+        } else {
+          errorMessage = 'Transaction failed. Please check your wallet connection and try again.';
         }
         
+        console.error('❌ Final error message for user:', errorMessage);
         setTxError(errorMessage);
       }
     };
