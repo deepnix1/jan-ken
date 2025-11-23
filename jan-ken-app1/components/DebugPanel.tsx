@@ -33,9 +33,33 @@ export function DebugPanel() {
     const originalInfo = console.info;
 
     const addLog = (level: LogEntry['level'], ...args: any[]): void => {
-      const message = args.map(arg => 
-        typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
-      ).join(' ');
+      // Safely convert arguments to string (avoid BigInt serialization issues)
+      const message = args.map(arg => {
+        if (arg === null || arg === undefined) {
+          return String(arg);
+        } else if (typeof arg === 'bigint') {
+          return arg.toString();
+        } else if (typeof arg === 'object') {
+          try {
+            // Try to stringify, but handle BigInt and circular references
+            return JSON.stringify(arg, (key, value) => {
+              if (typeof value === 'bigint') {
+                return value.toString() + 'n';
+              }
+              return value;
+            }, 2);
+          } catch (e) {
+            // If stringify fails (circular reference, BigInt, etc.), use String()
+            try {
+              return String(arg);
+            } catch (e2) {
+              return '[Object - could not serialize]';
+            }
+          }
+        } else {
+          return String(arg);
+        }
+      }).join(' ');
       
       setLogs(prev => {
         const newLog: LogEntry = {
@@ -45,7 +69,7 @@ export function DebugPanel() {
           message,
           data: args.length > 1 ? args : undefined,
         };
-        return [...prev.slice(-99), newLog]; // Keep last 100 logs
+        return [...prev.slice(-199), newLog]; // Keep last 200 logs (increased for better debugging)
       });
     };
 
@@ -183,37 +207,56 @@ export function DebugPanel() {
         {logs.length === 0 ? (
           <div className="text-gray-500 text-center py-4">No logs yet...</div>
         ) : (
-          logs.map((log) => (
-            <div
-              key={log.id}
-              className={`p-2 rounded border-l-2 ${
-                log.level === 'error' ? 'border-red-400 bg-red-500/10' :
-                log.level === 'warn' ? 'border-yellow-400 bg-yellow-500/10' :
-                log.level === 'info' ? 'border-blue-400 bg-blue-500/10' :
-                'border-gray-400 bg-gray-500/10'
-              }`}
-            >
-              <div className="flex items-start gap-2">
-                <span className={`text-xs font-bold ${getLogColor(log.level)}`}>
-                  [{log.level.toUpperCase()}]
-                </span>
-                <span className="text-gray-400 text-[10px]">
-                  {new Date(log.timestamp).toLocaleTimeString()}
-                </span>
+          logs.map((log) => {
+            // Safely serialize log data for display
+            let dataString = '';
+            if (log.data) {
+              try {
+                dataString = JSON.stringify(log.data, (key, value) => {
+                  if (typeof value === 'bigint') {
+                    return value.toString() + 'n';
+                  }
+                  return value;
+                }, 2);
+              } catch (e) {
+                dataString = '[Could not serialize data - may contain BigInt or circular references]';
+              }
+            }
+            
+            return (
+              <div
+                key={log.id}
+                className={`p-2 rounded border-l-2 ${
+                  log.level === 'error' ? 'border-red-400 bg-red-500/10' :
+                  log.level === 'warn' ? 'border-yellow-400 bg-yellow-500/10' :
+                  log.level === 'info' ? 'border-blue-400 bg-blue-500/10' :
+                  'border-gray-400 bg-gray-500/10'
+                }`}
+              >
+                <div className="flex items-start gap-2">
+                  <span className={`text-xs font-bold ${getLogColor(log.level)}`}>
+                    [{log.level.toUpperCase()}]
+                  </span>
+                  <span className="text-gray-400 text-[10px]">
+                    {new Date(log.timestamp).toLocaleTimeString()}
+                  </span>
+                </div>
+                <div className={`mt-1 break-words ${getLogColor(log.level)} whitespace-pre-wrap`}>
+                  {log.message}
+                </div>
+                {log.data && (
+                  <details className="mt-1">
+                    <summary className="text-gray-400 text-[10px] cursor-pointer hover:text-gray-300">
+                      Details ({Array.isArray(log.data) ? log.data.length : 'Object'})
+                    </summary>
+                    <pre className="text-[10px] text-gray-500 mt-1 overflow-x-auto whitespace-pre-wrap break-words">
+                      {dataString}
+                    </pre>
+                  </details>
+                )}
               </div>
-              <div className={`mt-1 break-words ${getLogColor(log.level)}`}>
-                {log.message}
-              </div>
-              {log.data && (
-                <details className="mt-1">
-                  <summary className="text-gray-400 text-[10px] cursor-pointer">Details</summary>
-                  <pre className="text-[10px] text-gray-500 mt-1 overflow-x-auto">
-                    {JSON.stringify(log.data, null, 2)}
-                  </pre>
-                </details>
-              )}
-            </div>
-          ))
+            );
+          })
         )}
         <div ref={logsEndRef} />
       </div>
@@ -231,13 +274,33 @@ export function DebugPanel() {
         </label>
         <button
           onClick={() => {
-            const logText = logs.map(l => `[${l.level}] ${l.message}`).join('\n');
-            navigator.clipboard.writeText(logText);
-            alert('Logs copied to clipboard!');
+            try {
+              const logText = logs.map(l => {
+                let dataText = '';
+                if (l.data) {
+                  try {
+                    dataText = '\n  Data: ' + JSON.stringify(l.data, (key, value) => {
+                      if (typeof value === 'bigint') {
+                        return value.toString() + 'n';
+                      }
+                      return value;
+                    }, 2);
+                  } catch (e) {
+                    dataText = '\n  Data: [Could not serialize]';
+                  }
+                }
+                return `[${l.level.toUpperCase()}] ${new Date(l.timestamp).toISOString()}\n${l.message}${dataText}`;
+              }).join('\n\n');
+              navigator.clipboard.writeText(logText);
+              alert(`Copied ${logs.length} logs to clipboard!`);
+            } catch (e) {
+              console.error('Error copying logs:', e);
+              alert('Error copying logs. Please try again.');
+            }
           }}
           className="px-2 py-1 bg-purple-500/20 border border-purple-400 rounded text-purple-300 text-xs hover:bg-purple-500/30"
         >
-          Copy Logs
+          Copy Logs ({logs.length})
         </button>
       </div>
     </div>
