@@ -64,6 +64,22 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
   useEffect(() => {
     if (!isConnected || !writeContract || hasJoinedQueue) return;
     
+    // Security: Validate inputs before sending transaction
+    if (!isValidBetAmount(betAmount)) {
+      console.error('Invalid bet amount:', betAmount);
+      return;
+    }
+    
+    if (!address || !isValidAddress(address)) {
+      console.error('Invalid wallet address');
+      return;
+    }
+    
+    if (!CONTRACT_ADDRESS || !isValidAddress(CONTRACT_ADDRESS)) {
+      console.error('Invalid contract address');
+      return;
+    }
+    
     try {
       // joinQueue fonksiyonunu çağır - aynı betAmount'u seçen oyuncular eşleşecek
       // If there's already a player waiting, match will happen immediately
@@ -83,7 +99,7 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
       setHasJoinedQueue(false);
       // Error will be shown via writeError state
     }
-  }, [isConnected, writeContract, betAmount, hasJoinedQueue]);
+  }, [isConnected, writeContract, betAmount, hasJoinedQueue, address]);
 
   // Poll game status as fallback if event doesn't fire
   // This handles cases where event listener might miss the event
