@@ -25,32 +25,66 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
     mutation: {
       onError: (error) => {
         // Safely extract error details (avoid BigInt serialization issues)
-        const errorDetails: any = {
-          message: error?.message,
-          name: error?.name,
-          code: (error as any)?.code,
-          shortMessage: (error as any)?.shortMessage,
-        };
+        console.error('❌ writeContract mutation error (onError callback)');
+        console.error('Error type:', typeof error);
+        console.error('Error name:', error?.name);
+        console.error('Error constructor:', error?.constructor?.name);
         
-        // Try to extract cause safely
+        // Extract error properties safely (avoid JSON.stringify with BigInt)
+        let errorMessage = 'Transaction failed';
+        let errorCode: any = undefined;
+        let errorShortMessage = '';
+        let errorCause: any = null;
+        
         try {
-          const cause = (error as any)?.cause;
-          if (cause) {
-            errorDetails.cause = {
-              message: cause?.message,
-              name: cause?.name,
-              code: cause?.code,
-            };
+          // Extract error code
+          if (error && typeof error === 'object') {
+            errorCode = (error as any)?.code;
+          }
+          
+          // Extract error message (multiple attempts)
+          if (error?.message) {
+            errorMessage = String(error.message);
+          } else if ((error as any)?.shortMessage) {
+            errorShortMessage = String((error as any).shortMessage);
+            errorMessage = errorShortMessage;
+          } else {
+            try {
+              errorMessage = String(error);
+            } catch (e) {
+              errorMessage = 'Transaction failed (could not extract error message)';
+            }
+          }
+          
+          // Try to extract cause safely
+          try {
+            if ((error as any)?.cause) {
+              const cause = (error as any).cause;
+              errorCause = {
+                message: cause?.message ? String(cause.message) : undefined,
+                name: cause?.name,
+                code: cause?.code,
+              };
+            }
+          } catch (e) {
+            // Ignore cause extraction errors
           }
         } catch (e) {
-          // Ignore cause extraction errors
+          console.warn('Could not extract error details:', e);
+          errorMessage = 'Transaction failed (could not extract error details)';
         }
         
-        console.error('❌ writeContract mutation error (onError callback):', errorDetails);
-        console.error('Full error object:', error);
+        console.error('❌ Error message:', errorMessage);
+        console.error('❌ Error short message:', errorShortMessage || 'none');
+        console.error('❌ Error code:', errorCode);
+        console.error('❌ Error cause:', errorCause);
         
-        // Extract user-friendly error message
-        const errorMessage = error?.message || (error as any)?.shortMessage || 'Transaction failed';
+        // Don't show BigInt serialization errors to user
+        if (errorMessage.includes('BigInt') || errorMessage.includes('serialize')) {
+          errorMessage = 'Transaction failed. Please try again.';
+          console.error('❌ Internal error (BigInt serialization) - not showing to user');
+        }
+        
         setTxError(`Transaction failed: ${errorMessage}`);
         setHasJoinedQueue(false);
         setTxStartTime(null);
@@ -502,32 +536,63 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
         }
         
         if (simulateStatus === 'error') {
-          // Log detailed error information
+          // Log detailed error information (avoid BigInt serialization)
           console.error('❌ Simulation error detected');
-          console.error('Simulate error object:', simulateError);
+          console.error('Simulate status:', simulateStatus);
           console.error('Error type:', typeof simulateError);
           console.error('Error constructor:', simulateError?.constructor?.name);
+          console.error('Error name:', simulateError?.name);
           
-          // Try to extract error message safely
+          // Try to extract error message safely (avoid JSON.stringify with BigInt)
           let errorMsg = 'Unknown simulation error';
+          let errorCode: any = undefined;
+          let errorShortMessage = '';
+          
           try {
             if (simulateError) {
-              errorMsg = simulateError?.message || 
-                        (simulateError as any)?.shortMessage || 
-                        (simulateError as any)?.cause?.message ||
-                        String(simulateError);
+              // Extract error code
+              if (typeof simulateError === 'object') {
+                errorCode = (simulateError as any)?.code;
+              }
+              
+              // Extract error message (multiple attempts, avoid BigInt)
+              if (simulateError?.message) {
+                errorMsg = String(simulateError.message);
+              } else if ((simulateError as any)?.shortMessage) {
+                errorShortMessage = String((simulateError as any).shortMessage);
+                errorMsg = errorShortMessage;
+              } else if ((simulateError as any)?.cause?.message) {
+                errorMsg = String((simulateError as any).cause.message);
+              } else if ((simulateError as any)?.reason) {
+                errorMsg = String((simulateError as any).reason);
+              } else {
+                // Last resort: try to stringify (but catch BigInt issues)
+                try {
+                  errorMsg = String(simulateError);
+                } catch (e) {
+                  errorMsg = 'Simulation error (could not extract details)';
+                }
+              }
+            } else {
+              // If simulateError is null/undefined but status is error, it might be a different issue
+              console.warn('⚠️ Simulation status is error but simulateError is null/undefined');
+              console.warn('⚠️ This might indicate a network or RPC issue');
+              errorMsg = 'Simulation failed (network or RPC issue)';
             }
           } catch (e) {
             console.warn('Could not extract error message:', e);
+            errorMsg = 'Simulation error (could not extract details)';
           }
           
-          console.error('Error message:', errorMsg);
+          console.error('❌ Simulation error message:', errorMsg);
+          console.error('❌ Simulation error short message:', errorShortMessage || 'none');
+          console.error('❌ Simulation error code:', errorCode);
           
           // Only block if it's a critical error (insufficient funds)
           if (errorMsg.includes('insufficient funds') || 
               errorMsg.includes('Insufficient') ||
               errorMsg.includes('insufficient balance')) {
-            console.error('❌ Simulation error: Insufficient funds');
+            console.error('❌ Simulation error: Insufficient funds - BLOCKING transaction');
             setHasJoinedQueue(false);
             setTxStartTime(null);
             setTxError('Insufficient funds. Please add more ETH to your wallet.');
@@ -538,6 +603,7 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
           // Common non-critical errors: RPC timeout, network issues, etc.
           console.warn('⚠️ Simulation error (non-critical), proceeding with direct transaction');
           console.warn('⚠️ Error details:', errorMsg);
+          console.warn('⚠️ Error code:', errorCode);
           console.warn('⚠️ Wallet will estimate gas instead');
           // Continue to send transaction even if simulation failed (non-critical error)
         }
@@ -822,35 +888,72 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
         // Note: In Wagmi v3, status changes are tracked via the hook
         // We'll monitor it via useEffect above
       } catch (error: any) {
-        // Safely extract error details (avoid serialization issues)
-        console.error('❌ Error joining queue - Full error object:', error);
+        // Safely extract error details (avoid BigInt serialization issues)
+        console.error('❌ Error joining queue detected');
         console.error('❌ Error type:', typeof error);
         console.error('❌ Error constructor:', error?.constructor?.name);
-        console.error('❌ Error keys:', error ? Object.keys(error) : 'null/undefined');
+        console.error('❌ Error name:', error?.name);
         
-        // Try to extract error message safely
+        // Try to extract error properties safely (avoid JSON.stringify with BigInt)
+        let errorCode: any = undefined;
         let errorMessage = 'Transaction failed';
         let errorMsg = '';
+        let errorShortMessage = '';
+        let errorCause: any = null;
         
         try {
-          errorMsg = error?.message || 
-                    (error as any)?.shortMessage || 
-                    (error as any)?.cause?.message ||
-                    (error as any)?.reason ||
-                    String(error);
+          // Extract error code
+          if (error && typeof error === 'object') {
+            errorCode = (error as any)?.code;
+          }
+          
+          // Extract error message (multiple attempts)
+          if (error?.message) {
+            errorMsg = String(error.message);
+          } else if ((error as any)?.shortMessage) {
+            errorShortMessage = String((error as any).shortMessage);
+            errorMsg = errorShortMessage;
+          } else if ((error as any)?.cause?.message) {
+            errorMsg = String((error as any).cause.message);
+          } else if ((error as any)?.reason) {
+            errorMsg = String((error as any).reason);
+          } else {
+            // Last resort: try to stringify error (but catch BigInt issues)
+            try {
+              errorMsg = String(error);
+            } catch (e) {
+              errorMsg = 'Unknown error (could not extract message)';
+            }
+          }
         } catch (e) {
           console.warn('Could not extract error message:', e);
           errorMsg = 'Unknown error (could not extract message)';
         }
         
+        // Try to extract cause safely
+        try {
+          if ((error as any)?.cause) {
+            const cause = (error as any).cause;
+            errorCause = {
+              message: cause?.message ? String(cause.message) : undefined,
+              name: cause?.name,
+              code: cause?.code,
+            };
+          }
+        } catch (e) {
+          // Ignore cause extraction errors
+        }
+        
         console.error('❌ Extracted error message:', errorMsg);
-        console.error('❌ Error code:', (error as any)?.code);
-        console.error('❌ Error name:', error?.name);
+        console.error('❌ Error short message:', errorShortMessage || 'none');
+        console.error('❌ Error code:', errorCode);
+        console.error('❌ Error cause:', errorCause);
         
         setHasJoinedQueue(false);
         setTxStartTime(null);
         
-        if (errorMsg.includes('rejected') || errorMsg.includes('Rejected') || errorMsg.includes('User rejected') || errorMsg.includes('user rejected') || errorMsg.includes('ACTION_REJECTED')) {
+        // Determine user-friendly error message
+        if (errorMsg.includes('rejected') || errorMsg.includes('Rejected') || errorMsg.includes('User rejected') || errorMsg.includes('user rejected') || errorMsg.includes('ACTION_REJECTED') || errorCode === 4001) {
           errorMessage = 'Transaction was rejected. Please check your wallet and approve the transaction when the popup appears.';
         } else if (errorMsg.includes('insufficient funds') || errorMsg.includes('Insufficient') || errorMsg.includes('insufficient balance')) {
           errorMessage = 'Insufficient funds. Please add more ETH to your wallet.';
@@ -858,6 +961,10 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
           errorMessage = 'Transaction was denied. Please approve in your wallet.';
         } else if (errorMsg.includes('timeout') || errorMsg.includes('Timeout')) {
           errorMessage = 'Transaction timeout. Please try again.';
+        } else if (errorMsg.includes('BigInt') || errorMsg.includes('serialize')) {
+          // This is an internal error, not a user-facing error
+          errorMessage = 'Transaction failed. Please try again. If the problem persists, refresh the page.';
+          console.error('❌ Internal error (BigInt serialization) - this should not be shown to user');
         } else if (errorMsg && errorMsg !== 'Unknown error (could not extract message)') {
           errorMessage = errorMsg;
         } else {
