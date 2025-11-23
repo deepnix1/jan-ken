@@ -7,7 +7,10 @@
     "test": "test"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "compile": "hardhat compile",
+    "verify": "hardhat verify",
+    "security-check": "npm audit && echo 'Security check complete'"
   },
   "keywords": [],
   "author": "",
