@@ -10,7 +10,6 @@
     "security-check": "npm audit && echo 'Security check complete'"
   },
   "dependencies": {
-    "@coinbase/onchainkit": "latest",
     "@farcaster/miniapp-sdk": "^0.2.1",
     "@farcaster/miniapp-wagmi-connector": "^1.1.0",
     "@metamask/sdk": "^0.34.0",
