@@ -798,19 +798,19 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
           // Use simulation data if available for better gas estimation
           if (simulateData && (simulateData as any).request) {
             console.log('📤 Using simulation data for gas estimation');
-            console.log('Simulation request:', (simulateData as any).request);
             
-            // Log simulation request details
+            // Log simulation request details safely (avoid BigInt serialization)
             const simRequest = (simulateData as any).request;
+            // DON'T log simRequest directly - it contains BigInt values
             console.log('Simulation request details:', {
               address: simRequest.address,
               functionName: simRequest.functionName,
-              args: simRequest.args?.map((a: any) => a?.toString()),
-              value: simRequest.value?.toString(),
-              gas: simRequest.gas?.toString(),
-              gasPrice: simRequest.gasPrice?.toString(),
-              maxFeePerGas: simRequest.maxFeePerGas?.toString(),
-              maxPriorityFeePerGas: simRequest.maxPriorityFeePerGas?.toString(),
+              args: simRequest.args?.map((a: any) => typeof a === 'bigint' ? a.toString() : String(a)),
+              value: simRequest.value ? (typeof simRequest.value === 'bigint' ? simRequest.value.toString() : String(simRequest.value)) : undefined,
+              gas: simRequest.gas ? (typeof simRequest.gas === 'bigint' ? simRequest.gas.toString() : String(simRequest.gas)) : undefined,
+              gasPrice: simRequest.gasPrice ? (typeof simRequest.gasPrice === 'bigint' ? simRequest.gasPrice.toString() : String(simRequest.gasPrice)) : undefined,
+              maxFeePerGas: simRequest.maxFeePerGas ? (typeof simRequest.maxFeePerGas === 'bigint' ? simRequest.maxFeePerGas.toString() : String(simRequest.maxFeePerGas)) : undefined,
+              maxPriorityFeePerGas: simRequest.maxPriorityFeePerGas ? (typeof simRequest.maxPriorityFeePerGas === 'bigint' ? simRequest.maxPriorityFeePerGas.toString() : String(simRequest.maxPriorityFeePerGas)) : undefined,
             });
             
             console.log('📤 Calling writeContract with simulation request...');
@@ -894,16 +894,32 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
           }, 500); // Check every 500ms
           
         } catch (err: any) {
-          console.error('❌ Error calling writeContract:', err);
-          console.error('Error details:', {
-            message: err?.message,
-            name: err?.name,
-            stack: err?.stack,
-            cause: err?.cause,
-          });
+          // Safely extract error details (avoid BigInt serialization issues)
+          // DON'T log error object directly - it may contain BigInt values
+          console.error('❌ Error calling writeContract detected');
+          console.error('❌ Error type:', typeof err);
+          console.error('❌ Error constructor:', err?.constructor?.name);
+          console.error('❌ Error name:', err?.name);
+          
+          // Try to extract error message safely
+          let errorMsg = '';
+          try {
+            errorMsg = err?.message ||
+                      (err as any)?.shortMessage ||
+                      (err as any)?.cause?.message ||
+                      (err as any)?.reason ||
+                      String(err);
+          } catch (e) {
+            console.warn('Could not extract error message:', e);
+            errorMsg = 'Unknown error (could not extract message)';
+          }
+          
+          console.error('❌ Extracted error message:', errorMsg);
+          console.error('❌ Error code:', (err as any)?.code);
+          
           setHasJoinedQueue(false);
           setTxStartTime(null);
-          setTxError(`Failed to send transaction: ${err?.message || String(err)}`);
+          setTxError(`Failed to send transaction: ${errorMsg}`);
           return;
         }
         
