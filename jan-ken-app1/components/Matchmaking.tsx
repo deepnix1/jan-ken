@@ -19,8 +19,9 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
   const [hasJoinedQueue, setHasJoinedQueue] = useState(false);
   const [txError, setTxError] = useState<string | null>(null);
   
-  const { data: hash, writeContract, isPending, error: writeError, reset: resetWriteContract } = useWriteContract();
+  const { data: hash, writeContract, isPending, error: writeError, reset: resetWriteContract, status } = useWriteContract();
   const [txHash, setTxHash] = useState<string | null>(null);
+  const [txStartTime, setTxStartTime] = useState<number | null>(null);
   
   // Don't wait for receipt - rely on event listener instead
   // This prevents UI from getting stuck on "confirming transaction"
@@ -49,15 +50,25 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
       setTxHash(hash);
       setHasJoinedQueue(true);
       setTxError(null);
-      console.log('Transaction hash received:', hash);
+      setTxStartTime(null);
+      console.log('✅ Transaction hash received:', hash);
+      console.log('Transaction status:', status);
     }
-  }, [hash]);
+  }, [hash, status]);
   
   // Handle writeError from useWriteContract
   useEffect(() => {
     if (writeError) {
-      console.error('WriteContract error:', writeError);
+      console.error('❌ WriteContract error:', writeError);
+      console.error('Error details:', {
+        message: writeError?.message,
+        shortMessage: writeError?.shortMessage,
+        cause: writeError?.cause,
+        name: writeError?.name,
+        stack: writeError?.stack,
+      });
       setHasJoinedQueue(false);
+      setTxStartTime(null);
       
       let errorMessage = 'Transaction failed';
       const errorMsg = writeError?.message || writeError?.shortMessage || writeError?.cause?.message || String(writeError);
@@ -77,6 +88,22 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
       setTxError(errorMessage);
     }
   }, [writeError]);
+  
+  // Monitor transaction status and detect stuck transactions
+  useEffect(() => {
+    if (isPending && !hash && txStartTime) {
+      const elapsed = Date.now() - txStartTime;
+      if (elapsed > 45000) { // 45 seconds
+        console.warn('⚠️ Transaction seems stuck - no hash received after 45 seconds');
+        console.warn('Status:', status);
+        console.warn('isPending:', isPending);
+        console.warn('writeError:', writeError);
+        setTxError('Transaction is taking too long. Please check your wallet and try again.');
+        setHasJoinedQueue(false);
+        setTxStartTime(null);
+      }
+    }
+  }, [isPending, hash, txStartTime, status, writeError]);
   
   // Get pool status - count players waiting for this bet amount
   const [poolCount, setPoolCount] = useState<number>(0);
@@ -144,8 +171,12 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
     // Small delay to ensure UI is ready before showing wallet popup
     const sendTransaction = () => {
       try {
-        console.log('Attempting to send transaction...');
+        console.log('🚀 Attempting to send transaction...');
+        console.log('Contract address:', CONTRACT_ADDRESS);
+        console.log('Bet amount:', betAmount.toString());
+        console.log('Address:', address);
         setTxError(null);
+        setTxStartTime(Date.now());
         
         // joinQueue fonksiyonunu çağır - aynı betAmount'u seçen oyuncular eşleşecek
         // If there's already a player waiting, match will happen immediately
@@ -158,21 +189,13 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
           value: betAmount,
         });
         
-        console.log('Transaction request sent, waiting for wallet approval and hash...');
-        
-        // Set a timeout to detect if transaction gets stuck
-        const timeoutId = setTimeout(() => {
-          if (!hash && isPending) {
-            console.warn('Transaction seems stuck - no hash received after 30 seconds');
-            // Don't show error immediately - might still be processing
-            // The writeError will handle actual errors
-          }
-        }, 30000); // 30 seconds
-        
-        return () => clearTimeout(timeoutId);
+        console.log('📤 Transaction request sent, waiting for wallet approval and hash...');
+        console.log('Current status:', status);
+        console.log('isPending:', isPending);
       } catch (error: any) {
-        console.error('Error joining queue:', error);
+        console.error('❌ Error joining queue:', error);
         setHasJoinedQueue(false);
+        setTxStartTime(null);
         
         let errorMessage = 'Transaction failed';
         const errorMsg = error?.message || error?.shortMessage || error?.cause?.message || String(error);
