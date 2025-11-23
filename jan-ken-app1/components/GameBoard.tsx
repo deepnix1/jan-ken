@@ -89,28 +89,14 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
     
     try {
       // Send choice to contract - PRODUCTION MODE
+      // Note: Wagmi v3 doesn't support callbacks - use hook state instead
       writeContract({
         address: CONTRACT_ADDRESS as `0x${string}`,
         abi: CONTRACT_ABI,
         functionName: 'makeChoice',
         args: [choiceId],
-      }, {
-        onSuccess: (txHash) => {
-          console.log('Transaction sent:', txHash);
-        },
-        onError: (error: any) => {
-          console.error('Error making choice:', error);
-          // Reset selection on error
-          setSelectedChoice(null);
-          
-          // Show user-friendly error
-          if (error?.message?.includes('rejected') || error?.message?.includes('Rejected')) {
-            alert('Transaction was rejected. Please approve in your wallet and try again.');
-          } else if (error?.message?.includes('user rejected') || error?.message?.includes('User rejected')) {
-            alert('Transaction was rejected. Please try again and approve in your wallet.');
-          }
-        },
       });
+      console.log('Transaction request sent for choice:', choiceId);
     } catch (error: any) {
       console.error('Error making choice:', error);
       // Reset selection on error

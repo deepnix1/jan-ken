@@ -219,7 +219,7 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
     // Small delay to ensure UI is ready
     const timeoutId = setTimeout(sendTransaction, 100);
     return () => clearTimeout(timeoutId);
-  }, [isConnected, writeContract, betAmount, hasJoinedQueue, address]);
+  }, [isConnected, writeContract, betAmount, hasJoinedQueue, address, status]);
 
   // Poll game status as fallback if event doesn't fire
   // This handles cases where event listener might miss the event
