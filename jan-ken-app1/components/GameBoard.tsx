@@ -29,6 +29,7 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
   const [txStartTime, setTxStartTime] = useState<number | null>(null);
   
   // Simulate contract call to get gas estimates
+  // Enable simulation when choice is selected (before transaction is sent)
   const { data: simulateData } = useSimulateContract({
     address: CONTRACT_ADDRESS as `0x${string}`,
     abi: CONTRACT_ABI,
@@ -36,6 +37,7 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
     args: selectedChoice ? [selectedChoice] : undefined,
     query: {
       enabled: !!selectedChoice && !isPending && !hash,
+      // Don't wait for simulation - it's optional
     },
   });
   
@@ -194,25 +196,37 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
     setTxStartTime(Date.now());
     
     try {
-      // Use simulateData.request if available (Wagmi v3 way)
-      // This includes all gas parameters needed for wallet popup
-      const writeParams: any = {
+      // Prepare transaction parameters
+      const txParams: any = {
         address: CONTRACT_ADDRESS as `0x${string}`,
         abi: CONTRACT_ABI,
         functionName: 'makeChoice',
         args: [choiceId],
       };
       
-      // If simulateData is available, use its request which includes gas params
-      if (simulateData && (simulateData as any).request) {
-        // Use the request from simulation which includes gas estimates
-        console.log('📤 Using simulateData.request for gas parameters');
-        writeContract((simulateData as any).request);
+      // Add gas parameters from simulateData if available
+      // This helps wallet show correct fee estimate
+      if (simulateData) {
+        const simData = simulateData as any;
+        if (simData.gas) {
+          txParams.gas = simData.gas;
+        }
+        if (simData.maxFeePerGas) {
+          txParams.maxFeePerGas = simData.maxFeePerGas;
+        }
+        if (simData.maxPriorityFeePerGas) {
+          txParams.maxPriorityFeePerGas = simData.maxPriorityFeePerGas;
+        }
+        if (simData.gasPrice) {
+          txParams.gasPrice = simData.gasPrice;
+        }
+        console.log('📤 Using gas parameters from simulation');
       } else {
-        // Fallback: send without gas params (wallet will estimate)
         console.log('📤 Sending makeChoice transaction (wallet will estimate gas)');
-        writeContract(writeParams);
       }
+      
+      // Send transaction - wallet will show popup
+      writeContract(txParams);
       console.log('Transaction request sent, waiting for wallet approval and hash...');
     } catch (error: any) {
       console.error('Error making choice:', error);

@@ -269,35 +269,45 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
           console.warn('⚠️ Simulation error (non-critical), proceeding anyway:', errorMsg);
         }
         
-        // Wait for simulation to be ready - it provides gas estimates
-        // This ensures wallet popup shows correct gas fee
-        if (!simulateData) {
-          console.warn('⚠️ Simulation not ready yet, waiting...');
-          // Wait a bit more for simulation
-          return;
-        }
-        
         setTxError(null);
         setTxStartTime(Date.now());
         
-        // Use simulateData.request if available (Wagmi v3 way)
-        // This includes all gas parameters needed for wallet popup to show correct fee
-        if (simulateData && (simulateData as any).request) {
-          // Use the request from simulation which includes gas estimates
-          console.log('📤 Using simulateData.request for gas parameters');
-          console.log('Simulate request:', (simulateData as any).request);
-          writeContract((simulateData as any).request);
-        } else {
-          // Fallback: send without gas params (wallet will estimate)
-          console.log('📤 Calling writeContract (wallet will estimate gas)');
-          writeContract({
-            address: CONTRACT_ADDRESS as `0x${string}`,
-            abi: CONTRACT_ABI,
-            functionName: 'joinQueue' as const,
-            args: [betAmount],
-            value: betAmount,
+        // Prepare transaction parameters
+        const txParams: any = {
+          address: CONTRACT_ADDRESS as `0x${string}`,
+          abi: CONTRACT_ABI,
+          functionName: 'joinQueue' as const,
+          args: [betAmount],
+          value: betAmount,
+        };
+        
+        // Add gas parameters from simulateData if available
+        // This helps wallet show correct fee estimate
+        if (simulateData) {
+          const simData = simulateData as any;
+          if (simData.gas) {
+            txParams.gas = simData.gas;
+          }
+          if (simData.maxFeePerGas) {
+            txParams.maxFeePerGas = simData.maxFeePerGas;
+          }
+          if (simData.maxPriorityFeePerGas) {
+            txParams.maxPriorityFeePerGas = simData.maxPriorityFeePerGas;
+          }
+          if (simData.gasPrice) {
+            txParams.gasPrice = simData.gasPrice;
+          }
+          console.log('📤 Using gas parameters from simulation:', {
+            gas: txParams.gas?.toString(),
+            maxFeePerGas: txParams.maxFeePerGas?.toString(),
+            maxPriorityFeePerGas: txParams.maxPriorityFeePerGas?.toString(),
           });
+        } else {
+          console.log('📤 Sending transaction (wallet will estimate gas)');
         }
+        
+        // Send transaction - wallet will show popup
+        writeContract(txParams);
         
         console.log('📤 Transaction request sent, waiting for wallet approval and hash...');
         console.log('Current status:', status);
@@ -331,16 +341,8 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
       }
     };
     
-    // Wait for simulation to be ready before sending
-    // This ensures gas parameters are available for wallet popup
-    if (!simulateData && !simulateError) {
-      // Simulation is still loading, wait a bit
-      console.log('⏳ Waiting for simulation to complete...');
-      const timeoutId = setTimeout(sendTransaction, 500);
-      return () => clearTimeout(timeoutId);
-    }
-    
-    // Send transaction when simulation is ready or has non-critical error
+    // Send transaction immediately - don't wait for simulation
+    // Gas parameters will be added if simulation is ready, otherwise wallet will estimate
     const timeoutId = setTimeout(sendTransaction, 200);
     return () => clearTimeout(timeoutId);
   }, [isConnected, writeContract, betAmount, hasJoinedQueue, address, status, simulateData, simulateError]);
