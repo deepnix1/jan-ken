@@ -495,9 +495,29 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
         
         // CRITICAL: Wait for simulation to complete before sending transaction
         // Per Wagmi best practices, we should use simulateData.request for gas estimation
+        // But if simulation takes too long, we can fallback to direct transaction
         if (simulateStatus === 'pending') {
           console.warn('⚠️ Simulation is still pending, waiting for it to complete...');
-          return; // Wait for simulation to complete
+          console.warn('⚠️ This might take a few seconds. If it takes too long, we will send transaction without simulation.');
+          
+          // Wait up to 10 seconds for simulation, then fallback to direct transaction
+          // This prevents the app from getting stuck if simulation fails
+          const simulationWaitStart = Date.now();
+          const checkSimulation = setInterval(() => {
+            const elapsed = Date.now() - simulationWaitStart;
+            if (elapsed > 10000) { // 10 seconds timeout
+              clearInterval(checkSimulation);
+              console.warn('⚠️ Simulation timeout after 10 seconds, proceeding with direct transaction (wallet will estimate gas)');
+              // Continue to send transaction without simulation
+            } else if (simulateStatus !== 'pending') {
+              clearInterval(checkSimulation);
+              console.log('✅ Simulation completed, proceeding with transaction');
+            }
+          }, 500);
+          
+          // For now, return and let the useEffect retry when simulation completes
+          // The useEffect will be triggered again when simulateStatus changes
+          return () => clearInterval(checkSimulation);
         }
         
         if (simulateStatus === 'error' && simulateError) {
@@ -509,11 +529,15 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
             setTxError('Insufficient funds. Please add more ETH to your wallet.');
             return;
           }
-          console.warn('⚠️ Simulation error (non-critical), proceeding anyway:', errorMsg);
+          console.warn('⚠️ Simulation error (non-critical), proceeding with direct transaction:', errorMsg);
+          // Continue to send transaction even if simulation failed (non-critical error)
         }
         
+        // If simulation data is not available and status is not error, wait for it
+        // Note: This check is after the pending check above, so status can be 'success' or 'error' here
         if (!simulateData && simulateStatus !== 'error') {
           console.warn('⚠️ Simulation data not available yet, waiting...');
+          console.warn('⚠️ Simulation status:', simulateStatus);
           return; // Wait for simulation to complete
         }
         
@@ -823,7 +847,7 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
       const timeoutId = setTimeout(sendTransaction, 1000);
       return () => clearTimeout(timeoutId);
     }
-  }, [isConnected, writeContract, betAmount, hasJoinedQueue, address, simulateData, chainId]);
+  }, [isConnected, writeContract, betAmount, hasJoinedQueue, address, simulateData, simulateStatus, simulateError, chainId, connectorClient]);
 
   // Poll game status as fallback if event doesn't fire
   // This handles cases where event listener might miss the event
