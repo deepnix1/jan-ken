@@ -677,16 +677,74 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
           }
           
           // E15 error: Player already in queue (player1 == player2 in _matchPlayers)
-          // This happens when user tries to join queue while already in queue
+          // E5 error: Player already has an active game
+          // If user is already in queue (E5), check game status - might be waiting for match
           if (errorMsg.includes('E15') || errorMsg.includes('E5')) {
-            console.error('❌ Simulation error: Player already in queue (E15/E5) - BLOCKING transaction');
-            console.error('❌ User already has an active game or is already in queue');
-            setHasJoinedQueue(false);
-            setTxStartTime(null);
-            setTxError('You are already in the queue or have an active game. Please wait for a match or finish your current game.');
-            // Refetch game status to update UI
-            refetchGame();
-            return;
+            console.warn('⚠️ Simulation error: Player already in queue (E15/E5)');
+            console.warn('⚠️ Checking current game status...');
+            
+            // Check current game status - might be waiting for match
+            try {
+              const gameData = await refetchGame();
+              if (gameData?.data) {
+                const game = gameData.data;
+                const gameStatus = game.status;
+                const hasPlayer2 = game.player2 && game.player2 !== '0x0000000000000000000000000000000000000000';
+                
+                console.log('📊 Current game status:', {
+                  status: gameStatus,
+                  player1: game.player1,
+                  player2: game.player2,
+                  hasPlayer2,
+                  betAmount: game.betAmount?.toString(),
+                });
+                
+                // Status 2 = InProgress (matched and game started)
+                if (gameStatus === 2 || (gameStatus === 1 && hasPlayer2)) {
+                  console.log('✅ Game already matched! Status:', gameStatus);
+                  setIsMatching(false);
+                  setHasJoinedQueue(true); // Mark as joined since game exists
+                  const gameId = game.player1 && game.player2 
+                    ? `game-${game.player1.toLowerCase()}-${game.player2.toLowerCase()}-${Date.now()}`
+                    : `game-${Date.now()}`;
+                  console.log('✅ Calling onMatchFound with gameId:', gameId);
+                  onMatchFound(gameId);
+                  return; // Don't show error, game already exists
+                } else if (gameStatus === 0 && !hasPlayer2) {
+                  // Status 0 = Waiting, no player2 yet - user is in queue waiting for match
+                  console.log('⏳ User is in queue waiting for match (status: Waiting)');
+                  console.log('⏳ Enabling polling to wait for match...');
+                  setHasJoinedQueue(true); // Mark as joined since we're in queue
+                  setTxError(null); // Clear error - this is expected, we're waiting
+                  // Don't return - let polling mechanism handle it
+                  // Continue to send transaction anyway (might be duplicate, but contract will handle it)
+                } else {
+                  // Other status - show error
+                  console.error('❌ Game in unexpected state:', gameStatus);
+                  setHasJoinedQueue(false);
+                  setTxStartTime(null);
+                  setTxError('You are already in the queue or have an active game. Please wait for a match or finish your current game.');
+                  return;
+                }
+              } else {
+                // No game data - might be a different issue
+                console.error('❌ No game data found, but E5 error occurred');
+                setHasJoinedQueue(false);
+                setTxStartTime(null);
+                setTxError('You are already in the queue or have an active game. Please wait for a match or finish your current game.');
+                return;
+              }
+            } catch (gameCheckError) {
+              console.error('❌ Error checking game status:', gameCheckError);
+              setHasJoinedQueue(false);
+              setTxStartTime(null);
+              setTxError('You are already in the queue or have an active game. Please wait for a match or finish your current game.');
+              return;
+            }
+            
+            // If we reach here, user is in queue waiting - don't block, let transaction proceed
+            // Contract will handle duplicate join attempts
+            console.warn('⚠️ User already in queue, but allowing transaction to proceed (contract will handle)');
           }
           
           // For other simulation errors, log but continue (might be false positive)
@@ -1152,12 +1210,26 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
 
   // Poll game status as fallback if event doesn't fire
   // This handles cases where event listener might miss the event
+  // Also handles cases where user is already in queue (E5 error)
   useEffect(() => {
-    if (!isConnected || !hasJoinedQueue || !isMatching || !address) return;
+    // Start polling if:
+    // 1. User is connected and has joined queue, OR
+    // 2. User is in matching state (waiting for match)
+    if (!isConnected || !address) return;
+    
+    // Check if we should start polling
+    const shouldPoll = hasJoinedQueue || isMatching;
+    if (!shouldPoll) return;
     
     console.log('🔄 Starting game status polling (fallback mechanism)');
+    console.log('🔄 Polling conditions:', {
+      hasJoinedQueue,
+      isMatching,
+      address,
+    });
+    
     let pollCount = 0;
-    const maxPolls = 15; // Poll for 30 seconds (15 * 2 seconds)
+    const maxPolls = 30; // Poll for 60 seconds (30 * 2 seconds) - increased for better reliability
     
     // Poll every 2 seconds to check if game was created
     const pollInterval = setInterval(async () => {
@@ -1171,18 +1243,20 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
         if (gameData?.data) {
           const game = gameData.data;
           const gameStatus = game.status;
+          const hasPlayer2 = game.player2 && game.player2 !== '0x0000000000000000000000000000000000000000';
           
           console.log('🔄 Polled game status:', {
             status: gameStatus,
             player1: game.player1,
             player2: game.player2,
+            hasPlayer2,
             betAmount: game.betAmount?.toString(),
           });
           
           // Status 2 = InProgress (matched and game started)
           // Status 1 = Matched (if contract uses this)
           // Status 0 = Waiting (still in queue)
-          if (gameStatus === 2 || (gameStatus === 1 && game.player2 && game.player2 !== '0x0000000000000000000000000000000000000000')) {
+          if (gameStatus === 2 || (gameStatus === 1 && hasPlayer2)) {
             console.log('✅ Match found via polling! Game status:', gameStatus);
             console.log('✅ Game details:', {
               player1: game.player1,
@@ -1191,6 +1265,7 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
             });
             
             setIsMatching(false);
+            setHasJoinedQueue(true); // Ensure this is set
             // Generate gameId from player addresses
             const gameId = game.player1 && game.player2 
               ? `game-${game.player1.toLowerCase()}-${game.player2.toLowerCase()}-${Date.now()}`
@@ -1199,18 +1274,27 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
             onMatchFound(gameId);
             clearInterval(pollInterval);
             return;
-          } else if (gameStatus === 0) {
-            console.log('⏳ Still waiting in queue (status: Waiting)');
+          } else if (gameStatus === 0 && !hasPlayer2) {
+            // Status 0 = Waiting, no player2 yet - user is in queue waiting for match
+            console.log('⏳ Still waiting in queue (status: Waiting, no player2 yet)');
+            // Continue polling
+          } else if (gameStatus === 0 && hasPlayer2) {
+            // Status 0 = Waiting but has player2 - might be transitioning
+            console.log('⏳ Waiting status but has player2 - might be transitioning to InProgress');
+            // Continue polling, should transition soon
           } else {
-            console.log('⚠️ Unexpected game status:', gameStatus);
+            console.log('⚠️ Unexpected game status:', gameStatus, 'hasPlayer2:', hasPlayer2);
           }
         } else {
           console.log('⚠️ No game data returned from contract');
+          // If no game data but we think we're in queue, might be an issue
+          // Continue polling anyway
         }
         
         // Stop polling after max attempts
         if (pollCount >= maxPolls) {
-          console.warn('⚠️ Polling timeout - no match found after 30 seconds');
+          console.warn('⚠️ Polling timeout - no match found after 60 seconds');
+          console.warn('⚠️ This might indicate a problem with matchmaking');
           clearInterval(pollInterval);
         }
       } catch (error) {
@@ -1219,11 +1303,11 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
       }
     }, 2000); // Poll every 2 seconds
     
-    // Stop polling after 30 seconds (match should happen by then)
+    // Stop polling after 60 seconds (match should happen by then)
     const timeout = setTimeout(() => {
-      console.log('⏰ Polling timeout reached (30 seconds)');
+      console.log('⏰ Polling timeout reached (60 seconds)');
       clearInterval(pollInterval);
-    }, 30000);
+    }, 60000); // Increased to 60 seconds
     
     return () => {
       console.log('🛑 Stopping game status polling');
