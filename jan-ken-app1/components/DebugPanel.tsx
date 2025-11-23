@@ -33,33 +33,9 @@ export function DebugPanel() {
     const originalInfo = console.info;
 
     const addLog = (level: LogEntry['level'], ...args: any[]): void => {
-      // Safely convert arguments to string (avoid BigInt serialization issues)
-      const message = args.map(arg => {
-        if (arg === null || arg === undefined) {
-          return String(arg);
-        } else if (typeof arg === 'bigint') {
-          return arg.toString();
-        } else if (typeof arg === 'object') {
-          try {
-            // Try to stringify, but handle BigInt and circular references
-            return JSON.stringify(arg, (key, value) => {
-              if (typeof value === 'bigint') {
-                return value.toString() + 'n';
-              }
-              return value;
-            }, 2);
-          } catch (e) {
-            // If stringify fails (circular reference, BigInt, etc.), use String()
-            try {
-              return String(arg);
-            } catch (e2) {
-              return '[Object - could not serialize]';
-            }
-          }
-        } else {
-          return String(arg);
-        }
-      }).join(' ');
+      const message = args.map(arg => 
+        typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+      ).join(' ');
       
       setLogs(prev => {
         const newLog: LogEntry = {
@@ -69,7 +45,7 @@ export function DebugPanel() {
           message,
           data: args.length > 1 ? args : undefined,
         };
-        return [...prev.slice(-199), newLog]; // Keep last 200 logs (increased for better debugging)
+        return [...prev.slice(-99), newLog]; // Keep last 100 logs
       });
     };
 
@@ -110,109 +86,6 @@ export function DebugPanel() {
 
   const clearLogs = () => {
     setLogs([]);
-  };
-
-  const sendLogsToServer = async () => {
-    if (logs.length === 0) {
-      alert('No logs to send');
-      return;
-    }
-
-    try {
-      // Prepare logs for sending (safely serialize BigInt)
-      const logsToSend = logs.map(log => {
-        let safeData = null;
-        if (log.data) {
-          try {
-            // Try to serialize data, handling BigInt
-            safeData = JSON.parse(JSON.stringify(log.data, (key, value) => {
-              if (typeof value === 'bigint') {
-                return value.toString() + 'n';
-              }
-              return value;
-            }));
-          } catch (e) {
-            safeData = '[Could not serialize]';
-          }
-        }
-        return {
-          id: log.id,
-          timestamp: log.timestamp,
-          level: log.level,
-          message: log.message,
-          data: safeData,
-        };
-      });
-
-      const payload = {
-        logs: logsToSend,
-        address: address || 'N/A',
-        chainId: chainId || 'N/A',
-        userAgent: typeof window !== 'undefined' ? window.navigator.userAgent : 'N/A',
-        timestamp: Date.now(),
-      };
-
-      console.log('📤 Sending logs to server...', { logCount: logsToSend.length });
-
-      const response = await fetch('/api/logs', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        const analysis = result.analysis || {};
-        const errorsFound = analysis.errorsFound || 0;
-        const fixesAvailable = analysis.fixesAvailable || 0;
-        
-        let message = `✅ Logs sent successfully! (${result.logCount} logs)\n\n`;
-        message += `📊 Analysis:\n`;
-        message += `  - Errors found: ${errorsFound}\n`;
-        message += `  - Fixes available: ${fixesAvailable}\n\n`;
-        
-        if (fixesAvailable > 0) {
-          message += `🔧 Auto-fixing ${fixesAvailable} issues...\n`;
-          message += `Fixes will be applied automatically!`;
-        } else if (errorsFound > 0) {
-          message += `⚠️ ${errorsFound} errors detected but no auto-fixes available.\n`;
-          message += `I will analyze and fix them manually.`;
-        } else {
-          message += `✅ No critical errors detected!`;
-        }
-        
-        alert(message);
-        console.log('✅ Logs sent to server successfully');
-        console.log('📊 Analysis result:', analysis);
-        
-        // Log analysis details
-        if (analysis.errors && analysis.errors.length > 0) {
-          console.log('🔍 Detected errors:');
-          analysis.errors.forEach((error: any, index: number) => {
-            console.log(`  [${index + 1}] [${error.severity}] ${error.type}: ${error.message}`);
-            if (error.file) {
-              console.log(`      File: ${error.file}`);
-            }
-          });
-        }
-        
-        if (analysis.fixes && analysis.fixes.length > 0) {
-          console.log('🔧 Available fixes:');
-          analysis.fixes.forEach((fix: any, index: number) => {
-            console.log(`  [${index + 1}] ${fix.file}: ${fix.description}`);
-          });
-        }
-      } else {
-        alert(`❌ Failed to send logs: ${result.error || 'Unknown error'}`);
-        console.error('❌ Failed to send logs:', result);
-      }
-    } catch (error: any) {
-      console.error('❌ Error sending logs:', error);
-      alert(`❌ Error sending logs: ${error.message || 'Unknown error'}\n\nPlease copy logs manually and send them to me.`);
-    }
   };
 
   const getLogColor = (level: LogEntry['level']) => {
@@ -310,56 +183,37 @@ export function DebugPanel() {
         {logs.length === 0 ? (
           <div className="text-gray-500 text-center py-4">No logs yet...</div>
         ) : (
-          logs.map((log) => {
-            // Safely serialize log data for display
-            let dataString = '';
-            if (log.data) {
-              try {
-                dataString = JSON.stringify(log.data, (key, value) => {
-                  if (typeof value === 'bigint') {
-                    return value.toString() + 'n';
-                  }
-                  return value;
-                }, 2);
-              } catch (e) {
-                dataString = '[Could not serialize data - may contain BigInt or circular references]';
-              }
-            }
-            
-            return (
-              <div
-                key={log.id}
-                className={`p-2 rounded border-l-2 ${
-                  log.level === 'error' ? 'border-red-400 bg-red-500/10' :
-                  log.level === 'warn' ? 'border-yellow-400 bg-yellow-500/10' :
-                  log.level === 'info' ? 'border-blue-400 bg-blue-500/10' :
-                  'border-gray-400 bg-gray-500/10'
-                }`}
-              >
-                <div className="flex items-start gap-2">
-                  <span className={`text-xs font-bold ${getLogColor(log.level)}`}>
-                    [{log.level.toUpperCase()}]
-                  </span>
-                  <span className="text-gray-400 text-[10px]">
-                    {new Date(log.timestamp).toLocaleTimeString()}
-                  </span>
-                </div>
-                <div className={`mt-1 break-words ${getLogColor(log.level)} whitespace-pre-wrap`}>
-                  {log.message}
-                </div>
-                {log.data && (
-                  <details className="mt-1">
-                    <summary className="text-gray-400 text-[10px] cursor-pointer hover:text-gray-300">
-                      Details ({Array.isArray(log.data) ? log.data.length : 'Object'})
-                    </summary>
-                    <pre className="text-[10px] text-gray-500 mt-1 overflow-x-auto whitespace-pre-wrap break-words">
-                      {dataString}
-                    </pre>
-                  </details>
-                )}
+          logs.map((log) => (
+            <div
+              key={log.id}
+              className={`p-2 rounded border-l-2 ${
+                log.level === 'error' ? 'border-red-400 bg-red-500/10' :
+                log.level === 'warn' ? 'border-yellow-400 bg-yellow-500/10' :
+                log.level === 'info' ? 'border-blue-400 bg-blue-500/10' :
+                'border-gray-400 bg-gray-500/10'
+              }`}
+            >
+              <div className="flex items-start gap-2">
+                <span className={`text-xs font-bold ${getLogColor(log.level)}`}>
+                  [{log.level.toUpperCase()}]
+                </span>
+                <span className="text-gray-400 text-[10px]">
+                  {new Date(log.timestamp).toLocaleTimeString()}
+                </span>
               </div>
-            );
-          })
+              <div className={`mt-1 break-words ${getLogColor(log.level)}`}>
+                {log.message}
+              </div>
+              {log.data && (
+                <details className="mt-1">
+                  <summary className="text-gray-400 text-[10px] cursor-pointer">Details</summary>
+                  <pre className="text-[10px] text-gray-500 mt-1 overflow-x-auto">
+                    {JSON.stringify(log.data, null, 2)}
+                  </pre>
+                </details>
+              )}
+            </div>
+          ))
         )}
         <div ref={logsEndRef} />
       </div>
@@ -375,45 +229,16 @@ export function DebugPanel() {
           />
           Auto-scroll
         </label>
-        <div className="flex gap-2">
-          <button
-            onClick={sendLogsToServer}
-            className="px-2 py-1 bg-green-500/20 border border-green-400 rounded text-green-300 text-xs hover:bg-green-500/30"
-            title="Send logs to server (I can read them)"
-          >
-            📤 Send Logs
-          </button>
-          <button
-            onClick={() => {
-              try {
-                const logText = logs.map(l => {
-                  let dataText = '';
-                  if (l.data) {
-                    try {
-                      dataText = '\n  Data: ' + JSON.stringify(l.data, (key, value) => {
-                        if (typeof value === 'bigint') {
-                          return value.toString() + 'n';
-                        }
-                        return value;
-                      }, 2);
-                    } catch (e) {
-                      dataText = '\n  Data: [Could not serialize]';
-                    }
-                  }
-                  return `[${l.level.toUpperCase()}] ${new Date(l.timestamp).toISOString()}\n${l.message}${dataText}`;
-                }).join('\n\n');
-                navigator.clipboard.writeText(logText);
-                alert(`Copied ${logs.length} logs to clipboard!`);
-              } catch (e) {
-                console.error('Error copying logs:', e);
-                alert('Error copying logs. Please try again.');
-              }
-            }}
-            className="px-2 py-1 bg-purple-500/20 border border-purple-400 rounded text-purple-300 text-xs hover:bg-purple-500/30"
-          >
-            📋 Copy ({logs.length})
-          </button>
-        </div>
+        <button
+          onClick={() => {
+            const logText = logs.map(l => `[${l.level}] ${l.message}`).join('\n');
+            navigator.clipboard.writeText(logText);
+            alert('Logs copied to clipboard!');
+          }}
+          className="px-2 py-1 bg-purple-500/20 border border-purple-400 rounded text-purple-300 text-xs hover:bg-purple-500/30"
+        >
+          Copy Logs
+        </button>
       </div>
     </div>
   );

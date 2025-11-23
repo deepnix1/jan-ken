@@ -248,15 +248,13 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
       console.error('❌ WriteContract error detected:', writeError);
       console.error('Error type:', typeof writeError);
       console.error('Error constructor:', writeError?.constructor?.name);
+      // Log error details safely (avoid BigInt serialization)
       console.error('Error details:', {
-        message: writeError?.message,
-        shortMessage: (writeError as any)?.shortMessage,
-        cause: (writeError as any)?.cause,
+        message: writeError?.message ? String(writeError.message) : undefined,
+        shortMessage: (writeError as any)?.shortMessage ? String((writeError as any).shortMessage) : undefined,
         name: writeError?.name,
-        stack: writeError?.stack,
         code: (writeError as any)?.code,
-        data: (writeError as any)?.data,
-        fullError: 'Error object (cannot serialize - may contain BigInt)',
+        // Don't log cause, stack, or data - they may contain BigInt or circular references
       });
       
       setHasJoinedQueue(false);
@@ -524,8 +522,14 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
         console.log('Chain ID:', chainId);
         console.log('Is connected:', isConnected);
         console.log('Simulate status:', simulateStatus);
-        console.log('Simulate data:', simulateData);
-        console.log('Simulate error:', simulateError);
+        console.log('Simulate data available:', !!simulateData);
+        // Don't log simulateError object directly - it may contain BigInt
+        console.log('Simulate error available:', !!simulateError);
+        if (simulateError) {
+          console.log('Simulate error type:', typeof simulateError);
+          console.log('Simulate error name:', simulateError?.name);
+          console.log('Simulate error message:', simulateError?.message ? String(simulateError.message) : 'none');
+        }
         
         // CRITICAL: Wait for simulation to complete before sending transaction
         // Per Wagmi best practices, we should use simulateData.request for gas estimation
@@ -537,11 +541,22 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
         
         if (simulateStatus === 'error') {
           // Log detailed error information (avoid BigInt serialization)
+          // DON'T log simulateError object directly - it may contain BigInt values
           console.error('❌ Simulation error detected');
           console.error('Simulate status:', simulateStatus);
           console.error('Error type:', typeof simulateError);
           console.error('Error constructor:', simulateError?.constructor?.name);
           console.error('Error name:', simulateError?.name);
+          
+          // Try to get error keys safely
+          try {
+            if (simulateError && typeof simulateError === 'object') {
+              const errorKeys = Object.keys(simulateError);
+              console.error('Error keys:', errorKeys);
+            }
+          } catch (e) {
+            console.error('Could not get error keys:', e);
+          }
           
           // Try to extract error message safely (avoid JSON.stringify with BigInt)
           let errorMsg = 'Unknown simulation error';
