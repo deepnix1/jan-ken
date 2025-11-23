@@ -390,8 +390,8 @@ export default function Home() {
       </div>
           </main>
           
-          {/* Contract Monitor - Development/Testing Tool */}
-          {typeof window !== 'undefined' && process.env.NODE_ENV === 'development' && <ContractMonitor />}
+          {/* Contract Monitor - Testing Tool (enable with NEXT_PUBLIC_ENABLE_MONITOR=true) */}
+          {typeof window !== 'undefined' && (process.env.NEXT_PUBLIC_ENABLE_MONITOR === 'true' || process.env.NODE_ENV === 'development') && <ContractMonitor />}
           </>
         );
       }
