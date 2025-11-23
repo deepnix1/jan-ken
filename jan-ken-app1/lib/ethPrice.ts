@@ -61,3 +61,4 @@ export function calculateEthAmount(usdAmount: number, ethPrice: number): string 
 export function ethToUsd(ethAmount: number, ethPrice: number): number {
   return ethAmount * ethPrice;
 }
+

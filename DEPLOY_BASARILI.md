@@ -69,3 +69,4 @@ Artık oyunu test edebilirsin! Frontend'i başlat ve oyna! 🚀
 **Contract Address:** `0x877cb5a3BD613D764c0f4e61365A0B65A7f4F180`
 
 
+

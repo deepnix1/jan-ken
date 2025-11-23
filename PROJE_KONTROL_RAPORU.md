@@ -105,3 +105,4 @@ Proje başlangıç dokümantasyonuna uygun şekilde geliştirildi:
 **Tailwind CSS hatası düzeltildi, frontend şimdi çalışmalı!**
 
 
+

@@ -56,3 +56,4 @@ missing revert data
 Aşağıdaki contract kodunu kullan (sorunlu kısımlar düzeltildi):
 
 
+

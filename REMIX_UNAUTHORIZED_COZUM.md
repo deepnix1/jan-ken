@@ -58,3 +58,4 @@ WalletConnect yerine MetaMask'ı direkt kullan.
 **Şimdi Environment'ı `Injected Provider - MetaMask` olarak değiştir ve tekrar dene!**
 
 
+

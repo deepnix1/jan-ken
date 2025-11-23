@@ -108,3 +108,4 @@ contract Test {
 **Şimdi yukarıdaki adımları dene ve sonucu söyle!**
 
 
+

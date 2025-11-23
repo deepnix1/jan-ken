@@ -85,3 +85,4 @@ Eğer force send çalışmazsa:
 **Şimdi "Force send" seçeneğini dene! Genellikle çalışır! 🚀**
 
 
+

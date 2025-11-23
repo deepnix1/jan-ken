@@ -100,3 +100,4 @@ $env:PATH += ";$env:USERPROFILE\.foundry\bin"
 **İyi şanslar! 🍀**
 
 
+

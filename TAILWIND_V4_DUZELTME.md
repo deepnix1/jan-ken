@@ -56,3 +56,4 @@ Tailwind CSS v4'te `tailwind.config.ts` dosyası artık gerekli değil. Yapılan
 **Frontend şimdi çalışmalı! Modern UI görünmeli! 🎨**
 
 
+

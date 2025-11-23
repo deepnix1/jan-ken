@@ -105,3 +105,4 @@ Frontend şimdi çalışıyor:
 **Modern, profesyonel bir UI/UX tasarımı tamamlandı! 🎉**
 
 
+

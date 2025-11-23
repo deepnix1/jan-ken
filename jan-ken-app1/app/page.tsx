@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
-import { useAccount, useConnect } from 'wagmi';
+import { useAccount, useConnect, useDisconnect } from 'wagmi';
 import { sdk } from '@farcaster/miniapp-sdk';
 import { BetSelector } from '@/components/BetSelector';
 import { Matchmaking } from '@/components/Matchmaking';
@@ -14,13 +14,16 @@ import { MatchFoundAnimation } from '@/components/MatchFoundAnimation';
 export const dynamic = 'force-dynamic';
 
 export default function Home() {
+  // useAccount automatically watches for account changes in Wagmi v3
   const { isConnected, address } = useAccount();
   const { connect, connectors, isPending, error: connectError } = useConnect();
+  const { disconnect } = useDisconnect();
   const [gameState, setGameState] = useState<'select' | 'matching' | 'playing' | 'result'>('select');
   const [selectedBet, setSelectedBet] = useState<bigint | null>(null);
   const [gameId, setGameId] = useState<string | null>(null);
   const [showMatchFound, setShowMatchFound] = useState(false);
   const [appReady, setAppReady] = useState(false);
+  const previousAddressRef = useRef<string | undefined>(undefined);
 
   // Call sdk.actions.ready() when app is fully loaded (per Farcaster docs)
   useEffect(() => {
@@ -54,8 +57,76 @@ export default function Home() {
       setSelectedBet(null);
       setGameId(null);
       setShowMatchFound(false);
+      previousAddressRef.current = undefined;
     }
   }, [isConnected]);
+
+  // Watch for wallet address changes in Farcaster
+  useEffect(() => {
+    if (!appReady || typeof window === 'undefined') return;
+
+    // Listen for wallet changes from Farcaster SDK
+    const handleWalletChange = async () => {
+      try {
+        if (sdk && typeof sdk.wallet !== 'undefined') {
+          const provider = await sdk.wallet.getEthereumProvider();
+          if (provider) {
+            // Listen for account changes
+            provider.on('accountsChanged', async (accounts: readonly `0x${string}`[]) => {
+              console.log('🔄 Wallet address changed in Farcaster:', accounts);
+              const newAddress = accounts[0]?.toLowerCase();
+              const currentAddress = address?.toLowerCase();
+              
+              if (newAddress && newAddress !== currentAddress) {
+                console.log('🔄 Reconnecting with new wallet address...');
+                // Disconnect first, then reconnect
+                disconnect();
+                // Wait a bit for disconnect to complete
+                setTimeout(() => {
+                  const farcasterConnector = connectors.find(c => c.name === 'Farcaster Mini App' || c.name?.includes('Farcaster'));
+                  if (farcasterConnector) {
+                    connect({ connector: farcasterConnector });
+                  }
+                }, 500);
+              }
+            });
+
+            // Listen for chain changes
+            provider.on('chainChanged', () => {
+              console.log('🔄 Chain changed, reconnecting...');
+              disconnect();
+              setTimeout(() => {
+                const farcasterConnector = connectors.find(c => c.name === 'Farcaster Mini App' || c.name?.includes('Farcaster'));
+                if (farcasterConnector) {
+                  connect({ connector: farcasterConnector });
+                }
+              }, 500);
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error setting up wallet change listener:', error);
+      }
+    };
+
+    handleWalletChange();
+  }, [appReady, address, connectors, connect, disconnect]);
+
+  // Also watch for address changes via useAccount
+  useEffect(() => {
+    if (address && previousAddressRef.current && previousAddressRef.current !== address) {
+      console.log('🔄 Wallet address changed via useAccount:', {
+        previous: previousAddressRef.current,
+        current: address,
+      });
+      // Reset game state when wallet changes
+      setGameState('select');
+      setSelectedBet(null);
+      setGameId(null);
+      setShowMatchFound(false);
+    }
+    previousAddressRef.current = address;
+  }, [address]);
 
   const handleConnect = () => {
     if (connectors.length === 0) {

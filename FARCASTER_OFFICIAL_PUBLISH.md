@@ -221,3 +221,4 @@ App'inizin keşfedilebilir olması için:
 - **Audit Yapın**: Manifest audit yaparak hataları bulun
 - **Analytics İzleyin**: App kullanımını analytics'ten takip edin
 
+

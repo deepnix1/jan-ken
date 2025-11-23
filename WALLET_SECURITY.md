@@ -67,3 +67,4 @@ Private key'iniz environment dosyalarına eklendi. Şimdi:
 **✅ Private key güvenli şekilde kaydedildi. Şimdi contract deploy edebilirsin!**
 
 
+

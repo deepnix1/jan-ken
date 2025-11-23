@@ -152,3 +152,4 @@ F12 → Console sekmesindeki hataları paylaş
 **Şimdi yukarıdaki adımları tek tek dene ve sonuçları paylaş!**
 
 
+

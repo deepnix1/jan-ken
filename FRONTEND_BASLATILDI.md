@@ -86,3 +86,4 @@ Tarayıcıda şu adrese git:
 **Frontend hazır! Tarayıcıda http://localhost:3000 adresine git! 🎮**
 
 
+

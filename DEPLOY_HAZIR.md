@@ -189,3 +189,4 @@ Deploy başarılı olduysa:
 **Hazırsın! Deploy etmeye başlayabilirsin! 🚀**
 
 
+

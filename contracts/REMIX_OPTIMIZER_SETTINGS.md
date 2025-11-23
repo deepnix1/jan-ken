@@ -42,3 +42,4 @@ If contract is still too large after optimization:
 2. **Use libraries** - Move some logic to external libraries
 3. **Split contract** - Break into multiple contracts (not recommended for this use case)
 
+

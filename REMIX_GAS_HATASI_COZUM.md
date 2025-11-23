@@ -77,3 +77,4 @@ missing revert data
 **Şimdi yukarıdaki adımları tek tek dene!**
 
 
+

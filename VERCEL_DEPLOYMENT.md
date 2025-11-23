@@ -82,3 +82,4 @@ Make sure these are set in Vercel Dashboard:
 - Make sure contract address is correct in environment variables
 - Test thoroughly before going live
 
+

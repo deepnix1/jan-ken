@@ -112,3 +112,4 @@ npm run dev
 **Şimdi terminal'deki çıktıyı kontrol et ve hata var mı bak!**
 
 
+

@@ -180,3 +180,4 @@ Contract deploy edildikten sonra:
 **Şimdi Remix IDE'yi aç ve yukarıdaki adımları takip et! 🚀**
 
 
+

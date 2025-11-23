@@ -65,3 +65,4 @@ Base Sepolia explorer'da contract'ı deploy edebilirsin (daha karmaşık)
 Hangi yöntemi tercih edersin?
 
 
+

@@ -70,3 +70,4 @@ Ekranda beyaz arka plan ve basit tasarım görünüyor. Modern gradient arka pla
 **Şimdi tarayıcıda Hard Refresh yap (Ctrl+Shift+R) ve tekrar kontrol et!**
 
 
+

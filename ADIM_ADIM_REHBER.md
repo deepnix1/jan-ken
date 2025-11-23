@@ -468,3 +468,4 @@ Artık "Jan KeN!" uygulaman hazır! 🎊
 **İyi şanslar! 🍀**
 
 
+

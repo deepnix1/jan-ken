@@ -196,3 +196,4 @@ type .env.local
 **Şimdi yukarıdaki komutları `cd` ile başlayarak kullan! 🚀**
 
 
+
