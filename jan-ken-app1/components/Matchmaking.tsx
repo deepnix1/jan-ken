@@ -256,7 +256,7 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
         stack: writeError?.stack,
         code: (writeError as any)?.code,
         data: (writeError as any)?.data,
-        fullError: JSON.stringify(writeError, Object.getOwnPropertyNames(writeError), 2),
+        fullError: 'Error object (cannot serialize - may contain BigInt)',
       });
       
       setHasJoinedQueue(false);
@@ -610,10 +610,17 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
         
         // If simulation data is not available and status is not error, wait for it
         // Note: This check is after the pending check above, so status can be 'success' or 'error' here
-        if (!simulateData && simulateStatus !== 'error') {
+        // BUT: If simulation status is error, we should proceed with fallback transaction
+        if (!simulateData && simulateStatus !== 'error' && simulateStatus !== 'success') {
           console.warn('⚠️ Simulation data not available yet, waiting...');
           console.warn('⚠️ Simulation status:', simulateStatus);
           return; // Wait for simulation to complete
+        }
+        
+        // If simulation failed (error status) but we don't have data, proceed with fallback
+        if (!simulateData && simulateStatus === 'error') {
+          console.warn('⚠️ Simulation failed but no data available, proceeding with fallback transaction');
+          console.warn('⚠️ Wallet will estimate gas instead');
         }
         
         // Check Wagmi connector client - CRITICAL CHECK
@@ -734,12 +741,13 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
         console.log('From:', address);
         console.log('Chain ID:', chainId);
         console.log('writeContract function type:', typeof writeContract);
-        console.log('Transaction params:', JSON.stringify({
+        // Log transaction params safely (avoid JSON.stringify with BigInt)
+        console.log('Transaction params:', {
           address: txParams.address,
           functionName: txParams.functionName,
-          args: txParams.args.map(a => a.toString()),
+          args: txParams.args.map(a => typeof a === 'bigint' ? a.toString() : String(a)),
           value: txParams.value.toString(),
-        }, null, 2));
+        });
         
         try {
           // IMPORTANT: If Farcaster provider is not available, we can't send transaction
@@ -978,16 +986,32 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
     
     // Wait a bit for simulation to complete if available
     // This helps with gas estimation but don't wait too long
-    if (simulateData && (simulateData as any).request) {
+    // CRITICAL: If simulation status is 'error', send transaction immediately (fallback mode)
+    if (simulateStatus === 'error') {
+      // Simulation failed - send transaction immediately with fallback (wallet will estimate gas)
+      console.log('⚠️ Simulation error detected in useEffect, sending transaction immediately (fallback mode)');
+      const timeoutId = setTimeout(sendTransaction, 100);
+      return () => clearTimeout(timeoutId);
+    } else if (simulateData && (simulateData as any).request) {
       // Simulation ready, send immediately
+      console.log('✅ Simulation data available, sending transaction with gas estimation');
       const timeoutId = setTimeout(sendTransaction, 200);
       return () => clearTimeout(timeoutId);
+    } else if (simulateStatus === 'pending') {
+      // Simulation still pending - wait a bit more
+      console.log('⏳ Simulation pending, waiting up to 3 seconds...');
+      const timeoutId = setTimeout(() => {
+        console.warn('⚠️ Simulation timeout after 3 seconds, sending transaction anyway (fallback mode)');
+        sendTransaction();
+      }, 3000); // Wait 3 seconds max
+      return () => clearTimeout(timeoutId);
     } else {
-      // Wait max 1 second for simulation, then send anyway
-      const timeoutId = setTimeout(sendTransaction, 1000);
+      // No simulation data and not pending - send immediately (fallback mode)
+      console.log('⚠️ No simulation data, sending transaction immediately (fallback mode)');
+      const timeoutId = setTimeout(sendTransaction, 500);
       return () => clearTimeout(timeoutId);
     }
-  }, [isConnected, writeContract, betAmount, hasJoinedQueue, address, simulateData, simulateStatus, simulateError, chainId, connectorClient]);
+  }, [isConnected, writeContract, betAmount, hasJoinedQueue, address, simulateData, simulateStatus, simulateError, chainId, connectorClient, resetWriteContract]);
 
   // Poll game status as fallback if event doesn't fire
   // This handles cases where event listener might miss the event
