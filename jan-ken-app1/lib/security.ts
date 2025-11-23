@@ -42,7 +42,7 @@ export function isValidBetAmount(amount: bigint | string | number): boolean {
     
     // Must be positive and less than 1000 ETH (safety limit)
     const maxBet = BigInt('1000000000000000000000'); // 1000 ETH in wei
-    return numAmount > 0n && numAmount <= maxBet;
+    return numAmount > BigInt(0) && numAmount <= maxBet;
   } catch {
     return false;
   }
