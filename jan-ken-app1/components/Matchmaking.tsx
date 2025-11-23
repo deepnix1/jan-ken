@@ -121,17 +121,39 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
           console.log('Transaction sent successfully:', txHash);
           setHasJoinedQueue(true);
           setTxError(null);
+          setTxHash(txHash);
         },
-        onError: (error) => {
+        onError: (error: any) => {
           console.error('Error joining queue:', error);
           setHasJoinedQueue(false);
-          setTxError(error.message || 'Transaction failed');
+          
+          // User-friendly error messages
+          let errorMessage = 'Transaction failed';
+          if (error?.message?.includes('rejected') || error?.message?.includes('Rejected')) {
+            errorMessage = 'Transaction was rejected. Please approve in your wallet.';
+          } else if (error?.message?.includes('insufficient funds') || error?.message?.includes('Insufficient')) {
+            errorMessage = 'Insufficient funds. Please add more ETH to your wallet.';
+          } else if (error?.message?.includes('user rejected') || error?.message?.includes('User rejected')) {
+            errorMessage = 'Transaction was rejected. Please try again and approve in your wallet.';
+          } else if (error?.message) {
+            errorMessage = error.message;
+          }
+          
+          setTxError(errorMessage);
         },
       });
     } catch (error: any) {
       console.error('Error joining queue:', error);
       setHasJoinedQueue(false);
-      setTxError(error?.message || 'Transaction failed');
+      
+      let errorMessage = 'Transaction failed';
+      if (error?.message?.includes('rejected') || error?.message?.includes('Rejected')) {
+        errorMessage = 'Transaction was rejected. Please approve in your wallet.';
+      } else if (error?.message) {
+        errorMessage = error.message;
+      }
+      
+      setTxError(errorMessage);
     }
   }, [isConnected, writeContract, betAmount, hasJoinedQueue, address]);
 
@@ -258,11 +280,29 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
             </div>
           )}
           
-          {writeError && (
-            <div className="flex items-center justify-center gap-3 sm:gap-4 px-4 sm:px-6 md:px-8 py-4 sm:py-5 bg-black/60 border-2 border-red-500/40 rounded-lg shadow-[0_0_30px_rgba(239,68,68,0.4)]">
+          {(writeError || txError) && (
+            <div className="flex flex-col items-center justify-center gap-3 sm:gap-4 px-4 sm:px-6 md:px-8 py-4 sm:py-5 bg-black/60 border-2 border-red-500/40 rounded-lg shadow-[0_0_30px_rgba(239,68,68,0.4)]">
               <p className="text-red-400 font-mono font-bold uppercase tracking-wider text-xs sm:text-sm text-center">
-                Error: {writeError.message || 'Transaction failed'}
+                {txError || writeError?.message || 'Transaction failed'}
               </p>
+              {(txError?.includes('rejected') || writeError?.message?.includes('rejected')) && (
+                <div className="mt-2 text-center">
+                  <p className="text-gray-400 font-mono text-xs mb-2">
+                    Please check your wallet and approve the transaction.
+                  </p>
+                  <button
+                    onClick={() => {
+                      setHasJoinedQueue(false);
+                      setTxError(null);
+                      // Retry transaction
+                      window.location.reload();
+                    }}
+                    className="px-4 py-2 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400 font-mono text-xs hover:bg-red-500/30 transition-colors"
+                  >
+                    Try Again
+                  </button>
+                </div>
+              )}
             </div>
           )}
           

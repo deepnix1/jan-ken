@@ -98,16 +98,27 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
         onSuccess: (txHash) => {
           console.log('Transaction sent:', txHash);
         },
-        onError: (error) => {
+        onError: (error: any) => {
           console.error('Error making choice:', error);
           // Reset selection on error
           setSelectedChoice(null);
+          
+          // Show user-friendly error
+          if (error?.message?.includes('rejected') || error?.message?.includes('Rejected')) {
+            alert('Transaction was rejected. Please approve in your wallet and try again.');
+          } else if (error?.message?.includes('user rejected') || error?.message?.includes('User rejected')) {
+            alert('Transaction was rejected. Please try again and approve in your wallet.');
+          }
         },
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error making choice:', error);
       // Reset selection on error
       setSelectedChoice(null);
+      
+      if (error?.message?.includes('rejected') || error?.message?.includes('Rejected')) {
+        alert('Transaction was rejected. Please approve in your wallet and try again.');
+      }
     }
   };
 
