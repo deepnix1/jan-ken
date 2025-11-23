@@ -100,15 +100,26 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
       },
       onMutate: (variables) => {
         // Convert BigInt values to string for logging (JSON.stringify can't serialize BigInt)
-        const variablesForLog = variables ? {
-          ...variables,
-          args: variables.args ? variables.args.map((arg: any) => 
-            typeof arg === 'bigint' ? arg.toString() : arg
-          ) : variables.args,
-          value: variables.value ? (typeof variables.value === 'bigint' ? variables.value.toString() : variables.value) : variables.value,
-        } : variables;
-        console.log('🔄 writeContract mutation started (onMutate callback):', variablesForLog);
-        console.log('This means writeContract was called and is processing...');
+        // DON'T use spread operator - it copies ABI which may contain BigInt values
+        try {
+          const variablesForLog: any = {
+            address: variables?.address,
+            functionName: variables?.functionName,
+            args: variables?.args ? variables.args.map((arg: any) => 
+              typeof arg === 'bigint' ? arg.toString() : (typeof arg === 'object' ? '[object]' : String(arg))
+            ) : variables?.args,
+            value: variables?.value ? (typeof variables.value === 'bigint' ? variables.value.toString() : String(variables.value)) : variables?.value,
+            // Don't log ABI - it's very large and may contain BigInt
+            abi: 'ABI_REMOVED_FOR_LOGGING',
+          };
+          console.log('🔄 writeContract mutation started (onMutate callback):', variablesForLog);
+          console.log('This means writeContract was called and is processing...');
+        } catch (e) {
+          // If logging fails, just log a simple message
+          console.log('🔄 writeContract mutation started (onMutate callback)');
+          console.log('This means writeContract was called and is processing...');
+          console.warn('Could not log mutation variables (BigInt serialization issue):', e);
+        }
       },
       onSettled: (data: any, error: any) => {
         // Safely log settled state (avoid BigInt serialization issues)
