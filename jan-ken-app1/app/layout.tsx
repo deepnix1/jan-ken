@@ -1,7 +1,12 @@
 import type { Metadata } from "next";
 import { Inter, Source_Code_Pro } from "next/font/google";
-import { RootProvider } from "./rootProvider";
+import dynamic from "next/dynamic";
 import "./globals.css";
+
+// Dynamically import RootProvider to avoid SSR issues with Wagmi
+const RootProvider = dynamic(() => import("./rootProvider").then(mod => ({ default: mod.RootProvider })), {
+  ssr: false,
+});
 
 const inter = Inter({
   variable: "--font-inter",
