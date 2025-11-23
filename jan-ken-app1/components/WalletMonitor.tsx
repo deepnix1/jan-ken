@@ -121,7 +121,7 @@ export function WalletMonitor() {
   }, [isMonitoring]);
 
   return (
-    <div className="fixed bottom-4 left-4 w-[500px] max-h-[80vh] overflow-y-auto bg-black/95 backdrop-blur-lg border-2 border-purple-400/50 rounded-lg p-4 shadow-[0_0_30px_rgba(168,85,247,0.4)] z-50">
+    <div className="fixed bottom-4 left-4 w-[500px] max-h-[80vh] overflow-y-auto bg-black/95 backdrop-blur-lg border-2 border-purple-400/50 rounded-lg p-4 shadow-[0_0_30px_rgba(168,85,247,0.4)] z-[9999]">
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="text-lg font-bold text-purple-400">Wallet Monitor</h3>
@@ -129,7 +129,7 @@ export function WalletMonitor() {
             {MONITORED_ADDRESS.slice(0, 10)}...{MONITORED_ADDRESS.slice(-8)}
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-shrink-0">
           <button
             onClick={() => {
               console.log('🔄 Check Now button clicked - loading transactions...');
@@ -137,16 +137,26 @@ export function WalletMonitor() {
               loadBalance();
             }}
             disabled={isLoading}
-            className="px-4 py-2 bg-purple-500/30 border-2 border-purple-400 rounded-lg text-purple-300 font-bold text-sm hover:bg-purple-500/40 hover:border-purple-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_10px_rgba(168,85,247,0.3)] transition-all"
+            style={{ 
+              minWidth: '120px',
+              zIndex: 10000,
+              position: 'relative'
+            }}
+            className="px-4 py-2 bg-purple-500/40 border-2 border-purple-400 rounded-lg text-purple-200 font-bold text-sm hover:bg-purple-500/60 hover:border-purple-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_15px_rgba(168,85,247,0.5)] transition-all cursor-pointer"
           >
             {isLoading ? '⏳ Loading...' : '🔄 Check Now'}
           </button>
           <button
             onClick={startMonitoring}
-            className={`px-4 py-2 border-2 rounded-lg text-sm font-bold shadow-[0_0_10px_rgba(34,197,94,0.3)] transition-all ${
+            style={{ 
+              minWidth: '100px',
+              zIndex: 10000,
+              position: 'relative'
+            }}
+            className={`px-4 py-2 border-2 rounded-lg text-sm font-bold shadow-[0_0_15px_rgba(34,197,94,0.5)] transition-all cursor-pointer ${
               isMonitoring
-                ? 'bg-red-500/30 border-red-400 text-red-300 hover:bg-red-500/40 hover:border-red-300'
-                : 'bg-green-500/30 border-green-400 text-green-300 hover:bg-green-500/40 hover:border-green-300'
+                ? 'bg-red-500/40 border-red-400 text-red-200 hover:bg-red-500/60 hover:border-red-300'
+                : 'bg-green-500/40 border-green-400 text-green-200 hover:bg-green-500/60 hover:border-green-300'
             }`}
           >
             {isMonitoring ? '⏹️ Stop' : '▶️ Monitor'}
@@ -164,6 +174,11 @@ export function WalletMonitor() {
         {transactions.length > 0 && transactions[0].isContractCall && (
           <div className="text-xs text-green-400 mt-2 font-bold">
             ✅ Latest transaction sent to contract!
+          </div>
+        )}
+        {transactions.length === 0 && (
+          <div className="text-xs text-yellow-400 mt-2 font-bold">
+            💡 Click "Check Now" to load transactions
           </div>
         )}
       </div>
