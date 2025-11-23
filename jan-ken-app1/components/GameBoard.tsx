@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { useWriteContract, useReadContract, useAccount } from 'wagmi';
+import { useWriteContract, useReadContract, useAccount, useWaitForTransactionReceipt } from 'wagmi';
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from '@/lib/contract';
 import { isValidChoice, isValidBetAmount } from '@/lib/security';
 
@@ -25,7 +25,16 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
   const [gameFinished, setGameFinished] = useState(false);
   // TEST MODE: Wallet check temporarily disabled
 
-  const { writeContract, isPending, error: writeError } = useWriteContract();
+  const { data: hash, writeContract, isPending, error: writeError } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess: isTxSuccess, isError: isReceiptError } = useWaitForTransactionReceipt({
+    hash,
+    timeout: 60000, // 60 seconds timeout
+    confirmations: 1,
+    query: {
+      retry: 3,
+      retryDelay: 2000,
+    },
+  });
   const { data: gameData, isLoading: isLoadingGame } = useReadContract({
     address: CONTRACT_ADDRESS as `0x${string}`,
     abi: CONTRACT_ABI,
@@ -85,6 +94,15 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
         abi: CONTRACT_ABI,
         functionName: 'makeChoice',
         args: [choiceId],
+      }, {
+        onSuccess: (txHash) => {
+          console.log('Transaction sent:', txHash);
+        },
+        onError: (error) => {
+          console.error('Error making choice:', error);
+          // Reset selection on error
+          setSelectedChoice(null);
+        },
       });
     } catch (error) {
       console.error('Error making choice:', error);
@@ -272,12 +290,47 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
       </div>
 
       {/* Status Messages */}
-      {isPending && (
+      {(isPending || isConfirming) && (
         <div className="text-center py-6">
-          <div className="inline-flex items-center gap-4 px-8 py-4 bg-black/60 border-2 border-blue-500/40 rounded-lg shadow-[0_0_30px_rgba(59,130,246,0.4)]">
-            <div className="w-6 h-6 border-3 border-blue-400 border-t-transparent rounded-full animate-spin shadow-[0_0_10px_rgba(59,130,246,1)]"></div>
-            <p className="text-blue-400 font-mono font-bold uppercase tracking-wider">
-              Sending Transaction...
+          <div className="inline-flex flex-col items-center gap-3 px-8 py-4 bg-black/60 border-2 border-blue-500/40 rounded-lg shadow-[0_0_30px_rgba(59,130,246,0.4)]">
+            <div className="flex items-center gap-4">
+              <div className="w-6 h-6 border-3 border-blue-400 border-t-transparent rounded-full animate-spin shadow-[0_0_10px_rgba(59,130,246,1)]"></div>
+              <p className="text-blue-400 font-mono font-bold uppercase tracking-wider">
+                {isPending ? 'Sending Transaction...' : 'Confirming transaction...'}
+              </p>
+            </div>
+            {hash && (
+              <a
+                href={`https://sepolia.basescan.org/tx/${hash}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-300 hover:text-blue-200 font-mono text-xs underline"
+              >
+                View on BaseScan
+              </a>
+            )}
+          </div>
+        </div>
+      )}
+      
+      {isReceiptError && (
+        <div className="text-center py-6">
+          <div className="inline-flex flex-col items-center gap-3 px-8 py-4 bg-black/60 border-2 border-red-500/40 rounded-lg shadow-[0_0_30px_rgba(239,68,68,0.4)]">
+            <p className="text-red-400 font-mono font-bold uppercase tracking-wider text-sm">
+              Transaction confirmation timeout
+            </p>
+            {hash && (
+              <a
+                href={`https://sepolia.basescan.org/tx/${hash}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-red-300 hover:text-red-200 font-mono text-xs underline"
+              >
+                Check transaction on BaseScan
+              </a>
+            )}
+            <p className="text-gray-400 font-mono text-xs text-center mt-2">
+              Transaction may still be processing. Check BaseScan for status.
             </p>
           </div>
         </div>

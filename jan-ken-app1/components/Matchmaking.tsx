@@ -19,8 +19,14 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
   const [hasJoinedQueue, setHasJoinedQueue] = useState(false);
   
   const { data: hash, writeContract, isPending, error: writeError } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
+  const { isLoading: isConfirming, isSuccess, isError: isReceiptError, error: receiptError } = useWaitForTransactionReceipt({
     hash,
+    timeout: 60000, // 60 seconds timeout
+    confirmations: 1, // Wait for 1 confirmation
+    query: {
+      retry: 3, // Retry 3 times
+      retryDelay: 2000, // Wait 2 seconds between retries
+    },
   });
   
   // Get pool status - count players waiting for this bet amount
@@ -190,10 +196,47 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
         {/* Gaming Status Indicators - Mobile Responsive */}
         <div className="space-y-4 sm:space-y-5 w-full max-w-md px-4">
           {(isPending || isConfirming) && (
-            <div className="flex items-center justify-center gap-3 sm:gap-4 px-4 sm:px-6 md:px-8 py-4 sm:py-5 bg-black/60 border-2 border-blue-500/40 rounded-lg shadow-[0_0_30px_rgba(59,130,246,0.4)]">
-              <div className="w-5 h-5 sm:w-6 sm:h-6 border-2 sm:border-3 border-blue-400 border-t-transparent rounded-full animate-spin shadow-[0_0_10px_rgba(59,130,246,1)]"></div>
-              <p className="text-blue-400 font-mono font-bold uppercase tracking-wider text-xs sm:text-sm md:text-base">
-                Confirming transaction...
+            <div className="flex flex-col items-center justify-center gap-3 sm:gap-4 px-4 sm:px-6 md:px-8 py-4 sm:py-5 bg-black/60 border-2 border-blue-500/40 rounded-lg shadow-[0_0_30px_rgba(59,130,246,0.4)]">
+              <div className="flex items-center gap-3 sm:gap-4">
+                <div className="w-5 h-5 sm:w-6 sm:h-6 border-2 sm:border-3 border-blue-400 border-t-transparent rounded-full animate-spin shadow-[0_0_10px_rgba(59,130,246,1)]"></div>
+                <p className="text-blue-400 font-mono font-bold uppercase tracking-wider text-xs sm:text-sm md:text-base">
+                  {isPending ? 'Sending transaction...' : 'Confirming transaction...'}
+                </p>
+              </div>
+              {hash && (
+                <div className="mt-2">
+                  <a
+                    href={`https://sepolia.basescan.org/tx/${hash}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-300 hover:text-blue-200 font-mono text-xs underline"
+                  >
+                    View on BaseScan
+                  </a>
+                </div>
+              )}
+            </div>
+          )}
+          
+          {isReceiptError && (
+            <div className="flex flex-col items-center justify-center gap-3 sm:gap-4 px-4 sm:px-6 md:px-8 py-4 sm:py-5 bg-black/60 border-2 border-red-500/40 rounded-lg shadow-[0_0_30px_rgba(239,68,68,0.4)]">
+              <p className="text-red-400 font-mono font-bold uppercase tracking-wider text-xs sm:text-sm text-center">
+                Transaction confirmation timeout
+              </p>
+              {hash && (
+                <div className="mt-2">
+                  <a
+                    href={`https://sepolia.basescan.org/tx/${hash}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-red-300 hover:text-red-200 font-mono text-xs underline"
+                  >
+                    Check transaction on BaseScan
+                  </a>
+                </div>
+              )}
+              <p className="text-gray-400 font-mono text-xs text-center mt-2">
+                Transaction may still be processing. Check BaseScan for status.
               </p>
             </div>
           )}
