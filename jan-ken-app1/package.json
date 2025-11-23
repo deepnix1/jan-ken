@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "security-check": "npm audit && echo 'Security check complete'"
   },
   "dependencies": {
     "@coinbase/onchainkit": "latest",

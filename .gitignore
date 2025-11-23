@@ -9,10 +9,33 @@ dist/
 build/
 *.log
 
-# Environment variables
+# Environment variables - SECURITY: NEVER commit these
 .env
 .env.local
 .env*.local
+.env.production
+.env.development
+*.env
+!env.example
+
+# Private keys and secrets - SECURITY CRITICAL
+*.key
+*.pem
+*.p12
+*.pfx
+secrets/
+.secrets/
+private-keys/
+PRIVATE_KEY
+PRIVATE_KEY_*
+
+# API Keys and credentials - SECURITY CRITICAL
+*_API_KEY
+*_SECRET
+*_TOKEN
+CDP_API_KEY
+CDP_SECRET
+BASESCAN_API_KEY
 
 # IDE
 .vscode/
@@ -39,12 +62,19 @@ typechain-types/
 *.log
 dev.log
 monitor.log
+*.log.*
 
 # Temporary files
 *.tmp
 *.temp
+*.bak
+*.backup
 
 # Monitoring scripts (not needed in repo)
 monitor.ps1
 setup-env.ps1
+
+# Deployment artifacts
+deployments/
+.openzeppelin/
 

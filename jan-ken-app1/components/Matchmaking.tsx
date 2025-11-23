@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useWriteContract, useWaitForTransactionReceipt, useAccount, useWatchContractEvent } from 'wagmi';
 import { formatEther } from 'viem';
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from '@/lib/contract';
+import { isValidBetAmount, isValidAddress } from '@/lib/security';
 
 interface MatchmakingProps {
   betAmount: bigint;

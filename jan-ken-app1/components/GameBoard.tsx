@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { useWriteContract, useReadContract, useAccount } from 'wagmi';
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from '@/lib/contract';
+import { isValidChoice, isValidBetAmount } from '@/lib/security';
 
 interface GameBoardProps {
   betAmount: bigint;
@@ -61,7 +62,19 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
   }, [timeLeft, gameFinished, onGameEnd]);
 
   const handleChoice = (choiceId: number) => {
+    // Security: Input validation
+    if (!isValidChoice(choiceId)) {
+      console.error('Invalid choice:', choiceId);
+      return;
+    }
+    
     if (selectedChoice || !writeContract || !address) return;
+
+    // Security: Validate address format
+    if (!address || !address.startsWith('0x') || address.length !== 42) {
+      console.error('Invalid wallet address');
+      return;
+    }
 
     setSelectedChoice(choiceId);
     
