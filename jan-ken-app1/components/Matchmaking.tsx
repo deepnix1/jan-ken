@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useWriteContract, useWaitForTransactionReceipt, useAccount, useWatchContractEvent, useSimulateContract, useChainId } from 'wagmi';
+import { sdk } from '@farcaster/miniapp-sdk';
 import { formatEther } from 'viem';
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from '@/lib/contract';
 import { isValidBetAmount, isValidAddress } from '@/lib/security';
@@ -309,26 +310,47 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
     // Small delay to ensure UI is ready before showing wallet popup
     const sendTransaction = async () => {
       try {
-        // Check wallet provider before sending
+        // Check wallet provider before sending - use imported SDK
+        console.log('🔍 Wallet provider check:');
+        console.log('  - Imported SDK available:', !!sdk);
+        console.log('  - SDK wallet available:', !!(sdk && sdk.wallet));
+        
+        let farcasterProvider: any = null;
+        if (sdk && sdk.wallet) {
+          try {
+            farcasterProvider = await sdk.wallet.getEthereumProvider();
+            console.log('  - Farcaster provider:', !!farcasterProvider);
+            if (farcasterProvider) {
+              const providerAny = farcasterProvider as any;
+              console.log('  - Provider chainId:', providerAny.chainId);
+              console.log('  - Provider networkVersion:', providerAny.networkVersion);
+              console.log('  - Provider isConnected:', providerAny.isConnected);
+              console.log('  - Provider has request method:', typeof providerAny.request === 'function');
+              console.log('  - Provider has send method:', typeof providerAny.send === 'function');
+              
+              // Test if provider is responsive
+              try {
+                const accounts = await providerAny.request({ method: 'eth_accounts' });
+                console.log('  - Provider accounts:', accounts);
+              } catch (err) {
+                console.warn('  - Could not get accounts from provider:', err);
+              }
+            } else {
+              console.error('  - ❌ Farcaster provider is null/undefined!');
+            }
+          } catch (err) {
+            console.error('  - ❌ Could not get Farcaster provider:', err);
+          }
+        } else {
+          console.error('  - ❌ SDK or SDK.wallet not available!');
+        }
+        
+        // Also check window for debugging
         if (typeof window !== 'undefined') {
           const ethereum = (window as any).ethereum;
           const farcaster = (window as any).farcaster;
-          console.log('🔍 Wallet provider check:');
           console.log('  - window.ethereum:', !!ethereum);
           console.log('  - window.farcaster:', !!farcaster);
-          console.log('  - farcaster.sdk:', !!farcaster?.sdk);
-          console.log('  - farcaster.sdk.wallet:', !!farcaster?.sdk?.wallet);
-          
-          if (farcaster?.sdk?.wallet) {
-            try {
-              const provider = await farcaster.sdk.wallet.getEthereumProvider();
-              console.log('  - Farcaster provider:', !!provider);
-              console.log('  - Provider chainId:', provider?.chainId);
-              console.log('  - Provider networkVersion:', provider?.networkVersion);
-            } catch (err) {
-              console.warn('  - Could not get Farcaster provider:', err);
-            }
-          }
         }
         
         console.log('🚀 Attempting to send transaction...');
@@ -395,6 +417,15 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
         }, null, 2));
         
         try {
+          // IMPORTANT: If Farcaster provider is not available, we can't send transaction
+          if (!farcasterProvider && sdk && sdk.wallet) {
+            console.error('❌ Farcaster provider not available - cannot send transaction');
+            setTxError('Wallet provider not available. Please check your Farcaster wallet connection.');
+            setHasJoinedQueue(false);
+            setTxStartTime(null);
+            return;
+          }
+          
           // Use simulation data if available for better gas estimation
           if (simulateData && (simulateData as any).request) {
             console.log('📤 Using simulation data for gas estimation');
@@ -413,6 +444,7 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
               maxPriorityFeePerGas: simRequest.maxPriorityFeePerGas?.toString(),
             });
             
+            console.log('📤 Calling writeContract with simulation request...');
             writeContract(simRequest);
           } else {
             console.log('📤 Sending transaction directly (wallet will estimate gas)');
@@ -422,6 +454,7 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
               args: txParams.args.map(a => a.toString()),
               value: txParams.value.toString(),
             });
+            console.log('📤 Calling writeContract...');
             writeContract(txParams);
           }
           
@@ -430,18 +463,52 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
           console.log('isPending after call:', isPending);
           console.log('Waiting for wallet popup...');
           
-          // Check if wallet popup should appear
-          setTimeout(() => {
-            console.log('⏰ 2 seconds after writeContract call:');
-            console.log('  Status:', status);
-            console.log('  isPending:', isPending);
-            console.log('  Hash:', hash);
-            console.log('  Error:', writeError);
+          // Monitor status changes more closely
+          let statusCheckCount = 0;
+          const statusCheckInterval = setInterval(() => {
+            statusCheckCount++;
+            console.log(`⏰ ${statusCheckCount * 0.5}s after writeContract call:`, {
+              status,
+              isPending,
+              hash: hash || 'none',
+              error: writeError ? {
+                message: writeError.message,
+                code: (writeError as any).code,
+                name: writeError.name,
+              } : 'none',
+            });
             
-            if (!hash && !writeError && isPending) {
-              console.warn('⚠️ No hash and no error after 2 seconds - wallet popup might not have appeared');
+            // If we've been pending for more than 5 seconds without hash or error, something is wrong
+            if (statusCheckCount >= 10) {
+              clearInterval(statusCheckInterval);
+              if (!hash && !writeError) {
+                console.error('❌ Transaction stuck - no hash and no error after 5 seconds');
+                console.error('This usually means wallet popup did not appear or transaction was silently rejected');
+                
+                // Try to get more info from Farcaster SDK
+                if (sdk && sdk.wallet) {
+                  sdk.wallet.getEthereumProvider().then(provider => {
+                    if (provider) {
+                      const providerAny = provider as any;
+                      console.log('Provider state:', {
+                        chainId: providerAny.chainId,
+                        isConnected: providerAny.isConnected,
+                      });
+                    } else {
+                      console.warn('Provider is null/undefined');
+                    }
+                  }).catch(err => {
+                    console.error('Could not get provider state:', err);
+                  });
+                }
+              }
             }
-          }, 2000);
+            
+            // Stop checking if we have hash or error
+            if (hash || writeError) {
+              clearInterval(statusCheckInterval);
+            }
+          }, 500); // Check every 500ms
           
         } catch (err: any) {
           console.error('❌ Error calling writeContract:', err);
