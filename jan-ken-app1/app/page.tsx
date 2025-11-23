@@ -9,6 +9,7 @@ import { Matchmaking } from '@/components/Matchmaking';
 import { GameBoard } from '@/components/GameBoard';
 import { Result } from '@/components/Result';
 import { MatchFoundAnimation } from '@/components/MatchFoundAnimation';
+import { ContractMonitor } from '@/components/ContractMonitor';
 
 // Disable SSR for this page (Wagmi doesn't work with SSR)
 export const dynamic = 'force-dynamic';
@@ -267,8 +268,9 @@ export default function Home() {
     // For now, we just reset the UI state
   };
 
-  return (
-    <main className="min-h-screen bg-black relative overflow-hidden">
+        return (
+          <>
+          <main className="min-h-screen bg-black relative overflow-hidden">
       {/* Background Effects */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:50px_50px]"></div>
@@ -386,6 +388,10 @@ export default function Home() {
           </div>
         </div>
       </div>
-    </main>
-  );
-}
+          </main>
+          
+          {/* Contract Monitor - Development/Testing Tool */}
+          {typeof window !== 'undefined' && process.env.NODE_ENV === 'development' && <ContractMonitor />}
+          </>
+        );
+      }

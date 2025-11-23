@@ -6,6 +6,7 @@ import { formatEther } from 'viem';
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from '@/lib/contract';
 import { isValidBetAmount, isValidAddress } from '@/lib/security';
 import { useTransactionMonitor } from '@/hooks/useTransactionMonitor';
+import { verifyTransaction } from '@/lib/contractTest';
 
 interface MatchmakingProps {
   betAmount: bigint;
@@ -109,8 +110,36 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
         status: 'sent',
         hash: hash as `0x${string}`,
       });
+      
+      // Verify transaction was sent to contract
+      verifyTransaction(hash as `0x${string}`, 'joinQueue', CONTRACT_ADDRESS as `0x${string}`)
+        .then((result) => {
+          if (result.success) {
+            console.log('✅ Transaction verified - sent to contract:', result.data);
+            updateTransaction(txIdRef.current!, {
+              metadata: {
+                ...getTransaction(txIdRef.current!)?.metadata,
+                verified: true,
+                blockNumber: result.data?.blockNumber,
+                gasUsed: result.data?.gasUsed,
+              },
+            });
+          } else {
+            console.error('❌ Transaction verification failed:', result.message, result.error);
+            updateTransaction(txIdRef.current!, {
+              metadata: {
+                ...getTransaction(txIdRef.current!)?.metadata,
+                verified: false,
+                verificationError: result.error || result.message,
+              },
+            });
+          }
+        })
+        .catch((error) => {
+          console.error('❌ Error verifying transaction:', error);
+        });
     }
-  }, [hash, status, updateTransaction]);
+  }, [hash, status, updateTransaction, getTransaction]);
 
   // Monitor status changes - hash might come after status changes
   useEffect(() => {
