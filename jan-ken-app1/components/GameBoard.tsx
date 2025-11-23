@@ -320,13 +320,13 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
               key={choice.id}
               onClick={() => handleChoice(choice.id)}
               disabled={isDisabled}
-              className={`group relative overflow-hidden rounded-xl sm:rounded-2xl p-4 sm:p-6 md:p-8 transition-all duration-300 transform ${
+              className={`group relative overflow-hidden rounded-lg sm:rounded-xl p-3 sm:p-4 transition-all duration-300 transform ${
                 isSelected
-                  ? `scale-110 ${config.shadow} border-4 ${config.border}`
+                  ? `scale-110 ${config.shadow} border-3 ${config.border}`
                   : isDisabled
                   ? 'opacity-30 cursor-not-allowed'
-                  : `hover:scale-105 hover:${config.shadow} cursor-pointer border-4 ${config.border}`
-              } bg-gradient-to-b ${config.gradient} backdrop-blur-sm`}
+                  : `hover:scale-105 hover:${config.shadow} cursor-pointer border-3 ${config.border}`
+              } bg-gradient-to-b ${config.gradient} backdrop-blur-sm w-[100px] sm:w-[120px] md:w-[140px] flex-shrink-0`}
               style={{ animationDelay: `${index * 150}ms` }}
             >
               {/* Neon Corner Brackets */}
