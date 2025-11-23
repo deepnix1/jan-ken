@@ -20,9 +20,8 @@ const sourceCodePro = Source_Code_Pro({
 
 // Farcaster Mini App embed metadata
 // Per Farcaster docs: https://miniapps.farcaster.xyz/docs/guides/agents-checklist
-// IMPORTANT: Set NEXT_PUBLIC_APP_URL in .env.local with your production domain
-// Example: NEXT_PUBLIC_APP_URL=https://jan-ken.vercel.app
-const domain = process.env.NEXT_PUBLIC_APP_URL || "https://YOUR_DOMAIN.com";
+// Production domain: https://jan-ken.vercel.app
+const domain = process.env.NEXT_PUBLIC_APP_URL || "https://jan-ken.vercel.app";
 
 const farcasterFrame = {
   version: "1", // Must be "1", not "next" (per Farcaster docs)
