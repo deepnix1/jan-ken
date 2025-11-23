@@ -23,6 +23,8 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
   const [selectedChoice, setSelectedChoice] = useState<number | null>(null);
   const [timeLeft, setTimeLeft] = useState(20); // Changed from 40 to 20 seconds
   const [gameFinished, setGameFinished] = useState(false);
+  const [player1Profile, setPlayer1Profile] = useState<{ pfpUrl: string | null; username: string | null } | null>(null);
+  const [player2Profile, setPlayer2Profile] = useState<{ pfpUrl: string | null; username: string | null } | null>(null);
   // TEST MODE: Wallet check temporarily disabled
 
   const { data: hash, writeContract, isPending, error: writeError, reset: resetWriteContract, status } = useWriteContract();
@@ -280,8 +282,8 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
         </p>
       </div>
 
-      {/* Gaming Choices - Mobile Responsive */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-8 sm:mb-12">
+      {/* Gaming Choices - Horizontal Layout, Smaller Size */}
+      <div className="flex flex-row items-center justify-center gap-3 sm:gap-4 md:gap-6 mb-8 sm:mb-12">
         {CHOICES.map((choice, index) => {
           const isSelected = selectedChoice === choice.id;
           const isDisabled = selectedChoice !== null || gameFinished;
@@ -341,11 +343,11 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
               )}
               
               <div className="relative z-10 flex flex-col items-center">
-                {/* User's Custom Images - Mobile Responsive */}
-                <div className={`mb-4 sm:mb-6 transform transition-all duration-300 relative flex items-center justify-center w-full max-w-[200px] sm:max-w-[240px] md:max-w-[280px] h-[200px] sm:h-[240px] md:h-[280px] ${
+                {/* User's Custom Images - Smaller Size */}
+                <div className={`mb-2 sm:mb-3 transform transition-all duration-300 relative flex items-center justify-center w-full h-[80px] sm:h-[100px] md:h-[120px] ${
                   isSelected 
-                    ? 'scale-110 sm:scale-125' 
-                    : 'group-hover:scale-105 sm:group-hover:scale-110'
+                    ? 'scale-110' 
+                    : 'group-hover:scale-105'
                 }`}>
                   {/* Strong Glow Background */}
                   <div className={`absolute inset-0 rounded-full blur-3xl opacity-70 ${config.glow}`}></div>
@@ -385,9 +387,9 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
                   )}
                 </div>
                 
-                {/* Text with Neon Glow - Mobile Responsive */}
-                <div className={`text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black font-mono uppercase tracking-wider ${config.text} ${config.shadow} ${
-                  isSelected ? 'scale-105 sm:scale-110' : ''
+                {/* Text with Neon Glow - Smaller Size */}
+                <div className={`text-lg sm:text-xl md:text-2xl font-black font-mono uppercase tracking-wider ${config.text} ${config.shadow} ${
+                  isSelected ? 'scale-105' : ''
                 } transition-all duration-300`}>
                   {choice.name}
                 </div>

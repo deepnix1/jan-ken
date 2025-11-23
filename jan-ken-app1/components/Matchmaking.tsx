@@ -9,7 +9,7 @@ import { isValidBetAmount, isValidAddress } from '@/lib/security';
 
 interface MatchmakingProps {
   betAmount: bigint;
-  onMatchFound: (gameId: string) => void;
+  onMatchFound: (gameId: string, player1Address?: string, player2Address?: string) => void;
   onCancel?: () => void; // Cancel matchmaking callback
   showMatchFound?: boolean;
 }
@@ -478,8 +478,10 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
         
         // Use gameId from event or transaction hash
         const gameId = gameLog.args?.gameId?.toString() || gameLog.transactionHash || hash || `game-${Date.now()}`;
-        console.log('🎮 Calling onMatchFound with gameId:', gameId);
-        onMatchFound(gameId);
+        const player1 = gameLog.args?.player1;
+        const player2 = gameLog.args?.player2;
+        console.log('🎮 Calling onMatchFound with gameId:', gameId, 'player1:', player1, 'player2:', player2);
+        onMatchFound(gameId, player1, player2);
       } else {
         console.log('⚠️ GameCreated event received but not for current player');
         console.log('⚠️ Current address:', address?.toLowerCase());
@@ -736,7 +738,7 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
                     ? `game-${game.player1.toLowerCase()}-${game.player2.toLowerCase()}-${Date.now()}`
                     : `game-${Date.now()}`;
                   console.log('✅ Calling onMatchFound with gameId:', gameId);
-                  onMatchFound(gameId);
+                  onMatchFound(gameId, game.player1, game.player2);
                   return; // Don't show error, game already exists
                 } else if (gameStatus === 0 && !hasPlayer2) {
                   // Status 0 = Waiting, no player2 yet - user is in queue waiting for match
@@ -1338,7 +1340,7 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
               ? `game-${game.player1.toLowerCase()}-${game.player2.toLowerCase()}-${Date.now()}`
               : hash || `game-${Date.now()}`;
             console.log('✅ Calling onMatchFound with gameId:', gameId);
-            onMatchFound(gameId);
+            onMatchFound(gameId, game.player1, game.player2);
             clearInterval(pollInterval);
             return;
           } else if (gameStatus === 0 && !hasPlayer2) {

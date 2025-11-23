@@ -1,10 +1,43 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { getFarcasterProfileByAddress } from '@/lib/farcasterProfile';
+import Image from 'next/image';
 
-export function MatchFoundAnimation() {
+interface MatchFoundAnimationProps {
+  player1Address?: string;
+  player2Address?: string;
+  currentUserAddress?: string;
+}
+
+export function MatchFoundAnimation({ player1Address, player2Address, currentUserAddress }: MatchFoundAnimationProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [showAnimation, setShowAnimation] = useState(true);
+  const [opponentProfile, setOpponentProfile] = useState<{ pfpUrl: string | null; username: string | null } | null>(null);
+  const [currentUserProfile, setCurrentUserProfile] = useState<{ pfpUrl: string | null; username: string | null } | null>(null);
+
+  // Determine opponent address
+  const opponentAddress = currentUserAddress 
+    ? (player1Address?.toLowerCase() === currentUserAddress.toLowerCase() ? player2Address : player1Address)
+    : (player1Address || player2Address);
+
+  useEffect(() => {
+    // Fetch opponent profile
+    const fetchProfiles = async () => {
+      if (opponentAddress) {
+        const opponentProfile = await getFarcasterProfileByAddress(opponentAddress);
+        setOpponentProfile(opponentProfile);
+      }
+      
+      // Fetch current user profile
+      if (currentUserAddress) {
+        const userProfile = await getFarcasterProfileByAddress(currentUserAddress);
+        setCurrentUserProfile(userProfile);
+      }
+    };
+    
+    fetchProfiles();
+  }, [player1Address, player2Address, currentUserAddress, opponentAddress]);
 
   useEffect(() => {
     // Play sound effect
@@ -84,6 +117,56 @@ export function MatchFoundAnimation() {
                 MATCH FOUND!
               </span>
             </h3>
+            
+            {/* Player profiles - side by side */}
+            <div className="flex items-center justify-center gap-6 sm:gap-8 mb-2">
+              {/* Current User Profile */}
+              <div className="flex flex-col items-center gap-2">
+                <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-full border-4 border-white/80 overflow-hidden shadow-[0_0_20px_rgba(59,130,246,0.8)] bg-gradient-to-br from-blue-500/20 to-cyan-500/20">
+                  {currentUserProfile?.pfpUrl ? (
+                    <Image
+                      src={currentUserProfile.pfpUrl}
+                      alt={currentUserProfile.username || 'You'}
+                      fill
+                      className="object-cover"
+                      unoptimized
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-500 to-cyan-500 text-white text-2xl sm:text-3xl font-black">
+                      {currentUserAddress?.slice(2, 4).toUpperCase() || '?'}
+                    </div>
+                  )}
+                </div>
+                <p className="text-white/90 font-bold text-xs sm:text-sm text-center max-w-[80px] sm:max-w-[100px] truncate">
+                  {currentUserProfile?.username || 'You'}
+                </p>
+              </div>
+              
+              {/* VS Divider */}
+              <div className="text-white/80 font-black text-2xl sm:text-3xl">VS</div>
+              
+              {/* Opponent Profile */}
+              <div className="flex flex-col items-center gap-2">
+                <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-full border-4 border-white/80 overflow-hidden shadow-[0_0_20px_rgba(239,68,68,0.8)] bg-gradient-to-br from-red-500/20 to-pink-500/20">
+                  {opponentProfile?.pfpUrl ? (
+                    <Image
+                      src={opponentProfile.pfpUrl}
+                      alt={opponentProfile.username || 'Opponent'}
+                      fill
+                      className="object-cover"
+                      unoptimized
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-red-500 to-pink-500 text-white text-2xl sm:text-3xl font-black">
+                      {opponentAddress?.slice(2, 4).toUpperCase() || '?'}
+                    </div>
+                  )}
+                </div>
+                <p className="text-white/90 font-bold text-xs sm:text-sm text-center max-w-[80px] sm:max-w-[100px] truncate">
+                  {opponentProfile?.username || 'Opponent'}
+                </p>
+              </div>
+            </div>
             
             {/* Subtitle */}
             <p className="text-white/90 font-bold text-lg sm:text-xl text-center">

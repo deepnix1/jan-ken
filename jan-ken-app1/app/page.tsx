@@ -24,6 +24,8 @@ export default function Home() {
   const [selectedBet, setSelectedBet] = useState<bigint | null>(null);
   const [gameId, setGameId] = useState<string | null>(null);
   const [showMatchFound, setShowMatchFound] = useState(false);
+  const [player1Address, setPlayer1Address] = useState<string | undefined>(undefined);
+  const [player2Address, setPlayer2Address] = useState<string | undefined>(undefined);
   const [appReady, setAppReady] = useState(false);
   const previousAddressRef = useRef<string | undefined>(undefined);
 
@@ -279,7 +281,9 @@ export default function Home() {
     setShowMatchFound(false);
   };
 
-  const handleMatchFound = (id: string) => {
+  const handleMatchFound = (id: string, p1Address?: string, p2Address?: string) => {
+    setPlayer1Address(p1Address);
+    setPlayer2Address(p2Address);
     setShowMatchFound(true);
     setTimeout(() => {
       setGameId(id);
@@ -406,7 +410,11 @@ export default function Home() {
             ) : (
               <>
                 {showMatchFound && (
-                  <MatchFoundAnimation />
+                  <MatchFoundAnimation 
+                    player1Address={player1Address}
+                    player2Address={player2Address}
+                    currentUserAddress={address}
+                  />
                 )}
                 {gameState === 'select' && (
                   <BetSelector onSelect={handleBetSelect} />
