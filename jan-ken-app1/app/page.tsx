@@ -440,7 +440,7 @@ export default function Home() {
           </main>
           
           {/* Debug Panel - Always visible for mobile debugging */}
-          {typeof window !== 'undefined' && <DebugPanel />}
+          <DebugPanel />
           </>
         );
       }

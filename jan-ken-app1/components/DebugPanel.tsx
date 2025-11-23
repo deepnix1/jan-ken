@@ -100,17 +100,41 @@ export function DebugPanel() {
   if (!isOpen) {
     return (
       <button
-        onClick={() => setIsOpen(true)}
-        className="fixed bottom-4 right-4 z-[10000] w-12 h-12 bg-purple-500/80 border-2 border-purple-400 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(168,85,247,0.6)] hover:bg-purple-500 transition-all"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          console.log('🐛 Debug Panel button clicked');
+          setIsOpen(true);
+        }}
+        onTouchStart={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          console.log('🐛 Debug Panel button touched');
+          setIsOpen(true);
+        }}
+        className="fixed bottom-4 right-4 z-[99999] w-14 h-14 bg-purple-600 border-2 border-purple-400 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(168,85,247,0.8)] hover:bg-purple-500 active:bg-purple-700 transition-all cursor-pointer touch-manipulation"
+        style={{ 
+          position: 'fixed',
+          zIndex: 99999,
+          pointerEvents: 'auto',
+        }}
         title="Open Debug Panel"
+        aria-label="Open Debug Panel"
       >
-        <span className="text-2xl">🐛</span>
+        <span className="text-2xl select-none">🐛</span>
       </button>
     );
   }
 
   return (
-    <div className="fixed bottom-4 right-4 w-[90vw] max-w-md max-h-[70vh] bg-black/95 backdrop-blur-lg border-2 border-purple-400/50 rounded-lg shadow-[0_0_30px_rgba(168,85,247,0.4)] z-[10000] flex flex-col">
+    <div 
+      className="fixed bottom-4 right-4 w-[90vw] max-w-md max-h-[70vh] bg-black/95 backdrop-blur-lg border-2 border-purple-400/50 rounded-lg shadow-[0_0_30px_rgba(168,85,247,0.4)] z-[99999] flex flex-col"
+      style={{ 
+        position: 'fixed',
+        zIndex: 99999,
+        pointerEvents: 'auto',
+      }}
+    >
       {/* Header */}
       <div className="flex items-center justify-between p-3 border-b border-purple-400/30">
         <div>
@@ -127,8 +151,13 @@ export function DebugPanel() {
             Clear
           </button>
           <button
-            onClick={() => setIsOpen(false)}
-            className="px-2 py-1 bg-red-500/20 border border-red-400 rounded text-red-300 text-xs hover:bg-red-500/30"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              console.log('🐛 Debug Panel close clicked');
+              setIsOpen(false);
+            }}
+            className="px-2 py-1 bg-red-500/20 border border-red-400 rounded text-red-300 text-xs hover:bg-red-500/30 cursor-pointer"
           >
             ✕
           </button>
