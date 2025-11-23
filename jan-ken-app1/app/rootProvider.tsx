@@ -78,9 +78,9 @@ export function RootProvider({ children }: { children: ReactNode }) {
       chains: [baseSepolia],
       transports: {
         [baseSepolia.id]: http('https://sepolia.base.org', {
-          timeout: 30000, // 30 second timeout
-          retryCount: 3,
-          retryDelay: 1000,
+          timeout: 60000, // 60 second timeout (increased for Farcaster wallet)
+          retryCount: 5, // More retries
+          retryDelay: 2000, // Longer delay between retries
         }),
       },
       connectors,

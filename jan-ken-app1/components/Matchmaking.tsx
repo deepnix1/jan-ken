@@ -17,8 +17,9 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
   const { address, isConnected } = useAccount();
   const [isMatching, setIsMatching] = useState(true);
   const [hasJoinedQueue, setHasJoinedQueue] = useState(false);
+  const [txError, setTxError] = useState<string | null>(null);
   
-  const { data: hash, writeContract, isPending, error: writeError } = useWriteContract();
+  const { data: hash, writeContract, isPending, error: writeError, reset: resetWriteContract } = useWriteContract();
   const [txHash, setTxHash] = useState<string | null>(null);
   
   // Don't wait for receipt - rely on event listener instead
@@ -42,13 +43,40 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
     },
   });
   
-  // Store hash when transaction is sent
+  // Store hash when transaction is sent and update state
   useEffect(() => {
     if (hash) {
       setTxHash(hash);
+      setHasJoinedQueue(true);
+      setTxError(null);
       console.log('Transaction hash received:', hash);
     }
   }, [hash]);
+  
+  // Handle writeError from useWriteContract
+  useEffect(() => {
+    if (writeError) {
+      console.error('WriteContract error:', writeError);
+      setHasJoinedQueue(false);
+      
+      let errorMessage = 'Transaction failed';
+      const errorMsg = writeError?.message || writeError?.shortMessage || writeError?.cause?.message || String(writeError);
+      
+      if (errorMsg.includes('rejected') || errorMsg.includes('Rejected') || errorMsg.includes('User rejected') || errorMsg.includes('user rejected')) {
+        errorMessage = 'Transaction was rejected. Please check your wallet and approve the transaction when the popup appears.';
+      } else if (errorMsg.includes('insufficient funds') || errorMsg.includes('Insufficient')) {
+        errorMessage = 'Insufficient funds. Please add more ETH to your wallet.';
+      } else if (errorMsg.includes('denied') || errorMsg.includes('Denied')) {
+        errorMessage = 'Transaction was denied. Please approve in your wallet.';
+      } else if (errorMsg.includes('timeout') || errorMsg.includes('Timeout')) {
+        errorMessage = 'Transaction timeout. Please try again.';
+      } else if (errorMsg) {
+        errorMessage = errorMsg;
+      }
+      
+      setTxError(errorMessage);
+    }
+  }, [writeError]);
   
   // Get pool status - count players waiting for this bet amount
   const [poolCount, setPoolCount] = useState<number>(0);
@@ -116,51 +144,44 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
     // Small delay to ensure UI is ready before showing wallet popup
     const sendTransaction = async () => {
       try {
+        console.log('Attempting to send transaction...');
+        setTxError(null);
+        
         // joinQueue fonksiyonunu çağır - aynı betAmount'u seçen oyuncular eşleşecek
         // If there's already a player waiting, match will happen immediately
-        writeContract({
+        const result = await writeContract({
           address: CONTRACT_ADDRESS as `0x${string}`,
           abi: CONTRACT_ABI,
           functionName: 'joinQueue',
           args: [betAmount],
           value: betAmount,
-        }, {
-          onSuccess: (txHash) => {
-            console.log('Transaction sent successfully:', txHash);
-            setHasJoinedQueue(true);
-            setTxError(null);
-            setTxHash(txHash);
-          },
-          onError: (error: any) => {
-            console.error('Error joining queue:', error);
-            setHasJoinedQueue(false);
-            
-            // User-friendly error messages
-            let errorMessage = 'Transaction failed';
-            const errorMsg = error?.message || error?.shortMessage || String(error);
-            
-            if (errorMsg.includes('rejected') || errorMsg.includes('Rejected') || errorMsg.includes('User rejected') || errorMsg.includes('user rejected')) {
-              errorMessage = 'Transaction was rejected. Please check your wallet and approve the transaction when the popup appears.';
-            } else if (errorMsg.includes('insufficient funds') || errorMsg.includes('Insufficient')) {
-              errorMessage = 'Insufficient funds. Please add more ETH to your wallet.';
-            } else if (errorMsg.includes('denied') || errorMsg.includes('Denied')) {
-              errorMessage = 'Transaction was denied. Please approve in your wallet.';
-            } else if (errorMsg) {
-              errorMessage = errorMsg;
-            }
-            
-            setTxError(errorMessage);
-          },
         });
+        
+        // If writeContract returns a hash directly (some versions do)
+        if (result && typeof result === 'string') {
+          console.log('Transaction hash received directly:', result);
+          setTxHash(result);
+          setHasJoinedQueue(true);
+          setTxError(null);
+        } else {
+          // Otherwise, hash will come from useWriteContract hook
+          console.log('Transaction sent, waiting for hash...');
+        }
       } catch (error: any) {
         console.error('Error joining queue:', error);
         setHasJoinedQueue(false);
         
         let errorMessage = 'Transaction failed';
-        const errorMsg = error?.message || error?.shortMessage || String(error);
+        const errorMsg = error?.message || error?.shortMessage || error?.cause?.message || String(error);
         
         if (errorMsg.includes('rejected') || errorMsg.includes('Rejected') || errorMsg.includes('User rejected') || errorMsg.includes('user rejected')) {
           errorMessage = 'Transaction was rejected. Please check your wallet and approve the transaction when the popup appears.';
+        } else if (errorMsg.includes('insufficient funds') || errorMsg.includes('Insufficient')) {
+          errorMessage = 'Insufficient funds. Please add more ETH to your wallet.';
+        } else if (errorMsg.includes('denied') || errorMsg.includes('Denied')) {
+          errorMessage = 'Transaction was denied. Please approve in your wallet.';
+        } else if (errorMsg.includes('timeout') || errorMsg.includes('Timeout')) {
+          errorMessage = 'Transaction timeout. Please try again.';
         } else if (errorMsg) {
           errorMessage = errorMsg;
         }
@@ -311,10 +332,10 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
                     onClick={() => {
                       setHasJoinedQueue(false);
                       setTxError(null);
+                      resetWriteContract?.(); // Reset writeContract state
                       // Retry transaction
-                      window.location.reload();
                     }}
-                    className="px-4 py-2 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400 font-mono text-xs hover:bg-red-500/30 transition-colors"
+                    className="px-6 py-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400 font-mono text-sm hover:bg-red-500/30 transition-colors font-bold uppercase tracking-wider"
                   >
                     Try Again
                   </button>
