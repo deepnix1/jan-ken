@@ -115,24 +115,37 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
   // Handle writeError from useWriteContract
   useEffect(() => {
     if (writeError) {
-      console.error('❌ WriteContract error:', writeError);
+      console.error('❌ WriteContract error detected:', writeError);
+      console.error('Error type:', typeof writeError);
+      console.error('Error constructor:', writeError?.constructor?.name);
       console.error('Error details:', {
         message: writeError?.message,
         shortMessage: (writeError as any)?.shortMessage,
         cause: (writeError as any)?.cause,
         name: writeError?.name,
         stack: writeError?.stack,
+        code: (writeError as any)?.code,
+        data: (writeError as any)?.data,
+        fullError: JSON.stringify(writeError, Object.getOwnPropertyNames(writeError), 2),
       });
+      
       setHasJoinedQueue(false);
       setTxStartTime(null);
       
       let errorMessage = 'Transaction failed';
       const errorMsg = writeError?.message || (writeError as any)?.shortMessage || (writeError as any)?.cause?.message || String(writeError);
+      const errorCode = (writeError as any)?.code;
       
-      if (errorMsg.includes('rejected') || errorMsg.includes('Rejected') || errorMsg.includes('User rejected') || errorMsg.includes('user rejected')) {
+      console.error('Error message extracted:', errorMsg);
+      console.error('Error code:', errorCode);
+      
+      // Check for specific error codes
+      if (errorCode === 4001 || errorCode === '4001') {
+        errorMessage = 'Transaction was rejected by user. Please check your wallet popup and approve the transaction.';
+      } else if (errorCode === -32603 || errorCode === '-32603') {
+        errorMessage = 'Internal JSON-RPC error. Please check your wallet connection and try again.';
+      } else if (errorMsg.includes('rejected') || errorMsg.includes('Rejected') || errorMsg.includes('User rejected') || errorMsg.includes('user rejected') || errorMsg.includes('ACTION_REJECTED')) {
         errorMessage = 'Transaction was rejected. Please check your wallet popup and approve the transaction. Make sure you are on Base Sepolia network (Chain ID: 84532).';
-        // Reset state to allow retry
-        resetWriteContract?.();
       } else if (errorMsg.includes('insufficient funds') || errorMsg.includes('Insufficient')) {
         errorMessage = 'Insufficient funds. Please add more ETH to your wallet.';
       } else if (errorMsg.includes('denied') || errorMsg.includes('Denied')) {
@@ -141,20 +154,32 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
         errorMessage = 'Transaction timeout. Please try again.';
       } else if (errorMsg.includes('network') || errorMsg.includes('Network')) {
         errorMessage = 'Network error. Please check your connection and try again.';
+      } else if (errorMsg.includes('not connected') || errorMsg.includes('Not connected')) {
+        errorMessage = 'Wallet not connected. Please reconnect your wallet.';
       } else if (errorMsg) {
         errorMessage = `Transaction failed: ${errorMsg}`;
       }
       
       setTxError(errorMessage);
-      console.error('Transaction error details:', {
+      
+      // Reset writeContract state to allow retry
+      if (errorMsg.includes('rejected') || errorCode === 4001 || errorCode === '4001') {
+        console.log('Resetting writeContract state to allow retry...');
+        resetWriteContract?.();
+      }
+      
+      console.error('Final transaction error details:', {
         error: writeError,
         errorMessage,
+        errorCode,
         contract: CONTRACT_ADDRESS,
         betAmount: betAmount.toString(),
         address,
+        chainId,
+        isConnected,
       });
     }
-  }, [writeError]);
+  }, [writeError, resetWriteContract, betAmount, address, chainId, isConnected]);
   
   // Monitor transaction status and detect stuck transactions
   useEffect(() => {
@@ -282,12 +307,36 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
     console.log('Sending transaction - wallet approval required');
     
     // Small delay to ensure UI is ready before showing wallet popup
-    const sendTransaction = () => {
+    const sendTransaction = async () => {
       try {
+        // Check wallet provider before sending
+        if (typeof window !== 'undefined') {
+          const ethereum = (window as any).ethereum;
+          const farcaster = (window as any).farcaster;
+          console.log('🔍 Wallet provider check:');
+          console.log('  - window.ethereum:', !!ethereum);
+          console.log('  - window.farcaster:', !!farcaster);
+          console.log('  - farcaster.sdk:', !!farcaster?.sdk);
+          console.log('  - farcaster.sdk.wallet:', !!farcaster?.sdk?.wallet);
+          
+          if (farcaster?.sdk?.wallet) {
+            try {
+              const provider = await farcaster.sdk.wallet.getEthereumProvider();
+              console.log('  - Farcaster provider:', !!provider);
+              console.log('  - Provider chainId:', provider?.chainId);
+              console.log('  - Provider networkVersion:', provider?.networkVersion);
+            } catch (err) {
+              console.warn('  - Could not get Farcaster provider:', err);
+            }
+          }
+        }
+        
         console.log('🚀 Attempting to send transaction...');
         console.log('Contract address:', CONTRACT_ADDRESS);
         console.log('Bet amount:', betAmount.toString());
         console.log('Address:', address);
+        console.log('Chain ID:', chainId);
+        console.log('Is connected:', isConnected);
         console.log('Simulate data:', simulateData);
         console.log('Simulate error:', simulateError);
         
@@ -308,8 +357,26 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
           console.warn('⚠️ Simulation error (non-critical), proceeding anyway:', errorMsg);
         }
         
+        // Validate writeContract is available
+        if (!writeContract) {
+          console.error('❌ writeContract is not available');
+          setTxError('Wallet connection error. Please reconnect your wallet.');
+          setHasJoinedQueue(false);
+          setTxStartTime(null);
+          return;
+        }
+        
         setTxError(null);
         setTxStartTime(Date.now());
+        
+        // Prepare transaction parameters
+        const txParams = {
+          address: CONTRACT_ADDRESS as `0x${string}`,
+          abi: CONTRACT_ABI,
+          functionName: 'joinQueue' as const,
+          args: [betAmount] as [bigint],
+          value: betAmount,
+        };
         
         // Send transaction with proper gas estimation
         console.log('📤 Sending transaction to contract...');
@@ -318,39 +385,44 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
         console.log('Args:', [betAmount.toString()]);
         console.log('Value:', betAmount.toString(), 'wei =', (Number(betAmount) / 1e18).toFixed(6), 'ETH');
         console.log('From:', address);
+        console.log('Chain ID:', chainId);
+        console.log('writeContract function type:', typeof writeContract);
+        console.log('Transaction params:', JSON.stringify({
+          address: txParams.address,
+          functionName: txParams.functionName,
+          args: txParams.args.map(a => a.toString()),
+          value: txParams.value.toString(),
+        }, null, 2));
         
-        // Use simulation data if available for better gas estimation
-        // Otherwise send directly and let wallet estimate
-        if (simulateData && (simulateData as any).request) {
-          console.log('📤 Using simulation data for gas estimation');
-          try {
+        try {
+          // Use simulation data if available for better gas estimation
+          if (simulateData && (simulateData as any).request) {
+            console.log('📤 Using simulation data for gas estimation');
+            console.log('Simulation request:', (simulateData as any).request);
             writeContract((simulateData as any).request);
-          } catch (err: any) {
-            console.error('Error using simulation request, falling back to direct call:', err);
-            // Fallback to direct call
-            writeContract({
-              address: CONTRACT_ADDRESS as `0x${string}`,
-              abi: CONTRACT_ABI,
-              functionName: 'joinQueue' as const,
-              args: [betAmount],
-              value: betAmount,
-            });
+          } else {
+            console.log('📤 Sending transaction directly (wallet will estimate gas)');
+            console.log('Calling writeContract with params:', txParams);
+            writeContract(txParams);
           }
-        } else {
-          console.log('📤 Sending transaction directly (wallet will estimate gas)');
-          // Direct call - wallet will estimate gas
-          writeContract({
-            address: CONTRACT_ADDRESS as `0x${string}`,
-            abi: CONTRACT_ABI,
-            functionName: 'joinQueue' as const,
-            args: [betAmount],
-            value: betAmount,
+          
+          console.log('✅ writeContract called successfully');
+          console.log('Current status after call:', status);
+          console.log('isPending after call:', isPending);
+          console.log('Waiting for wallet popup...');
+        } catch (err: any) {
+          console.error('❌ Error calling writeContract:', err);
+          console.error('Error details:', {
+            message: err?.message,
+            name: err?.name,
+            stack: err?.stack,
+            cause: err?.cause,
           });
+          setHasJoinedQueue(false);
+          setTxStartTime(null);
+          setTxError(`Failed to send transaction: ${err?.message || String(err)}`);
+          return;
         }
-        
-        console.log('📤 Transaction request sent, waiting for wallet approval and hash...');
-        console.log('Current status:', status);
-        console.log('isPending:', isPending);
         
         // Set up a listener for status changes
         // Note: In Wagmi v3, status changes are tracked via the hook
