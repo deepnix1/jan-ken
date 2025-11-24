@@ -535,7 +535,7 @@ export default function Home() {
           )}
           
           {/* Main Content - Clean Style */}
-          <div className="relative bg-black/80 backdrop-blur-xl rounded-xl border border-red-600/30 shadow-[0_0_40px_rgba(220,20,60,0.2)] p-4 sm:p-6 md:p-8 min-h-[50vh] flex items-center justify-center overflow-hidden">
+          <div className="relative bg-black/80 backdrop-blur-xl rounded-xl border border-red-600/30 shadow-[0_0_40px_rgba(220,20,60,0.2)] p-4 sm:p-6 md:p-8 min-h-[50vh] flex items-center justify-center overflow-visible">
             {/* Subtle Corner Accents - Smaller */}
             <div className="absolute top-0 left-0 w-8 h-8 border-t-2 border-l-2 border-red-500/30"></div>
             <div className="absolute top-0 right-0 w-8 h-8 border-t-2 border-r-2 border-red-500/30"></div>

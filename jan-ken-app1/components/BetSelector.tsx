@@ -81,14 +81,23 @@ export function BetSelector({ onSelect }: BetSelectorProps) {
   };
 
   return (
-    <div className="w-full -mt-8 sm:-mt-12 md:-mt-16">
-      <div className="text-center mb-6 sm:mb-8 md:mb-10">
-        <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-3 sm:mb-4">
-          <span className="bg-gradient-to-r from-red-400 via-blue-400 to-yellow-400 bg-clip-text text-transparent drop-shadow-[0_0_30px_rgba(239,68,68,0.8)]">
-            SELECT BET
-          </span>
+    <div className="w-full -mt-8 sm:-mt-12 md:-mt-16 relative z-20">
+      <div className="text-center mb-6 sm:mb-8 md:mb-10 relative z-10 pt-4 sm:pt-6">
+        <h2 
+          className="text-3xl sm:text-4xl md:text-5xl font-black mb-3 sm:mb-4 relative z-10"
+          style={{
+            background: 'linear-gradient(to right, #f87171, #60a5fa, #fbbf24)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+            color: 'transparent',
+            textShadow: '0 0 30px rgba(239, 68, 68, 0.8)',
+            filter: 'drop-shadow(0 0 30px rgba(239, 68, 68, 0.8))',
+          }}
+        >
+          SELECT BET
         </h2>
-        <p className="text-gray-400 text-base sm:text-lg font-mono uppercase tracking-wider px-4">
+        <p className="text-gray-300 text-base sm:text-lg font-mono uppercase tracking-wider px-4 relative z-10 font-bold">
           Winner Takes All
         </p>
       </div>
