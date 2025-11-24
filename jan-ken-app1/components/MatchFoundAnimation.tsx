@@ -8,9 +8,10 @@ interface MatchFoundAnimationProps {
   player1Address?: string;
   player2Address?: string;
   currentUserAddress?: string;
+  onClose?: () => void;
 }
 
-export function MatchFoundAnimation({ player1Address, player2Address, currentUserAddress }: MatchFoundAnimationProps) {
+export function MatchFoundAnimation({ player1Address, player2Address, currentUserAddress, onClose }: MatchFoundAnimationProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const hasShownRef = useRef(false); // Prevent multiple renders
   const [showAnimation, setShowAnimation] = useState(false); // Start hidden - wait for profiles
@@ -18,6 +19,7 @@ export function MatchFoundAnimation({ player1Address, player2Address, currentUse
   const [opponentProfile, setOpponentProfile] = useState<{ pfpUrl: string | null; username: string | null } | null>(null);
   const [currentUserProfile, setCurrentUserProfile] = useState<{ pfpUrl: string | null; username: string | null } | null>(null);
   const [imagesLoaded, setImagesLoaded] = useState({ opponent: false, user: false });
+  const [countdown, setCountdown] = useState(5); // Countdown from 5 to 0
 
   // Determine opponent address
   const opponentAddress = currentUserAddress 
@@ -117,13 +119,13 @@ export function MatchFoundAnimation({ player1Address, player2Address, currentUse
     }
   }, [imagesLoaded, opponentProfile, currentUserProfile, showAnimation]);
 
+  // Countdown timer effect
   useEffect(() => {
-    if (!showAnimation) return; // Only play sound when animation is shown
+    if (!showAnimation || countdown <= 0) return;
     
-    // Play sound effect
+    // Play sound effect when animation starts
     const playSound = () => {
       try {
-        // Create a simple sound effect using Web Audio API
         const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
         const oscillator = audioContext.createOscillator();
         const gainNode = audioContext.createGain();
@@ -131,7 +133,6 @@ export function MatchFoundAnimation({ player1Address, player2Address, currentUse
         oscillator.connect(gainNode);
         gainNode.connect(audioContext.destination);
         
-        // Create a "whoosh" sound effect (like shuriken)
         oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
         oscillator.frequency.exponentialRampToValueAtTime(1200, audioContext.currentTime + 0.1);
         oscillator.frequency.exponentialRampToValueAtTime(600, audioContext.currentTime + 0.3);
@@ -148,18 +149,38 @@ export function MatchFoundAnimation({ player1Address, player2Address, currentUse
 
     playSound();
     
-    // Hide animation after 2.5 seconds
-    const timer = setTimeout(() => {
-      setShowAnimation(false);
-    }, 2500);
+    // Start countdown from 5
+    setCountdown(5);
+    
+    // Countdown timer: decrement every second
+    const countdownInterval = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(countdownInterval);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
 
     return () => {
-      clearTimeout(timer);
+      clearInterval(countdownInterval);
       if (audioRef.current) {
         audioRef.current.pause();
       }
     };
   }, [showAnimation]);
+
+  // When countdown reaches 0, close animation
+  useEffect(() => {
+    if (countdown === 0 && showAnimation) {
+      console.log('[MatchFound] ⏱️ Countdown reached 0, closing animation');
+      setShowAnimation(false);
+      if (onClose) {
+        onClose();
+      }
+    }
+  }, [countdown, showAnimation, onClose]);
 
   // Show loading state while profiles are being fetched
   if (isLoadingProfiles) {
@@ -177,9 +198,9 @@ export function MatchFoundAnimation({ player1Address, player2Address, currentUse
   if (!showAnimation) return null;
 
   return (
-    <div className="fixed top-0 left-0 right-0 bottom-0 z-[9999] flex items-center justify-center pointer-events-none p-4" style={{ margin: 0, padding: '1rem' }}>
-      {/* Background overlay with glow */}
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-pulse"></div>
+    <div className="fixed top-0 left-0 right-0 bottom-0 z-[99999] flex items-center justify-center p-4" style={{ margin: 0, padding: '1rem' }}>
+      {/* Background overlay with glow - Full screen blocking */}
+      <div className="absolute inset-0 bg-black/90 backdrop-blur-md"></div>
       
       {/* Main animation container - FORCE CENTER */}
       <div className="relative w-full max-w-lg mx-auto" style={{ transform: 'none' }}>
@@ -287,10 +308,17 @@ export function MatchFoundAnimation({ player1Address, player2Address, currentUse
             </p>
             
             {/* Countdown - FORCE CENTER */}
-            <div className="flex items-center justify-center gap-2">
-              <div className="w-2 h-2 bg-red-400 rounded-full animate-pulse shadow-[0_0_10px_rgba(239,68,68,1)]"></div>
-              <span className="text-white/80 font-mono text-xs sm:text-sm text-center">Game starting in 2 seconds...</span>
-              <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse shadow-[0_0_10px_rgba(234,179,8,1)]"></div>
+            <div className="flex flex-col items-center justify-center gap-3">
+              <div className="text-6xl sm:text-7xl md:text-8xl font-black text-white drop-shadow-[0_0_30px_rgba(255,255,255,1)] animate-pulse">
+                {countdown}
+              </div>
+              <div className="flex items-center justify-center gap-2">
+                <div className="w-2 h-2 bg-red-400 rounded-full animate-pulse shadow-[0_0_10px_rgba(239,68,68,1)]"></div>
+                <span className="text-white/80 font-mono text-xs sm:text-sm text-center">
+                  Game starting in {countdown} second{countdown !== 1 ? 's' : ''}...
+                </span>
+                <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse shadow-[0_0_10px_rgba(234,179,8,1)]"></div>
+              </div>
             </div>
             
             {/* Kunai animation */}

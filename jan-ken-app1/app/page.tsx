@@ -364,11 +364,9 @@ export default function Home() {
   const handleMatchFound = (id: string, p1Address?: string, p2Address?: string) => {
     setPlayer1Address(p1Address);
     setPlayer2Address(p2Address);
+    setGameId(id); // Set gameId immediately
     setShowMatchFound(true);
-    setTimeout(() => {
-      setGameId(id);
-      setGameState('playing');
-    }, 2000);
+    // Game state will be set to 'playing' when animation closes (onClose callback)
   };
 
   const handleGameEnd = () => {
@@ -690,9 +688,15 @@ export default function Home() {
                     player1Address={player1Address}
                     player2Address={player2Address}
                     currentUserAddress={address}
+                    onClose={() => {
+                      console.log('[Home] 🎮 Match Found animation closed, starting game');
+                      setShowMatchFound(false);
+                      setGameState('playing'); // Start game when animation closes
+                    }}
                   />
                 )}
-                {!isTransitioning && (
+                {/* Hide other content when Match Found animation is showing */}
+                {!showMatchFound && !isTransitioning && (
                   <>
                     {gameState === 'select' && (
                       <div className="w-full animate-fade-in-up">
