@@ -266,13 +266,13 @@ export function MatchFoundAnimation({ player1Address, player2Address, currentUse
   if (!showAnimation) return null;
 
   return (
-    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 overflow-auto">
+    <div className="fixed inset-0 z-[99999] flex items-start justify-center p-4 overflow-y-auto overflow-x-hidden" style={{ minHeight: '100vh' }}>
       {/* Background overlay with glow - Full screen blocking */}
-      <div className="absolute inset-0 bg-black/90 backdrop-blur-md"></div>
+      <div className="fixed inset-0 bg-black/90 backdrop-blur-md pointer-events-none"></div>
       
       {/* Stage 1: MATCH FOUND! Animation */}
       {showMatchFound && (
-        <div className="relative w-full max-w-lg mx-auto my-auto animate-fade-in-scale">
+        <div className="relative w-full max-w-lg mx-auto my-8 sm:my-12 md:my-16 animate-fade-in-scale" style={{ minHeight: 'fit-content' }}>
           <div className="relative bg-gradient-to-br from-red-500/90 via-blue-500/90 to-yellow-500/90 text-white px-6 sm:px-8 md:px-10 py-8 sm:py-10 md:py-12 rounded-2xl sm:rounded-3xl shadow-2xl border-4 border-white/50 backdrop-blur-xl">
             {/* Decorative corner elements */}
             <div className="absolute top-2 left-2 w-6 h-6 border-t-4 border-l-4 border-white/80"></div>
@@ -379,7 +379,7 @@ export function MatchFoundAnimation({ player1Address, player2Address, currentUse
       
       {/* Stage 2: Opponent Ready Card with Countdown */}
       {showOpponentReady && (
-        <div className="relative w-full max-w-md mx-auto my-auto animate-slide-up-fade">
+        <div className="relative w-full max-w-md mx-auto my-8 sm:my-12 md:my-16 animate-slide-up-fade z-10" style={{ minHeight: 'fit-content' }}>
           <div className="relative bg-gradient-to-br from-red-600/95 via-blue-600/95 to-yellow-600/95 text-white px-6 sm:px-8 md:px-10 py-8 sm:py-10 md:py-12 rounded-2xl sm:rounded-3xl shadow-2xl border-4 border-white/60 backdrop-blur-xl">
             {/* Decorative corner elements */}
             <div className="absolute top-2 left-2 w-6 h-6 border-t-4 border-l-4 border-white/90"></div>
