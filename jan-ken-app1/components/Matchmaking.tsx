@@ -203,19 +203,38 @@ function MatchmakingComponent({ betAmount, onMatchFound, onCancel, showMatchFoun
   
   // Handle transaction confirmation via useEffect
   const [showApproved, setShowApproved] = useState(false);
+  const [txConfirmed, setTxConfirmed] = useState(false);
   
   useEffect(() => {
     if (isSuccess && hash) {
-      console.log('Transaction confirmed:', hash);
+      console.log('[Matchmaking] ✅ Transaction confirmed:', hash);
       setShowApproved(true);
+      setTxConfirmed(true);
       
-      // Hide after 3 seconds
+      // Hide approved notification after 3 seconds, but keep confirmed state
       const timer = setTimeout(() => {
         setShowApproved(false);
       }, 3000);
       return () => clearTimeout(timer);
     }
   }, [isSuccess, hash]);
+  
+  // Reset confirmed state when starting new transaction
+  useEffect(() => {
+    if (isPending && !hash) {
+      setTxConfirmed(false);
+    }
+  }, [isPending, hash]);
+  
+  // Handle receipt errors
+  useEffect(() => {
+    if (isReceiptError) {
+      console.error('[Matchmaking] ❌ Transaction receipt error:', isReceiptError);
+      setTxError('Transaction confirmation failed. Please try again.');
+      setHasJoinedQueue(false);
+      setTxStartTime(null);
+    }
+  }, [isReceiptError]);
   
   // Store hash when transaction is sent and update state
   useEffect(() => {
@@ -1481,12 +1500,12 @@ function MatchmakingComponent({ betAmount, onMatchFound, onCancel, showMatchFoun
             </div>
           )}
           
-          {(isConfirming && !isPending && txHash) && (
+          {(isConfirming && !isPending && txHash && !isSuccess) && (
             <div className="flex flex-col items-center justify-center gap-3 sm:gap-4 px-4 sm:px-6 md:px-8 py-4 sm:py-5 bg-black/60 border-2 border-yellow-500/40 rounded-lg shadow-[0_0_30px_rgba(234,179,8,0.4)]">
               <div className="flex items-center gap-3 sm:gap-4">
-                <div className="w-3 h-3 bg-yellow-400 rounded-full animate-pulse shadow-[0_0_10px_rgba(234,179,8,1)]"></div>
+                <div className="w-5 h-5 sm:w-6 sm:h-6 border-2 sm:border-3 border-yellow-400 border-t-transparent rounded-full animate-spin shadow-[0_0_10px_rgba(234,179,8,1)]"></div>
                 <p className="text-yellow-400 font-mono font-bold uppercase tracking-wider text-xs sm:text-sm md:text-base">
-                  Transaction sent - waiting for match...
+                  Confirming transaction...
                 </p>
               </div>
               <div className="mt-2">
@@ -1500,8 +1519,36 @@ function MatchmakingComponent({ betAmount, onMatchFound, onCancel, showMatchFoun
                 </a>
               </div>
               <p className="text-gray-400 font-mono text-xs text-center mt-2">
-                Event listener is active - match will be detected automatically
+                Waiting for blockchain confirmation...
               </p>
+            </div>
+          )}
+          
+          {(isSuccess && txHash) && (
+            <div className="flex flex-col items-center justify-center gap-3 sm:gap-4 px-4 sm:px-6 md:px-8 py-4 sm:py-5 bg-black/60 border-2 border-green-500/40 rounded-lg shadow-[0_0_30px_rgba(34,197,94,0.4)]">
+              <div className="flex items-center gap-3 sm:gap-4">
+                <div className="w-6 h-6 sm:w-7 sm:h-7 bg-green-400 rounded-full flex items-center justify-center shadow-[0_0_15px_rgba(34,197,94,1)]">
+                  <span className="text-green-900 font-black text-lg">✓</span>
+                </div>
+                <p className="text-green-400 font-mono font-bold uppercase tracking-wider text-xs sm:text-sm md:text-base">
+                  Transaction confirmed!
+                </p>
+              </div>
+              <div className="mt-2">
+                <a
+                  href={`https://sepolia.basescan.org/tx/${txHash}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-green-300 hover:text-green-200 font-mono text-xs underline"
+                >
+                  View on BaseScan
+                </a>
+              </div>
+              {isMatching && (
+                <p className="text-gray-400 font-mono text-xs text-center mt-2">
+                  Searching for opponent...
+                </p>
+              )}
             </div>
           )}
           

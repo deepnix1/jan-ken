@@ -374,10 +374,13 @@ export default function Home() {
   };
 
   const handlePlayAgain = () => {
+    // Reset all game-related state
     setGameState('select');
     setSelectedBet(null);
     setGameId(null);
     setShowMatchFound(false);
+    setPlayer1Address(undefined);
+    setPlayer2Address(undefined);
   };
 
   const handleTieRematch = () => {
@@ -391,10 +394,13 @@ export default function Home() {
   };
 
   const handleCancelMatchmaking = () => {
-    // Return to bet selection
+    // Return to bet selection and reset all state
     setGameState('select');
     setSelectedBet(null);
     setShowMatchFound(false);
+    setPlayer1Address(undefined);
+    setPlayer2Address(undefined);
+    setGameId(null);
     // Note: In production, we would need to call a contract function to leave queue
     // For now, we just reset the UI state
   };
