@@ -13,7 +13,8 @@ interface MatchFoundAnimationProps {
 export function MatchFoundAnimation({ player1Address, player2Address, currentUserAddress }: MatchFoundAnimationProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const hasShownRef = useRef(false); // Prevent multiple renders
-  const [showAnimation, setShowAnimation] = useState(true);
+  const [showAnimation, setShowAnimation] = useState(false); // Start hidden - wait for profiles
+  const [isLoadingProfiles, setIsLoadingProfiles] = useState(true);
   const [opponentProfile, setOpponentProfile] = useState<{ pfpUrl: string | null; username: string | null } | null>(null);
   const [currentUserProfile, setCurrentUserProfile] = useState<{ pfpUrl: string | null; username: string | null } | null>(null);
 
@@ -29,30 +30,55 @@ export function MatchFoundAnimation({ player1Address, player2Address, currentUse
       setShowAnimation(false);
       return;
     }
-    hasShownRef.current = true;
-    console.log('[MatchFound] ✅ Showing animation (first time)');
   }, []);
 
   useEffect(() => {
-    // Fetch opponent profile
+    // Fetch profiles - CRITICAL: Don't show animation until profiles are loaded
     const fetchProfiles = async () => {
       console.log('[MatchFound] 🔍 Fetching profiles...');
       console.log('[MatchFound] Opponent address:', opponentAddress);
       console.log('[MatchFound] Current user address:', currentUserAddress);
       
-      if (opponentAddress) {
-        console.log('[MatchFound] 📥 Fetching opponent profile:', opponentAddress);
-        const opponentProfile = await getFarcasterProfileByAddress(opponentAddress);
-        console.log('[MatchFound] 📦 Opponent profile received:', opponentProfile);
-        setOpponentProfile(opponentProfile);
-      }
+      setIsLoadingProfiles(true);
       
-      // Fetch current user profile
-      if (currentUserAddress) {
-        console.log('[MatchFound] 📥 Fetching current user profile:', currentUserAddress);
-        const userProfile = await getFarcasterProfileByAddress(currentUserAddress);
-        console.log('[MatchFound] 📦 Current user profile received:', userProfile);
-        setCurrentUserProfile(userProfile);
+      // Timeout: Show animation after 5 seconds even if profiles aren't loaded
+      const timeoutId = setTimeout(() => {
+        console.warn('[MatchFound] ⏱️ Profile fetch timeout, showing animation with fallback data');
+        setIsLoadingProfiles(false);
+        setShowAnimation(true);
+        hasShownRef.current = true;
+      }, 5000);
+      
+      try {
+        // Fetch both profiles in parallel
+        const [opponentData, userData] = await Promise.all([
+          opponentAddress ? getFarcasterProfileByAddress(opponentAddress) : Promise.resolve({ pfpUrl: null, username: null }),
+          currentUserAddress ? getFarcasterProfileByAddress(currentUserAddress) : Promise.resolve({ pfpUrl: null, username: null })
+        ]);
+        
+        clearTimeout(timeoutId); // Clear timeout if profiles loaded successfully
+        
+        console.log('[MatchFound] 📦 Opponent profile received:', opponentData);
+        console.log('[MatchFound] 📦 Current user profile received:', userData);
+        
+        setOpponentProfile(opponentData);
+        setCurrentUserProfile(userData);
+        
+        // Wait a bit for images to potentially start loading
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        // Now show animation - profiles are loaded (even if images are still loading)
+        console.log('[MatchFound] ✅ Profiles loaded, showing animation');
+        setIsLoadingProfiles(false);
+        setShowAnimation(true);
+        hasShownRef.current = true;
+      } catch (error) {
+        clearTimeout(timeoutId);
+        console.error('[MatchFound] ❌ Error fetching profiles:', error);
+        // Show animation anyway with fallback data
+        setIsLoadingProfiles(false);
+        setShowAnimation(true);
+        hasShownRef.current = true;
       }
     };
     
@@ -100,6 +126,19 @@ export function MatchFoundAnimation({ player1Address, player2Address, currentUse
       }
     };
   }, []);
+
+  // Show loading state while profiles are being fetched
+  if (isLoadingProfiles) {
+    return (
+      <div className="fixed top-0 left-0 right-0 bottom-0 z-[9999] flex items-center justify-center pointer-events-none p-4">
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
+        <div className="relative z-10 flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-red-500 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-white/80 font-mono text-sm">Loading opponent profile...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!showAnimation) return null;
 
