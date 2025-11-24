@@ -10,6 +10,7 @@ import { GameBoard } from '@/components/GameBoard';
 import { Result } from '@/components/Result';
 import { MatchFoundAnimation } from '@/components/MatchFoundAnimation';
 import { DebugPanel } from '@/components/DebugPanel';
+import { getFarcasterProfileByAddress } from '@/lib/farcasterProfile';
 
 // Disable SSR for this page (Wagmi doesn't work with SSR)
 export const dynamic = 'force-dynamic';
@@ -28,6 +29,8 @@ export default function Home() {
   const [player2Address, setPlayer2Address] = useState<string | undefined>(undefined);
   const [appReady, setAppReady] = useState(false);
   const previousAddressRef = useRef<string | undefined>(undefined);
+  const [userProfile, setUserProfile] = useState<{ pfpUrl: string | null; username: string | null } | null>(null);
+  const [showGame, setShowGame] = useState(false); // For "Let's Play" button
 
   // Call sdk.actions.ready() when interface is ready (per Farcaster docs)
   // https://miniapps.farcaster.xyz/docs/guides/loading
@@ -242,6 +245,17 @@ export default function Home() {
     }
   }, [isConnected, address, connectorClient, connectors, connect, disconnect]);
 
+  // Fetch user profile when connected
+  useEffect(() => {
+    if (address && isConnected) {
+      console.log('[Home] 📥 Fetching user profile:', address);
+      getFarcasterProfileByAddress(address).then((profile) => {
+        console.log('[Home] 📦 User profile received:', profile);
+        setUserProfile(profile);
+      });
+    }
+  }, [address, isConnected]);
+
   // Also watch for address changes via useAccount
   useEffect(() => {
     if (address && previousAddressRef.current && previousAddressRef.current !== address) {
@@ -254,6 +268,7 @@ export default function Home() {
       setSelectedBet(null);
       setGameId(null);
       setShowMatchFound(false);
+      setShowGame(false); // Reset Let's Play state
     }
     previousAddressRef.current = address;
   }, [address]);
@@ -337,6 +352,41 @@ export default function Home() {
         <div className="w-full max-w-6xl mx-auto">
           {/* Header */}
           <header className="flex flex-col items-center mb-8 sm:mb-12 relative">
+            {/* User Profile - Top Right (if connected) */}
+            {isConnected && userProfile && (
+              <div className="absolute top-0 right-0 flex items-center gap-3">
+                <div className="hidden sm:flex flex-col items-end">
+                  <span className="text-cyan-400 font-bold text-sm">
+                    {userProfile.username || 'Player'}
+                  </span>
+                  <span className="text-cyan-400/60 font-mono text-xs">
+                    {address?.slice(0, 6)}...{address?.slice(-4)}
+                  </span>
+                </div>
+                <div className="relative group">
+                  <div className="absolute inset-0 bg-cyan-500 rounded-full blur-lg opacity-50 group-hover:opacity-75 transition-opacity"></div>
+                  <div className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-full border-2 border-cyan-400 overflow-hidden shadow-[0_0_20px_rgba(34,211,238,0.6)] bg-gradient-to-br from-cyan-600 to-blue-600">
+                    {userProfile.pfpUrl ? (
+                      <Image
+                        src={userProfile.pfpUrl}
+                        alt={userProfile.username || 'You'}
+                        fill
+                        className="object-cover"
+                        unoptimized
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-white text-xl font-black">
+                        {address?.slice(2, 4).toUpperCase() || '👤'}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+            
             {/* Logo - Centered and Smaller - Mobile Optimized */}
             <div className="relative w-full max-w-[200px] sm:max-w-[250px] md:max-w-[300px] mb-4 sm:mb-6 md:mb-8 flex justify-center">
               <div className="absolute inset-0 bg-gradient-to-r from-red-500/20 via-blue-500/20 to-yellow-500/20 blur-3xl"></div>
@@ -352,29 +402,6 @@ export default function Home() {
                 />
               </div>
             </div>
-            
-            {/* Wallet - Below logo with proper spacing */}
-            <div className="relative mt-4">
-              <div className="absolute inset-0 bg-cyan-500/20 blur-xl"></div>
-              <div className="relative bg-black/60 backdrop-blur-lg rounded-full px-4 py-2 border border-cyan-400/50 shadow-[0_0_20px_rgba(34,211,238,0.4)]">
-                {isConnected ? (
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                    <span className="text-cyan-400 font-mono text-sm">
-                      {address?.slice(0, 6)}...{address?.slice(-4)}
-                    </span>
-                  </div>
-                ) : (
-                  <button
-                    onClick={handleConnect}
-                    disabled={isPending || connectors.length === 0}
-                    className="text-cyan-400 hover:text-cyan-300 font-semibold text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isPending ? 'Connecting...' : 'Connect Wallet'}
-                  </button>
-                )}
-              </div>
-            </div>
           </header>
           
           {/* Main Content - Mobile Optimized */}
@@ -383,12 +410,12 @@ export default function Home() {
               <div className="flex flex-col items-center gap-8 py-16">
                   <div className="text-center space-y-4">
                     <h2 className="text-4xl sm:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400 drop-shadow-[0_0_20px_rgba(34,211,238,0.6)]">
-                      WAITING FOR WALLET
+                      CONNECTING...
                     </h2>
                     <p className="text-lg sm:text-xl text-gray-300 text-center max-w-lg font-medium leading-relaxed">
-                      Please connect your wallet to begin playing Rock Paper Scissors on Base Network.
+                      Connecting to Farcaster Mini App...
                       <br />
-                      <span className="text-gray-400 text-base">Ensure you&apos;re connected to Base Sepolia network.</span>
+                      <span className="text-gray-400 text-base">Your wallet will connect automatically.</span>
                     </p>
                   </div>
                  {connectError && (
@@ -406,6 +433,49 @@ export default function Home() {
                      </p>
                    </div>
                  )}
+              </div>
+            ) : !showGame ? (
+              /* Let's Play Landing Screen */
+              <div className="flex flex-col items-center gap-8 py-16">
+                <div className="text-center space-y-6">
+                  <h2 className="text-5xl sm:text-6xl md:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-yellow-400 to-blue-400 drop-shadow-[0_0_30px_rgba(239,68,68,0.8)] animate-pulse">
+                    READY TO BATTLE?
+                  </h2>
+                  <p className="text-xl sm:text-2xl text-gray-300 font-bold">
+                    Rock • Paper • Scissors
+                  </p>
+                  <p className="text-lg text-gray-400 max-w-md">
+                    Challenge players on Base Network and win ETH!
+                  </p>
+                </div>
+                
+                {/* Let's Play Button */}
+                <button
+                  onClick={() => setShowGame(true)}
+                  className="group relative px-12 py-6 text-3xl font-black text-white bg-gradient-to-r from-red-500 via-yellow-500 to-blue-500 rounded-2xl overflow-hidden transition-all duration-300 hover:scale-110 hover:shadow-[0_0_60px_rgba(239,68,68,1)] active:scale-95"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-red-600 via-yellow-600 to-blue-600 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                  <div className="relative flex items-center gap-4">
+                    <span className="text-5xl">🎮</span>
+                    <span>LET&apos;S PLAY!</span>
+                  </div>
+                  
+                  {/* Animated border */}
+                  <div className="absolute inset-0 rounded-2xl border-4 border-white/50 animate-pulse"></div>
+                </button>
+                
+                {/* Stats or Info */}
+                <div className="flex flex-wrap justify-center gap-4 mt-8">
+                  <div className="bg-cyan-500/10 backdrop-blur-sm px-6 py-3 rounded-xl border border-cyan-400/30">
+                    <p className="text-cyan-400 text-sm font-mono">⚡ Instant Matches</p>
+                  </div>
+                  <div className="bg-yellow-500/10 backdrop-blur-sm px-6 py-3 rounded-xl border border-yellow-400/30">
+                    <p className="text-yellow-400 text-sm font-mono">💰 Win ETH</p>
+                  </div>
+                  <div className="bg-purple-500/10 backdrop-blur-sm px-6 py-3 rounded-xl border border-purple-400/30">
+                    <p className="text-purple-400 text-sm font-mono">🔒 Secure</p>
+                  </div>
+                </div>
               </div>
             ) : (
               <>

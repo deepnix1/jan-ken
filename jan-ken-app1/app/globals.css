@@ -391,3 +391,187 @@
     }
   }
 }
+
+/* VS Screen Animations */
+@keyframes slide-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-100px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(100px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes spin-reverse {
+  from {
+    transform: rotate(360deg);
+  }
+  to {
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes pulse-intense {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 60px rgba(234, 179, 8, 1);
+  }
+  50% {
+    transform: scale(1.1);
+    box-shadow: 0 0 100px rgba(234, 179, 8, 1), 0 0 150px rgba(239, 68, 68, 0.5);
+  }
+}
+
+@keyframes spark-1 {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: translateY(-20px) scale(1.5);
+    opacity: 0.5;
+  }
+}
+
+@keyframes spark-2 {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: translateY(-15px) scale(1.3);
+    opacity: 0.6;
+  }
+}
+
+@keyframes spark-3 {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: translateY(-25px) scale(1.4);
+    opacity: 0.4;
+  }
+}
+
+@keyframes lightning-1 {
+  0%, 100% {
+    opacity: 0;
+  }
+  10%, 12% {
+    opacity: 0.8;
+  }
+}
+
+@keyframes lightning-2 {
+  0%, 100% {
+    opacity: 0;
+  }
+  20%, 22% {
+    opacity: 0.6;
+  }
+}
+
+@keyframes gradient-shift {
+  0%, 100% {
+    background-position: 0% 50%;
+    background-size: 200% 200%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+.animate-slide-in-left {
+  animation: slide-in-left 0.8s ease-out;
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.8s ease-out;
+}
+
+.animate-spin-slow {
+  animation: spin-slow 3s linear infinite;
+}
+
+.animate-spin-reverse {
+  animation: spin-reverse 4s linear infinite;
+}
+
+.animate-pulse-intense {
+  animation: pulse-intense 1.5s ease-in-out infinite;
+}
+
+.animate-spark-1 {
+  animation: spark-1 1s ease-in-out infinite;
+}
+
+.animate-spark-2 {
+  animation: spark-2 1.2s ease-in-out infinite 0.2s;
+}
+
+.animate-spark-3 {
+  animation: spark-3 0.9s ease-in-out infinite 0.4s;
+}
+
+.animate-lightning-1 {
+  animation: lightning-1 3s ease-in-out infinite;
+}
+
+.animate-lightning-2 {
+  animation: lightning-2 4s ease-in-out infinite 0.5s;
+}
+
+.animate-gradient-shift {
+  animation: gradient-shift 10s ease infinite;
+}
+
+/* Additional animations for Winner/Loser */
+@keyframes bounce-slow {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-30px);
+  }
+}
+
+@keyframes pulse-slow {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-bounce-slow {
+  animation: bounce-slow 2s ease-in-out infinite;
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 2s ease-in-out infinite;
+}
