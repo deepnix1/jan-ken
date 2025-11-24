@@ -81,10 +81,10 @@ export function BetSelector({ onSelect }: BetSelectorProps) {
   };
 
   return (
-    <div className="w-full -mt-8 sm:-mt-12 md:-mt-16 relative z-20">
-      <div className="text-center mb-6 sm:mb-8 md:mb-10 relative z-10 pt-4 sm:pt-6">
+    <div className="w-full relative z-20">
+      <div className="text-center mb-4 sm:mb-6 md:mb-8 relative z-10">
         <h2 
-          className="text-3xl sm:text-4xl md:text-5xl font-black mb-3 sm:mb-4 relative z-10"
+          className="text-2xl sm:text-3xl md:text-4xl font-black mb-2 sm:mb-3 relative z-10"
           style={{
             background: 'linear-gradient(to right, #f87171, #60a5fa, #fbbf24)',
             WebkitBackgroundClip: 'text',
@@ -97,12 +97,12 @@ export function BetSelector({ onSelect }: BetSelectorProps) {
         >
           SELECT BET
         </h2>
-        <p className="text-gray-300 text-base sm:text-lg font-mono uppercase tracking-wider px-4 relative z-10 font-bold">
+        <p className="text-gray-300 text-sm sm:text-base font-mono uppercase tracking-wider px-4 relative z-10 font-bold">
           Winner Takes All
         </p>
       </div>
       
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-7 md:gap-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 md:gap-6">
         {betLevels.map((bet, index) => {
           const isSelected = selectedLevel === bet.level;
           const isDisabled = selectedLevel !== null && !isSelected;
@@ -112,7 +112,7 @@ export function BetSelector({ onSelect }: BetSelectorProps) {
               key={bet.level}
               onClick={() => handleSelect(bet.level, bet.amount)}
               disabled={isDisabled || loading || !ethPrice}
-              className={`group relative overflow-hidden rounded-lg p-7 sm:p-9 md:p-11 lg:p-12 transition-all-smooth transform animate-fade-in-up ${
+              className={`group relative overflow-hidden rounded-lg p-4 sm:p-5 md:p-6 transition-all-smooth transform animate-fade-in-up ${
                 isSelected
                   ? 'scale-105 shadow-[0_0_40px_rgba(34,211,238,0.6)] border-2 border-cyan-400 animate-glow-pulse-strong'
                   : isDisabled
@@ -122,10 +122,10 @@ export function BetSelector({ onSelect }: BetSelectorProps) {
               style={{ animationDelay: `${index * 100}ms` }}
             >
               {/* Corner Accents */}
-              <div className="absolute top-2 left-2 w-4 h-4 border-t-2 border-l-2 border-current opacity-50"></div>
-              <div className="absolute top-2 right-2 w-4 h-4 border-t-2 border-r-2 border-current opacity-50"></div>
-              <div className="absolute bottom-2 left-2 w-4 h-4 border-b-2 border-l-2 border-current opacity-50"></div>
-              <div className="absolute bottom-2 right-2 w-4 h-4 border-b-2 border-r-2 border-current opacity-50"></div>
+              <div className="absolute top-1 left-1 w-3 h-3 border-t-2 border-l-2 border-current opacity-50"></div>
+              <div className="absolute top-1 right-1 w-3 h-3 border-t-2 border-r-2 border-current opacity-50"></div>
+              <div className="absolute bottom-1 left-1 w-3 h-3 border-b-2 border-l-2 border-current opacity-50"></div>
+              <div className="absolute bottom-1 right-1 w-3 h-3 border-b-2 border-r-2 border-current opacity-50"></div>
               
               {/* Glow Effect */}
               {isSelected && (
@@ -133,13 +133,13 @@ export function BetSelector({ onSelect }: BetSelectorProps) {
               )}
               
               <div className="relative z-10 flex flex-col items-center justify-center text-center">
-                <div className="text-6xl sm:text-7xl md:text-8xl lg:text-9xl mb-5 sm:mb-7 transform group-hover:scale-110 transition-transform drop-shadow-[0_0_20px_currentColor]">
+                <div className="text-4xl sm:text-5xl md:text-6xl mb-3 sm:mb-4 transform group-hover:scale-110 transition-transform drop-shadow-[0_0_20px_currentColor]">
                   {bet.emoji}
                 </div>
-                <div className="text-4xl sm:text-5xl md:text-6xl font-black mb-3 sm:mb-4 drop-shadow-[0_0_10px_currentColor] break-words">
+                <div className="text-2xl sm:text-3xl md:text-4xl font-black mb-2 sm:mb-3 drop-shadow-[0_0_10px_currentColor] break-words">
                   {bet.label}
                 </div>
-                <div className="text-lg sm:text-xl md:text-2xl font-mono font-semibold opacity-90 break-words">
+                <div className="text-sm sm:text-base md:text-lg font-mono font-semibold opacity-90 break-words">
                   {bet.eth}
                 </div>
               </div>
