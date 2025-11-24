@@ -387,10 +387,10 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
                   )}
                 </div>
                 
-                {/* Text with Neon Glow - Smaller Size with proper text wrapping */}
-                <div className={`text-base sm:text-lg md:text-xl font-black font-mono uppercase tracking-wider ${config.text} ${config.shadow} ${
+                {/* Text with Neon Glow - Extra Small Size to prevent overflow */}
+                <div className={`text-sm sm:text-base md:text-lg font-black font-mono uppercase tracking-wide ${config.text} ${config.shadow} ${
                   isSelected ? 'scale-105' : ''
-                } transition-all duration-300 text-center break-words px-1`}>
+                } transition-all duration-300 text-center break-words px-2 max-w-full overflow-hidden`}>
                   {choice.name}
                 </div>
               </div>

@@ -84,13 +84,13 @@ export function MatchFoundAnimation({ player1Address, player2Address, currentUse
   if (!showAnimation) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+    <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none px-4">
       {/* Background overlay with glow */}
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-pulse"></div>
       
-      {/* Main animation container */}
-      <div className="relative animate-match-found">
-        <div className="relative bg-gradient-to-br from-red-500/90 via-blue-500/90 to-yellow-500/90 text-white px-12 py-10 rounded-3xl shadow-2xl border-4 border-white/50 backdrop-blur-xl animate-glow-pulse">
+      {/* Main animation container - Perfectly Centered */}
+      <div className="relative animate-match-found w-full max-w-2xl mx-auto flex items-center justify-center">
+        <div className="relative bg-gradient-to-br from-red-500/90 via-blue-500/90 to-yellow-500/90 text-white px-8 sm:px-12 py-8 sm:py-10 rounded-3xl shadow-2xl border-4 border-white/50 backdrop-blur-xl animate-glow-pulse w-full">
           {/* Decorative corner elements */}
           <div className="absolute top-2 left-2 w-6 h-6 border-t-4 border-l-4 border-white/80"></div>
           <div className="absolute top-2 right-2 w-6 h-6 border-t-4 border-r-4 border-white/80"></div>
@@ -109,17 +109,17 @@ export function MatchFoundAnimation({ player1Address, player2Address, currentUse
             <div className="absolute top-1/2 left-0 w-20 h-1 bg-gradient-to-r from-transparent via-white to-transparent animate-katana-slash opacity-60"></div>
           </div>
           
-          {/* Main content */}
-          <div className="relative z-10 flex flex-col items-center justify-center gap-4">
+          {/* Main content - Perfectly Centered */}
+          <div className="relative z-10 flex flex-col items-center justify-center gap-3 w-full">
             {/* Title with glow effect */}
-            <h3 className="text-4xl sm:text-5xl font-black text-center drop-shadow-[0_0_20px_rgba(255,255,255,0.8)] mb-2">
+            <h3 className="text-3xl sm:text-4xl md:text-5xl font-black text-center drop-shadow-[0_0_20px_rgba(255,255,255,0.8)] mb-1 w-full">
               <span className="bg-gradient-to-r from-red-400 via-blue-400 to-yellow-400 bg-clip-text text-transparent">
                 MATCH FOUND!
               </span>
             </h3>
             
-            {/* Player profiles - side by side */}
-            <div className="flex items-center justify-center gap-6 sm:gap-8 mb-2">
+            {/* Player profiles - side by side - Perfectly Centered */}
+            <div className="flex items-center justify-center gap-4 sm:gap-6 md:gap-8 mb-2 w-full">
               {/* Current User Profile */}
               <div className="flex flex-col items-center gap-2">
                 <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-full border-4 border-white/80 overflow-hidden shadow-[0_0_20px_rgba(59,130,246,0.8)] bg-gradient-to-br from-blue-500/20 to-cyan-500/20">
@@ -169,15 +169,15 @@ export function MatchFoundAnimation({ player1Address, player2Address, currentUse
             </div>
             
             {/* Subtitle */}
-            <p className="text-white/90 font-bold text-lg sm:text-xl text-center mb-1">
+            <p className="text-white/90 font-bold text-base sm:text-lg md:text-xl text-center mb-1 w-full">
               Opponent Ready
             </p>
             
-            {/* Countdown */}
-            <div className="flex items-center justify-center gap-2">
-              <div className="w-3 h-3 bg-red-400 rounded-full animate-pulse shadow-[0_0_10px_rgba(239,68,68,1)]"></div>
-              <span className="text-white/80 font-mono text-sm text-center">Game starting in 2 seconds...</span>
-              <div className="w-3 h-3 bg-yellow-400 rounded-full animate-pulse shadow-[0_0_10px_rgba(234,179,8,1)]"></div>
+            {/* Countdown - Perfectly Centered */}
+            <div className="flex items-center justify-center gap-2 w-full">
+              <div className="w-2 h-2 sm:w-3 sm:h-3 bg-red-400 rounded-full animate-pulse shadow-[0_0_10px_rgba(239,68,68,1)]"></div>
+              <span className="text-white/80 font-mono text-xs sm:text-sm text-center">Game starting in 2 seconds...</span>
+              <div className="w-2 h-2 sm:w-3 sm:h-3 bg-yellow-400 rounded-full animate-pulse shadow-[0_0_10px_rgba(234,179,8,1)]"></div>
             </div>
             
             {/* Kunai animation */}

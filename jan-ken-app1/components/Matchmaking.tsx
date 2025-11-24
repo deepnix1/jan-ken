@@ -415,13 +415,17 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
         });
       });
       
-      // If we're waiting for a match and someone joined, check if we should match
+      // If we're waiting for a match and someone joined, IMMEDIATELY check multiple times
       if (isMatching && hasJoinedQueue) {
-        console.log('👥 Someone joined queue, checking if match should happen...');
-        // Trigger a game status check after a short delay
-        setTimeout(() => {
-          refetchGame();
-        }, 1000);
+        console.log('👥 🚨 Someone joined queue - AGGRESSIVE MATCH CHECK!');
+        // Immediate checks at different intervals
+        refetchGame(); // Immediate
+        setTimeout(() => refetchGame(), 500);
+        setTimeout(() => refetchGame(), 1000);
+        setTimeout(() => refetchGame(), 2000);
+        setTimeout(() => refetchGame(), 3000);
+        // Also check queue count
+        setTimeout(() => refetchQueueCount(), 1500);
       }
     },
   });
@@ -434,62 +438,50 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
     abi: CONTRACT_ABI,
     eventName: 'GameCreated',
     enabled: isConnected && !!address, // Always enabled when connected, not just after joining queue
+    pollingInterval: 1000, // Poll every 1 second for events (more aggressive)
     onLogs(logs) {
       console.log('🎮 GameCreated event logs received:', logs.length, 'events');
       
-      // Check if this game involves the current player
-      const gameLog = logs.find((log: any) => {
+      // Check ALL logs, not just one
+      logs.forEach((log: any) => {
         const player1 = log.args?.player1?.toLowerCase();
         const player2 = log.args?.player2?.toLowerCase();
         const currentAddress = address?.toLowerCase();
         const isMatch = player1 === currentAddress || player2 === currentAddress;
         
+        console.log('🎮 Checking game log:', {
+          player1,
+          player2,
+          currentAddress,
+          isMatch,
+          gameId: log.args?.gameId?.toString(),
+          betAmount: log.args?.betAmount?.toString(),
+          transactionHash: log.transactionHash,
+          blockNumber: log.blockNumber,
+        });
+        
         if (isMatch) {
-          console.log('✅ Found matching game:', {
-            player1,
-            player2,
-            currentAddress,
+          console.log('🎮 ✅✅✅ MATCH FOUND! GameCreated event received!');
+          console.log('🎮 Event details:', {
+            player1: log.args?.player1,
+            player2: log.args?.player2,
             gameId: log.args?.gameId?.toString(),
             betAmount: log.args?.betAmount?.toString(),
             transactionHash: log.transactionHash,
             blockNumber: log.blockNumber,
           });
-        }
-        
-        return isMatch;
-      });
-      
-      if (gameLog) {
-        console.log('🎮 Match found! GameCreated event received:', gameLog);
-        console.log('🎮 Event details:', {
-          player1: gameLog.args?.player1,
-          player2: gameLog.args?.player2,
-          gameId: gameLog.args?.gameId?.toString(),
-          betAmount: gameLog.args?.betAmount?.toString(),
-          transactionHash: gameLog.transactionHash,
-          blockNumber: gameLog.blockNumber,
-        });
-        
-        // Always call onMatchFound if we find a match, regardless of isMatching state
-        // This handles cases where event arrives before state updates
-        if (isMatching) {
+          
+          // Stop matching
           setIsMatching(false);
+          
+          // Use gameId from event or transaction hash
+          const gameId = log.args?.gameId?.toString() || log.transactionHash || hash || `game-${Date.now()}`;
+          const p1 = log.args?.player1;
+          const p2 = log.args?.player2;
+          console.log('🎮 🚀 Calling onMatchFound with gameId:', gameId, 'player1:', p1, 'player2:', p2);
+          onMatchFound(gameId, p1, p2);
         }
-        
-        // Use gameId from event or transaction hash
-        const gameId = gameLog.args?.gameId?.toString() || gameLog.transactionHash || hash || `game-${Date.now()}`;
-        const player1 = gameLog.args?.player1;
-        const player2 = gameLog.args?.player2;
-        console.log('🎮 Calling onMatchFound with gameId:', gameId, 'player1:', player1, 'player2:', player2);
-        onMatchFound(gameId, player1, player2);
-      } else {
-        console.log('⚠️ GameCreated event received but not for current player');
-        console.log('⚠️ Current address:', address?.toLowerCase());
-        console.log('⚠️ Event logs:', logs.map((log: any) => ({
-          player1: log.args?.player1?.toLowerCase(),
-          player2: log.args?.player2?.toLowerCase(),
-        })));
-      }
+      });
     },
   });
 
@@ -1272,13 +1264,13 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
     });
     
     let pollCount = 0;
-    const maxPolls = 60; // Poll for 120 seconds (60 * 2 seconds) - increased for better reliability
+    const maxPolls = 90; // Poll for 180 seconds (90 * 2 seconds) - very aggressive
     
-    // Poll every 2 seconds to check if game was created
-    // More aggressive polling for matchmaking
+    // Poll every 1.5 seconds to check if game was created
+    // VERY AGGRESSIVE polling for matchmaking
     const pollInterval = setInterval(async () => {
       pollCount++;
-      console.log(`🔄 Polling game status (attempt ${pollCount}/${maxPolls})...`);
+      console.log(`🔄 🔥 AGGRESSIVE POLLING (attempt ${pollCount}/${maxPolls})...`);
       
       try {
         // Refetch queue count and game status
@@ -1366,7 +1358,7 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
         
         // Stop polling after max attempts
         if (pollCount >= maxPolls) {
-          console.warn('⚠️ Polling timeout - no match found after 120 seconds');
+          console.warn('⚠️ Polling timeout - no match found after 180 seconds');
           console.warn('⚠️ This might indicate a problem with matchmaking');
           console.warn('⚠️ Possible causes:');
           console.warn('   - No other players in queue');
@@ -1378,13 +1370,13 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
         console.error('❌ Error polling game status:', error);
         // Continue polling on error (might be temporary network issue)
       }
-    }, 2000); // Poll every 2 seconds
+    }, 1500); // Poll every 1.5 seconds - VERY AGGRESSIVE
     
-    // Stop polling after 120 seconds (match should happen by then)
+    // Stop polling after 180 seconds (match should happen by then)
     const timeout = setTimeout(() => {
-      console.log('⏰ Polling timeout reached (120 seconds)');
+      console.log('⏰ Polling timeout reached (180 seconds)');
       clearInterval(pollInterval);
-    }, 120000); // Increased to 120 seconds
+    }, 180000); // Increased to 180 seconds
     
     return () => {
       console.log('🛑 Stopping game status polling');
