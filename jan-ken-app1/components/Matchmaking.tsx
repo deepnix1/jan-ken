@@ -106,7 +106,7 @@ function MatchmakingComponent({ betAmount, onMatchFound, onCancel, showMatchFoun
         console.log('Transaction hash from callback:', data);
         if (data) {
           setTxHash(data);
-          setHasJoinedQueue(true);
+          // DON'T set hasJoinedQueue here - wait for transaction confirmation
           setTxError(null);
         }
       },
@@ -226,6 +226,10 @@ function MatchmakingComponent({ betAmount, onMatchFound, onCancel, showMatchFoun
       setShowApproved(true);
       setTxConfirmed(true);
       
+      // CRITICAL: Only join queue after transaction is confirmed on blockchain
+      setHasJoinedQueue(true);
+      console.log('[Matchmaking] ✅ User added to pool after transaction confirmation');
+      
       // Hide approved notification after 3 seconds, but keep confirmed state
       const timer = setTimeout(() => {
         setShowApproved(false);
@@ -251,16 +255,17 @@ function MatchmakingComponent({ betAmount, onMatchFound, onCancel, showMatchFoun
     }
   }, [isReceiptError]);
   
-  // Store hash when transaction is sent and update state
+  // Store hash when transaction is sent (but don't join queue yet - wait for confirmation)
   useEffect(() => {
     if (hash) {
       setTxHash(hash);
-      setHasJoinedQueue(true);
+      // DON'T set hasJoinedQueue here - wait for transaction confirmation
       setTxError(null);
       setTxStartTime(null);
       console.log('✅ Transaction hash received:', hash);
       console.log('Transaction status:', status);
       console.log('✅ Transaction sent to contract:', CONTRACT_ADDRESS);
+      console.log('⏳ Waiting for transaction confirmation before joining pool...');
     }
   }, [hash, status]);
 
