@@ -1462,16 +1462,7 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
         </div>
       )}
 
-      <div className="flex flex-col items-center justify-center py-8 sm:py-12 md:py-16 lg:py-20">
-        {/* Japanese Gaming Search Icon - Mobile Responsive */}
-        <div className="relative mb-8 sm:mb-10 md:mb-12">
-          <div className="absolute inset-0 bg-red-500/20 blur-3xl rounded-full"></div>
-          <div className="relative w-32 h-32 sm:w-40 sm:h-40 md:w-48 md:h-48 rounded-full bg-black/60 border-3 sm:border-4 border-red-400/40 flex items-center justify-center shadow-[0_0_40px_rgba(239,68,68,0.6)]">
-            <div className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl text-red-400 drop-shadow-[0_0_30px_rgba(239,68,68,1)] animate-pulse">🔍</div>
-          </div>
-          <div className="absolute inset-0 rounded-full border-3 sm:border-4 border-red-400/30 animate-ping"></div>
-        </div>
-        
+      <div className="flex flex-col items-center justify-center py-4 sm:py-6 md:py-8">
         <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-4 sm:mb-6 text-center px-4">
           <span className="bg-gradient-to-r from-red-400 via-blue-400 to-yellow-400 bg-clip-text text-transparent drop-shadow-[0_0_30px_rgba(239,68,68,0.8)]">
             SEARCHING
