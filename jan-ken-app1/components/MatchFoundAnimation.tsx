@@ -84,13 +84,13 @@ export function MatchFoundAnimation({ player1Address, player2Address, currentUse
   if (!showAnimation) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none px-4">
+    <div className="fixed top-0 left-0 right-0 bottom-0 z-[9999] flex items-center justify-center pointer-events-none p-4" style={{ margin: 0, padding: '1rem' }}>
       {/* Background overlay with glow */}
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-pulse"></div>
       
-      {/* Main animation container - Perfectly Centered */}
-      <div className="relative animate-match-found w-full max-w-2xl mx-auto flex items-center justify-center">
-        <div className="relative bg-gradient-to-br from-red-500/90 via-blue-500/90 to-yellow-500/90 text-white px-8 sm:px-12 py-8 sm:py-10 rounded-3xl shadow-2xl border-4 border-white/50 backdrop-blur-xl animate-glow-pulse w-full">
+      {/* Main animation container - FORCE CENTER */}
+      <div className="relative w-full max-w-lg mx-auto" style={{ transform: 'none' }}>
+        <div className="relative bg-gradient-to-br from-red-500/90 via-blue-500/90 to-yellow-500/90 text-white px-6 sm:px-8 py-6 sm:py-8 rounded-2xl sm:rounded-3xl shadow-2xl border-4 border-white/50 backdrop-blur-xl animate-pulse-slow">
           {/* Decorative corner elements */}
           <div className="absolute top-2 left-2 w-6 h-6 border-t-4 border-l-4 border-white/80"></div>
           <div className="absolute top-2 right-2 w-6 h-6 border-t-4 border-r-4 border-white/80"></div>
@@ -109,20 +109,20 @@ export function MatchFoundAnimation({ player1Address, player2Address, currentUse
             <div className="absolute top-1/2 left-0 w-20 h-1 bg-gradient-to-r from-transparent via-white to-transparent animate-katana-slash opacity-60"></div>
           </div>
           
-          {/* Main content - Perfectly Centered */}
-          <div className="relative z-10 flex flex-col items-center justify-center gap-3 w-full">
+          {/* Main content - FORCE CENTER */}
+          <div className="relative z-10 flex flex-col items-center justify-center gap-2 sm:gap-3">
             {/* Title with glow effect */}
-            <h3 className="text-3xl sm:text-4xl md:text-5xl font-black text-center drop-shadow-[0_0_20px_rgba(255,255,255,0.8)] mb-1 w-full">
+            <h3 className="text-2xl sm:text-3xl md:text-4xl font-black text-center drop-shadow-[0_0_20px_rgba(255,255,255,0.8)] mb-1">
               <span className="bg-gradient-to-r from-red-400 via-blue-400 to-yellow-400 bg-clip-text text-transparent">
                 MATCH FOUND!
               </span>
             </h3>
             
-            {/* Player profiles - side by side - Perfectly Centered */}
-            <div className="flex items-center justify-center gap-4 sm:gap-6 md:gap-8 mb-2 w-full">
+            {/* Player profiles - side by side - FORCE CENTER */}
+            <div className="flex items-center justify-center gap-3 sm:gap-4 md:gap-6 mb-1 sm:mb-2">
               {/* Current User Profile */}
-              <div className="flex flex-col items-center gap-2">
-                <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-full border-4 border-white/80 overflow-hidden shadow-[0_0_20px_rgba(59,130,246,0.8)] bg-gradient-to-br from-blue-500/20 to-cyan-500/20">
+              <div className="flex flex-col items-center gap-1 sm:gap-2">
+                <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-full border-3 sm:border-4 border-white/80 overflow-hidden shadow-[0_0_20px_rgba(59,130,246,0.8)] bg-gradient-to-br from-blue-500/20 to-cyan-500/20">
                   {currentUserProfile?.pfpUrl ? (
                     <Image
                       src={currentUserProfile.pfpUrl}
@@ -146,8 +146,8 @@ export function MatchFoundAnimation({ player1Address, player2Address, currentUse
               <div className="text-white/80 font-black text-2xl sm:text-3xl">VS</div>
               
               {/* Opponent Profile */}
-              <div className="flex flex-col items-center gap-2">
-                <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-full border-4 border-white/80 overflow-hidden shadow-[0_0_20px_rgba(239,68,68,0.8)] bg-gradient-to-br from-red-500/20 to-pink-500/20">
+              <div className="flex flex-col items-center gap-1 sm:gap-2">
+                <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-full border-3 sm:border-4 border-white/80 overflow-hidden shadow-[0_0_20px_rgba(239,68,68,0.8)] bg-gradient-to-br from-red-500/20 to-pink-500/20">
                   {opponentProfile?.pfpUrl ? (
                     <Image
                       src={opponentProfile.pfpUrl}
@@ -169,15 +169,15 @@ export function MatchFoundAnimation({ player1Address, player2Address, currentUse
             </div>
             
             {/* Subtitle */}
-            <p className="text-white/90 font-bold text-base sm:text-lg md:text-xl text-center mb-1 w-full">
+            <p className="text-white/90 font-bold text-sm sm:text-base md:text-lg text-center mb-1">
               Opponent Ready
             </p>
             
-            {/* Countdown - Perfectly Centered */}
-            <div className="flex items-center justify-center gap-2 w-full">
-              <div className="w-2 h-2 sm:w-3 sm:h-3 bg-red-400 rounded-full animate-pulse shadow-[0_0_10px_rgba(239,68,68,1)]"></div>
+            {/* Countdown - FORCE CENTER */}
+            <div className="flex items-center justify-center gap-2">
+              <div className="w-2 h-2 bg-red-400 rounded-full animate-pulse shadow-[0_0_10px_rgba(239,68,68,1)]"></div>
               <span className="text-white/80 font-mono text-xs sm:text-sm text-center">Game starting in 2 seconds...</span>
-              <div className="w-2 h-2 sm:w-3 sm:h-3 bg-yellow-400 rounded-full animate-pulse shadow-[0_0_10px_rgba(234,179,8,1)]"></div>
+              <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse shadow-[0_0_10px_rgba(234,179,8,1)]"></div>
             </div>
             
             {/* Kunai animation */}

@@ -1,246 +1,273 @@
-/**
- * Debug Panel Component
- * 
- * Shows console logs and transaction status in UI for mobile debugging
- */
-
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
-import { useAccount, useChainId } from 'wagmi';
+import { useState, useEffect } from 'react';
+import { useAccount, useReadContract } from 'wagmi';
+import { CONTRACT_ADDRESS, CONTRACT_ABI } from '@/lib/contract';
 
-interface LogEntry {
+interface DebugIssue {
   id: string;
-  timestamp: number;
-  level: 'log' | 'warn' | 'error' | 'info';
+  title: string;
+  status: 'ok' | 'warning' | 'error';
   message: string;
-  data?: any;
+  timestamp: string;
 }
 
 export function DebugPanel() {
-  const { address, isConnected } = useAccount();
-  const chainId = useChainId();
-  const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isOpen, setIsOpen] = useState(false);
-  const [autoScroll, setAutoScroll] = useState(true);
-  const logsEndRef = useRef<HTMLDivElement>(null);
+  const [issues, setIssues] = useState<DebugIssue[]>([]);
+  const { address, isConnected } = useAccount();
+
+  // Monitor wallet connection
+  useEffect(() => {
+    if (!isConnected) {
+      addIssue({
+        id: 'wallet',
+        title: 'Wallet Not Connected',
+        status: 'error',
+        message: 'Please connect your wallet to use the app',
+      });
+    } else {
+      removeIssue('wallet');
+      addIssue({
+        id: 'wallet-ok',
+        title: 'Wallet Connected',
+        status: 'ok',
+        message: `Connected: ${address?.slice(0, 6)}...${address?.slice(-4)}`,
+      });
+    }
+  }, [isConnected, address]);
+
+  // Monitor queue status
+  const { data: queueCount } = useReadContract({
+    address: CONTRACT_ADDRESS as `0x${string}`,
+    abi: CONTRACT_ABI,
+    functionName: 'getWaitingPlayersCount',
+    args: address ? [BigInt(1500000000000000)] : undefined, // Default bet level
+    query: {
+      enabled: isConnected && !!address,
+      refetchInterval: 3000,
+    },
+  });
 
   useEffect(() => {
-    // Capture console logs
-    const originalLog = console.log;
-    const originalWarn = console.warn;
+    if (queueCount !== undefined) {
+      const count = Number(queueCount);
+      if (count >= 2) {
+        addIssue({
+          id: 'queue-stuck',
+          title: 'Matchmaking Issue',
+          status: 'error',
+          message: `${count} players in queue but no match! Check console for "🎮 GameCreated" events.`,
+        });
+      } else if (count === 1) {
+        addIssue({
+          id: 'queue-waiting',
+          title: 'Waiting for Opponent',
+          status: 'warning',
+          message: `You're in queue (${count} player). Waiting for another player...`,
+        });
+      } else {
+        removeIssue('queue-stuck');
+        removeIssue('queue-waiting');
+      }
+    }
+  }, [queueCount]);
+
+  // Monitor console errors for specific issues
+  useEffect(() => {
     const originalError = console.error;
-    const originalInfo = console.info;
-
-    const addLog = (level: LogEntry['level'], ...args: any[]): void => {
-      const message = args.map(arg => 
-        typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
-      ).join(' ');
-      
-      setLogs(prev => {
-        const newLog: LogEntry = {
-          id: `${Date.now()}-${Math.random()}`,
-          timestamp: Date.now(),
-          level,
-          message,
-          data: args.length > 1 ? args : undefined,
-        };
-        return [...prev.slice(-99), newLog]; // Keep last 100 logs
-      });
-    };
-
-    console.log = (...args: any[]) => {
-      originalLog(...args);
-      addLog('log', ...args);
-    };
-
-    console.warn = (...args: any[]) => {
-      originalWarn(...args);
-      addLog('warn', ...args);
-    };
-
     console.error = (...args: any[]) => {
       originalError(...args);
-      addLog('error', ...args);
+      
+      const errorStr = args.join(' ');
+      
+      // Check for Farcaster profile issues
+      if (errorStr.includes('[Farcaster]') && errorStr.includes('❌')) {
+        addIssue({
+          id: 'farcaster',
+          title: 'Farcaster Profile Failed',
+          status: 'error',
+          message: 'Failed to load profile pictures. Check console for "[Farcaster]" logs.',
+        });
+      }
+      
+      // Check for match found animation issues
+      if (errorStr.includes('MatchFoundAnimation') || errorStr.includes('animation')) {
+        addIssue({
+          id: 'animation',
+          title: 'Animation Issue',
+          status: 'error',
+          message: 'Match Found animation may be off-screen. Check if z-index and positioning are correct.',
+        });
+      }
+      
+      // Check for text overflow issues
+      if (errorStr.includes('overflow') || errorStr.includes('Scissors')) {
+        addIssue({
+          id: 'text-overflow',
+          title: 'Text Overflow',
+          status: 'warning',
+          message: 'Button text may be overflowing. Check "Scissors" button in game.',
+        });
+      }
     };
-
-    console.info = (...args: any[]) => {
-      originalInfo(...args);
-      addLog('info', ...args);
-    };
-
+    
     return () => {
-      console.log = originalLog;
-      console.warn = originalWarn;
       console.error = originalError;
-      console.info = originalInfo;
     };
   }, []);
 
-  // Auto-scroll to bottom
+  // Monitor console logs for Farcaster success
   useEffect(() => {
-    if (autoScroll && logsEndRef.current) {
-      logsEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [logs, autoScroll]);
+    const originalLog = console.log;
+    console.log = (...args: any[]) => {
+      originalLog(...args);
+      
+      const logStr = args.join(' ');
+      
+      // Check for Farcaster success
+      if (logStr.includes('[Farcaster]') && logStr.includes('✅')) {
+        removeIssue('farcaster');
+      }
+      
+      // Check for match found
+      if (logStr.includes('🎮') && logStr.includes('MATCH FOUND')) {
+        removeIssue('queue-stuck');
+        removeIssue('queue-waiting');
+        addIssue({
+          id: 'match-found',
+          title: 'Match Found!',
+          status: 'ok',
+          message: 'Game matched successfully. Check if animation appears centered on screen.',
+        });
+      }
+    };
+    
+    return () => {
+      console.log = originalLog;
+    };
+  }, []);
 
-  const clearLogs = () => {
-    setLogs([]);
+  const addIssue = (issue: Omit<DebugIssue, 'timestamp'>) => {
+    setIssues(prev => {
+      const existing = prev.find(i => i.id === issue.id);
+      if (existing) {
+        return prev.map(i => i.id === issue.id ? { ...issue, timestamp: new Date().toISOString() } : i);
+      }
+      return [...prev, { ...issue, timestamp: new Date().toISOString() }];
+    });
   };
 
-  const getLogColor = (level: LogEntry['level']) => {
-    switch (level) {
-      case 'error': return 'text-red-400';
-      case 'warn': return 'text-yellow-400';
-      case 'info': return 'text-blue-400';
-      default: return 'text-gray-300';
+  const removeIssue = (id: string) => {
+    setIssues(prev => prev.filter(i => i.id !== id));
+  };
+
+  const clearIssues = () => {
+    setIssues([]);
+  };
+
+  const getStatusColor = (status: DebugIssue['status']) => {
+    switch (status) {
+      case 'ok': return 'text-green-400 border-green-500 bg-green-500/10';
+      case 'warning': return 'text-yellow-400 border-yellow-500 bg-yellow-500/10';
+      case 'error': return 'text-red-400 border-red-500 bg-red-500/10';
     }
   };
 
-  if (!isOpen) {
-    return (
-      <button
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          console.log('🐛 Debug Panel button clicked');
-          setIsOpen(true);
-        }}
-        onTouchStart={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          console.log('🐛 Debug Panel button touched');
-          setIsOpen(true);
-        }}
-        className="fixed bottom-4 right-4 z-[99999] w-14 h-14 bg-purple-600 border-2 border-purple-400 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(168,85,247,0.8)] hover:bg-purple-500 active:bg-purple-700 transition-all cursor-pointer touch-manipulation"
-        style={{ 
-          position: 'fixed',
-          zIndex: 99999,
-          pointerEvents: 'auto',
-        }}
-        title="Open Debug Panel"
-        aria-label="Open Debug Panel"
-      >
-        <span className="text-2xl select-none">🐛</span>
-      </button>
-    );
-  }
+  const getStatusEmoji = (status: DebugIssue['status']) => {
+    switch (status) {
+      case 'ok': return '✅';
+      case 'warning': return '⚠️';
+      case 'error': return '❌';
+    }
+  };
 
   return (
-    <div 
-      className="fixed bottom-4 right-4 w-[90vw] max-w-md max-h-[70vh] bg-black/95 backdrop-blur-lg border-2 border-purple-400/50 rounded-lg shadow-[0_0_30px_rgba(168,85,247,0.4)] z-[99999] flex flex-col"
-      style={{ 
-        position: 'fixed',
-        zIndex: 99999,
-        pointerEvents: 'auto',
-      }}
-    >
-      {/* Header */}
-      <div className="flex items-center justify-between p-3 border-b border-purple-400/30">
-        <div>
-          <h3 className="text-sm font-bold text-purple-400">Debug Panel</h3>
-          <div className="text-xs text-gray-400 mt-1">
-            {address?.slice(0, 6)}...{address?.slice(-4)} | Chain: {chainId} | Logs: {logs.length}
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={clearLogs}
-            className="px-2 py-1 bg-purple-500/20 border border-purple-400 rounded text-purple-300 text-xs hover:bg-purple-500/30"
-          >
-            Clear
-          </button>
-          <button
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              console.log('🐛 Debug Panel close clicked');
-              setIsOpen(false);
-            }}
-            className="px-2 py-1 bg-red-500/20 border border-red-400 rounded text-red-300 text-xs hover:bg-red-500/30 cursor-pointer"
-          >
-            ✕
-          </button>
-        </div>
-      </div>
-
-      {/* Connection Status */}
-      <div className="p-2 border-b border-purple-400/30 bg-purple-500/10">
-        <div className="text-xs space-y-1">
-          <div className="flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-400' : 'bg-red-400'}`}></div>
-            <span className="text-gray-300">Connected: {isConnected ? 'Yes' : 'No'}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${chainId === 84532 ? 'bg-green-400' : 'bg-red-400'}`}></div>
-            <span className="text-gray-300">Network: {chainId === 84532 ? 'Base Sepolia ✓' : `Chain ${chainId} ✗`}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Logs */}
-      <div className="flex-1 overflow-y-auto p-2 space-y-1 font-mono text-xs">
-        {logs.length === 0 ? (
-          <div className="text-gray-500 text-center py-4">No logs yet...</div>
+    <>
+      {/* Floating Debug Button */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="fixed bottom-4 right-4 z-[9998] w-14 h-14 rounded-full bg-purple-600 hover:bg-purple-700 text-white font-black shadow-lg flex items-center justify-center transition-all"
+        title="Debug Panel"
+      >
+        {issues.filter(i => i.status === 'error').length > 0 ? (
+          <span className="text-2xl animate-pulse">🐛</span>
         ) : (
-          logs.map((log) => (
-            <div
-              key={log.id}
-              className={`p-2 rounded border-l-2 ${
-                log.level === 'error' ? 'border-red-400 bg-red-500/10' :
-                log.level === 'warn' ? 'border-yellow-400 bg-yellow-500/10' :
-                log.level === 'info' ? 'border-blue-400 bg-blue-500/10' :
-                'border-gray-400 bg-gray-500/10'
-              }`}
-            >
-              <div className="flex items-start gap-2">
-                <span className={`text-xs font-bold ${getLogColor(log.level)}`}>
-                  [{log.level.toUpperCase()}]
+          <span className="text-2xl">🔧</span>
+        )}
+        {issues.filter(i => i.status === 'error').length > 0 && (
+          <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-xs flex items-center justify-center animate-bounce">
+            {issues.filter(i => i.status === 'error').length}
+          </span>
+        )}
+      </button>
+
+      {/* Debug Panel */}
+      {isOpen && (
+        <div className="fixed bottom-20 right-4 z-[9999] w-96 max-w-[calc(100vw-2rem)] max-h-[70vh] bg-black/95 border-2 border-purple-500 rounded-lg shadow-2xl overflow-hidden">
+          {/* Header */}
+          <div className="bg-purple-600 px-4 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">🔧</span>
+              <h3 className="text-white font-black">Debug Panel</h3>
+              {issues.length > 0 && (
+                <span className="bg-purple-800 text-white text-xs px-2 py-1 rounded-full">
+                  {issues.length}
                 </span>
-                <span className="text-gray-400 text-[10px]">
-                  {new Date(log.timestamp).toLocaleTimeString()}
-                </span>
-              </div>
-              <div className={`mt-1 break-words ${getLogColor(log.level)}`}>
-                {log.message}
-              </div>
-              {log.data && (
-                <details className="mt-1">
-                  <summary className="text-gray-400 text-[10px] cursor-pointer">Details</summary>
-                  <pre className="text-[10px] text-gray-500 mt-1 overflow-x-auto">
-                    {JSON.stringify(log.data, null, 2)}
-                  </pre>
-                </details>
               )}
             </div>
-          ))
-        )}
-        <div ref={logsEndRef} />
-      </div>
+            <div className="flex gap-2">
+              <button
+                onClick={clearIssues}
+                className="text-white/80 hover:text-white text-xs px-2 py-1 bg-purple-700 rounded"
+                title="Clear all"
+              >
+                Clear
+              </button>
+              <button
+                onClick={() => setIsOpen(false)}
+                className="text-white/80 hover:text-white text-lg leading-none"
+                title="Close"
+              >
+                ×
+              </button>
+            </div>
+          </div>
 
-      {/* Footer */}
-      <div className="p-2 border-t border-purple-400/30 flex items-center justify-between">
-        <label className="flex items-center gap-2 text-xs text-gray-400">
-          <input
-            type="checkbox"
-            checked={autoScroll}
-            onChange={(e) => setAutoScroll(e.target.checked)}
-            className="w-3 h-3"
-          />
-          Auto-scroll
-        </label>
-        <button
-          onClick={() => {
-            const logText = logs.map(l => `[${l.level}] ${l.message}`).join('\n');
-            navigator.clipboard.writeText(logText);
-            alert('Logs copied to clipboard!');
-          }}
-          className="px-2 py-1 bg-purple-500/20 border border-purple-400 rounded text-purple-300 text-xs hover:bg-purple-500/30"
-        >
-          Copy Logs
-        </button>
-      </div>
-    </div>
+          {/* Issues List */}
+          <div className="overflow-y-auto max-h-[calc(70vh-4rem)] p-4 space-y-2">
+            {issues.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-green-400 text-lg">✅</p>
+                <p className="text-gray-400 text-sm mt-2">No issues detected</p>
+              </div>
+            ) : (
+              issues.map((issue) => (
+                <div
+                  key={issue.id}
+                  className={`border-2 rounded-lg p-3 ${getStatusColor(issue.status)}`}
+                >
+                  <div className="flex items-start gap-2">
+                    <span className="text-lg flex-shrink-0">{getStatusEmoji(issue.status)}</span>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-bold text-sm">{issue.title}</h4>
+                      <p className="text-xs mt-1 opacity-90 break-words">{issue.message}</p>
+                      <p className="text-xs mt-1 opacity-60">
+                        {new Date(issue.timestamp).toLocaleTimeString()}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="bg-purple-900/50 px-4 py-2 text-xs text-gray-400 border-t border-purple-700">
+            <p>💡 Tip: Check browser console (F12) for detailed logs</p>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
-
