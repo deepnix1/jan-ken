@@ -512,18 +512,37 @@ function MatchmakingComponent({ betAmount, onMatchFound, onCancel, showMatchFoun
     onLogs: handleGameCreatedLogs,
   });
 
+  // Debug logging for connector client and writeContract
+  useEffect(() => {
+    console.log('[Matchmaking] 🔍 State check:', {
+      connectorClient: !!connectorClient,
+      writeContract: typeof writeContract,
+      isConnected,
+      address,
+      hasJoinedQueue,
+      betLevel,
+    });
+  }, [connectorClient, writeContract, isConnected, address, hasJoinedQueue, betLevel]);
+
   // Join queue via contract - PRODUCTION MODE
   useEffect(() => {
     // CRITICAL: Check connector client before proceeding
     if (!connectorClient) {
-      console.warn('⚠️ Connector client not available, cannot send transaction');
+      console.warn('[Matchmaking] ⚠️ Connector client not available, cannot send transaction');
       if (isConnected && address) {
         setTxError('Wallet connection issue. Please disconnect and reconnect your wallet.');
       }
       return;
     }
     
-    if (!isConnected || !writeContract || hasJoinedQueue) return;
+    // Check if writeContract is a function
+    if (typeof writeContract !== 'function') {
+      console.error('[Matchmaking] ❌ writeContract is not a function:', typeof writeContract);
+      setTxError('Transaction function not available. Please refresh the page.');
+      return;
+    }
+    
+    if (!isConnected || hasJoinedQueue) return;
     
     // Check network - Base Sepolia chain ID is 84532
     if (chainId !== 84532) {
@@ -552,13 +571,32 @@ function MatchmakingComponent({ betAmount, onMatchFound, onCancel, showMatchFoun
     }
     
     // Show notification that wallet approval is needed
-    console.log('Sending transaction - wallet approval required');
+    console.log('[Matchmaking] 📤 Sending transaction - wallet approval required');
+    console.log('[Matchmaking] 📤 Transaction parameters:', {
+      address: CONTRACT_ADDRESS,
+      functionName: 'joinQueue',
+      args: [betLevel],
+      betAmount: betAmount.toString(),
+    });
     
     // Small delay to ensure UI is ready before showing wallet popup
     const sendTransaction = async () => {
       try {
+        // Double-check connector client and writeContract before sending
+        if (!connectorClient) {
+          console.error('[Matchmaking] ❌ Connector client lost before transaction');
+          setTxError('Wallet connection lost. Please refresh the page.');
+          return;
+        }
+        
+        if (typeof writeContract !== 'function') {
+          console.error('[Matchmaking] ❌ writeContract lost before transaction');
+          setTxError('Transaction function lost. Please refresh the page.');
+          return;
+        }
+        
         // Check wallet provider before sending - use imported SDK
-        console.log('🔍 Wallet provider check:');
+        console.log('[Matchmaking] 🔍 Wallet provider check:');
         console.log('  - Imported SDK available:', !!sdk);
         console.log('  - SDK wallet available:', !!(sdk && sdk.wallet));
         
@@ -997,10 +1035,25 @@ function MatchmakingComponent({ betAmount, onMatchFound, onCancel, showMatchFoun
               maxPriorityFeePerGas: simRequest.maxPriorityFeePerGas ? (typeof simRequest.maxPriorityFeePerGas === 'bigint' ? simRequest.maxPriorityFeePerGas.toString() : String(simRequest.maxPriorityFeePerGas)) : undefined,
             });
             
-            console.log('📤 Calling writeContract with simulation request...');
+            console.log('[Matchmaking] 📤 Calling writeContract with simulation request...');
+            console.log('[Matchmaking] 📤 Simulation request params:', {
+              address: simRequest.address,
+              functionName: simRequest.functionName,
+              args: simRequest.args?.map((a: any) => typeof a === 'bigint' ? a.toString() : String(a)),
+            });
+            
+            // Final check before calling
+            if (typeof writeContract !== 'function') {
+              console.error('[Matchmaking] ❌ writeContract is not a function before call');
+              setTxError('Transaction function error. Please refresh the page.');
+              return;
+            }
+            
             try {
               writeContract(simRequest);
-              console.log('✅ writeContract called successfully (with simulation request)');
+              console.log('[Matchmaking] ✅ writeContract called successfully (with simulation request)');
+              console.log('[Matchmaking] ✅ Transaction status after call:', status);
+              console.log('[Matchmaking] ✅ isPending after call:', isPending);
             } catch (writeErr: any) {
               console.error('❌ Error calling writeContract with simulation request:', writeErr);
               // Safely extract error message
@@ -1016,17 +1069,27 @@ function MatchmakingComponent({ betAmount, onMatchFound, onCancel, showMatchFoun
               return;
             }
           } else {
-            console.log('📤 Sending transaction directly (wallet will estimate gas)');
-            console.log('Calling writeContract with params:', {
+            console.log('[Matchmaking] 📤 Sending transaction directly (wallet will estimate gas)');
+            console.log('[Matchmaking] 📤 Calling writeContract with params:', {
               address: txParams.address,
               functionName: txParams.functionName,
               args: txParams.args.map(a => a.toString()),
               value: txParams.value.toString(),
             });
-            console.log('📤 Calling writeContract...');
+            
+            // Final check before calling
+            if (typeof writeContract !== 'function') {
+              console.error('[Matchmaking] ❌ writeContract is not a function before call');
+              setTxError('Transaction function error. Please refresh the page.');
+              return;
+            }
+            
+            console.log('[Matchmaking] 📤 Calling writeContract...');
             try {
               writeContract(txParams);
-              console.log('✅ writeContract called successfully (direct)');
+              console.log('[Matchmaking] ✅ writeContract called successfully (direct)');
+              console.log('[Matchmaking] ✅ Transaction status after call:', status);
+              console.log('[Matchmaking] ✅ isPending after call:', isPending);
             } catch (writeErr: any) {
               console.error('❌ Error calling writeContract directly:', writeErr);
               // Safely extract error message

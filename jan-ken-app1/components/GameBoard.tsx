@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { useWriteContract, useReadContract, useAccount, useWaitForTransactionReceipt, useSimulateContract } from 'wagmi';
+import { useWriteContract, useReadContract, useAccount, useWaitForTransactionReceipt, useSimulateContract, useConnectorClient } from 'wagmi';
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from '@/lib/contract';
 import { isValidChoice, isValidBetAmount } from '@/lib/security';
 
@@ -20,15 +20,23 @@ const CHOICES = [
 
 export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }: GameBoardProps) {
   const { address } = useAccount();
+  const { data: connectorClient } = useConnectorClient();
   const [selectedChoice, setSelectedChoice] = useState<number | null>(null);
   const [timeLeft, setTimeLeft] = useState(20); // Changed from 40 to 20 seconds
   const [gameFinished, setGameFinished] = useState(false);
   const [player1Profile, setPlayer1Profile] = useState<{ pfpUrl: string | null; username: string | null } | null>(null);
   const [player2Profile, setPlayer2Profile] = useState<{ pfpUrl: string | null; username: string | null } | null>(null);
-  // TEST MODE: Wallet check temporarily disabled
+  const [txError, setTxError] = useState<string | null>(null);
 
   const { data: hash, writeContract, isPending, error: writeError, reset: resetWriteContract, status } = useWriteContract();
   const [txStartTime, setTxStartTime] = useState<number | null>(null);
+  
+  // Debug logging for connector client
+  useEffect(() => {
+    console.log('[GameBoard] Connector client available:', !!connectorClient);
+    console.log('[GameBoard] writeContract available:', typeof writeContract === 'function');
+    console.log('[GameBoard] Address:', address);
+  }, [connectorClient, writeContract, address]);
   
   // Simulate contract call to get gas estimates
   // Enable simulation when choice is selected (before transaction is sent)
@@ -179,49 +187,109 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
     return () => clearInterval(timer);
   }, [timeLeft, gameFinished, onGameEnd]);
 
-  const handleChoice = (choiceId: number) => {
+  const handleChoice = async (choiceId: number) => {
     // Security: Input validation
     if (!isValidChoice(choiceId)) {
-      console.error('Invalid choice:', choiceId);
+      console.error('[GameBoard] ❌ Invalid choice:', choiceId);
       return;
     }
     
-    if (selectedChoice || !writeContract || !address) return;
+    if (selectedChoice || !address) {
+      console.warn('[GameBoard] ⚠️ Cannot make choice - already selected or no address');
+      return;
+    }
+
+    // Check connector client before proceeding
+    if (!connectorClient) {
+      console.error('[GameBoard] ❌ Connector client not available');
+      setTxError('Wallet connection issue. Please refresh the page or reconnect your wallet.');
+      alert('Wallet connection issue. Please refresh the page.');
+      return;
+    }
+
+    // Check if writeContract is available
+    if (typeof writeContract !== 'function') {
+      console.error('[GameBoard] ❌ writeContract is not a function');
+      setTxError('Transaction function not available. Please refresh the page.');
+      alert('Transaction function not available. Please refresh the page.');
+      return;
+    }
 
     // Security: Validate address format
     if (!address || !address.startsWith('0x') || address.length !== 42) {
-      console.error('Invalid wallet address');
+      console.error('[GameBoard] ❌ Invalid wallet address');
+      setTxError('Invalid wallet address.');
       return;
     }
 
+    console.log('[GameBoard] ✅ All checks passed, preparing transaction...');
+    console.log('[GameBoard] Choice ID:', choiceId);
+    console.log('[GameBoard] Connector client:', !!connectorClient);
+    console.log('[GameBoard] writeContract type:', typeof writeContract);
+
     setSelectedChoice(choiceId);
     setTxStartTime(Date.now());
+    setTxError(null);
     
     try {
+      let txParams: any;
+      
       // Wagmi v3 best practice: Use simulateData.request if available
       // This includes all gas parameters and ensures wallet shows correct fee
       if (simulateData && (simulateData as any).request) {
-        console.log('📤 Using simulateData.request for makeChoice (Wagmi v3 best practice)');
-        // Use the request object directly - it includes all necessary parameters
-        writeContract((simulateData as any).request);
+        console.log('[GameBoard] 📤 Using simulateData.request for makeChoice (Wagmi v3 best practice)');
+        txParams = (simulateData as any).request;
       } else {
         // Fallback: send without simulation data (wallet will estimate)
-        console.log('📤 Sending makeChoice transaction (wallet will estimate gas)');
-        writeContract({
+        console.log('[GameBoard] 📤 Sending makeChoice transaction (wallet will estimate gas)');
+        txParams = {
           address: CONTRACT_ADDRESS as `0x${string}`,
           abi: CONTRACT_ABI,
           functionName: 'makeChoice',
           args: [choiceId],
-        });
+        };
       }
-      console.log('Transaction request sent, waiting for wallet approval and hash...');
+      
+      console.log('[GameBoard] 📤 Calling writeContract with params:', {
+        address: txParams.address,
+        functionName: txParams.functionName || 'makeChoice',
+        args: txParams.args ? txParams.args.map((a: any) => a.toString()) : [choiceId],
+      });
+      
+      // Call writeContract - this should trigger wallet popup
+      writeContract(txParams);
+      
+      console.log('[GameBoard] ✅ writeContract called successfully');
+      console.log('[GameBoard] Transaction status:', status);
+      console.log('[GameBoard] isPending:', isPending);
+      console.log('[GameBoard] Waiting for wallet approval and hash...');
     } catch (error: any) {
-      console.error('Error making choice:', error);
+      console.error('[GameBoard] ❌ Error making choice:', error);
+      console.error('[GameBoard] Error details:', {
+        message: error?.message,
+        name: error?.name,
+        code: (error as any)?.code,
+        shortMessage: (error as any)?.shortMessage,
+      });
+      
       // Reset selection on error
       setSelectedChoice(null);
+      setTxStartTime(null);
+      
+      // Extract error message
+      let errorMessage = 'Transaction failed. Please try again.';
+      if (error?.message) {
+        errorMessage = error.message;
+      } else if ((error as any)?.shortMessage) {
+        errorMessage = (error as any).shortMessage;
+      }
+      
+      setTxError(errorMessage);
       
       if (error?.message?.includes('rejected') || error?.message?.includes('Rejected')) {
         alert('Transaction was rejected. Please approve in your wallet and try again.');
+      } else {
+        alert(`Transaction error: ${errorMessage}`);
       }
     }
   };
@@ -437,6 +505,35 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
             <div className="absolute bottom-2 right-2 w-4 h-4 border-b-2 border-r-2 border-green-400"></div>
             {/* Pulse effect */}
             <div className="absolute inset-0 border-2 border-green-400 rounded-xl animate-ping opacity-20"></div>
+          </div>
+        </div>
+      )}
+
+      {/* Error Display */}
+      {(txError || writeError) && (
+        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 animate-fade-in-down">
+          <div className="inline-flex flex-col items-center gap-4 px-8 py-6 bg-black/95 backdrop-blur-lg border-3 border-red-500 rounded-xl shadow-[0_0_60px_rgba(239,68,68,0.8)] min-w-[300px] max-w-[90vw]">
+            <div className="flex items-center gap-4">
+              <div className="text-4xl">❌</div>
+              <div className="flex flex-col">
+                <p className="text-red-400 font-black text-lg uppercase tracking-wider">
+                  Transaction Error
+                </p>
+                <p className="text-red-300 font-mono text-sm mt-1 break-words">
+                  {txError || writeError?.message || (writeError as any)?.shortMessage || 'Unknown error'}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                setTxError(null);
+                setSelectedChoice(null);
+                resetWriteContract?.();
+              }}
+              className="px-6 py-2 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400 font-mono text-sm hover:bg-red-500/30 transition-colors font-bold uppercase tracking-wider mt-2"
+            >
+              Dismiss
+            </button>
           </div>
         </div>
       )}
