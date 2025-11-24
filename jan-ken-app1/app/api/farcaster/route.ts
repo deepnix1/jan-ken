@@ -90,9 +90,9 @@ async function fetchProfileByAddress(address: string) {
   console.log(`[API] 🔍 Fetching profile for address: ${normalizedAddress}`);
 
   try {
-    // Use Neynar SDK's fetchBulkUsersByEthereumAddress method with proper v3 API signature
-    // Per docs: https://docs.neynar.com/reference/user-bulk-by-address
-    const response = await neynarClient.fetchBulkUsersByEthereumAddress({ addresses: [normalizedAddress] });
+    // Use Neynar SDK's fetchBulkUsersByEthOrSolAddress method (v3 API)
+    // Method name changed from fetchBulkUsersByEthereumAddress in v3
+    const response = await neynarClient.fetchBulkUsersByEthOrSolAddress({ addresses: [normalizedAddress] });
     
     console.log(`[API] 🌐 Neynar SDK address lookup response:`, response);
 
