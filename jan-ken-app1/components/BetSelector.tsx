@@ -84,7 +84,7 @@ export function BetSelector({ onSelect }: BetSelectorProps) {
     <div className="w-full relative z-20">
       <div className="text-center mb-4 sm:mb-6 md:mb-8 relative z-10">
         <h2 
-          className="text-2xl sm:text-3xl md:text-4xl font-black mb-2 sm:mb-3 relative z-10"
+          className="text-xl sm:text-2xl md:text-3xl font-black mb-2 sm:mb-3 relative z-10"
           style={{
             background: 'linear-gradient(to right, #f87171, #60a5fa, #fbbf24)',
             WebkitBackgroundClip: 'text',
@@ -97,7 +97,7 @@ export function BetSelector({ onSelect }: BetSelectorProps) {
         >
           SELECT BET
         </h2>
-        <p className="text-gray-300 text-sm sm:text-base font-mono uppercase tracking-wider px-4 relative z-10 font-bold">
+        <p className="text-gray-300 text-xs sm:text-sm font-mono uppercase tracking-wider px-4 relative z-10 font-bold">
           Winner Takes All
         </p>
       </div>
@@ -133,13 +133,13 @@ export function BetSelector({ onSelect }: BetSelectorProps) {
               )}
               
               <div className="relative z-10 flex flex-col items-center justify-center text-center">
-                <div className="text-4xl sm:text-5xl md:text-6xl mb-3 sm:mb-4 transform group-hover:scale-110 transition-transform drop-shadow-[0_0_20px_currentColor]">
+                <div className="text-3xl sm:text-4xl md:text-5xl mb-2 sm:mb-3 transform group-hover:scale-110 transition-transform drop-shadow-[0_0_20px_currentColor]">
                   {bet.emoji}
                 </div>
-                <div className="text-2xl sm:text-3xl md:text-4xl font-black mb-2 sm:mb-3 drop-shadow-[0_0_10px_currentColor] break-words">
+                <div className="text-xl sm:text-2xl md:text-3xl font-black mb-1 sm:mb-2 drop-shadow-[0_0_10px_currentColor] break-words">
                   {bet.label}
                 </div>
-                <div className="text-sm sm:text-base md:text-lg font-mono font-semibold opacity-90 break-words">
+                <div className="text-xs sm:text-sm md:text-base font-mono font-semibold opacity-90 break-words">
                   {bet.eth}
                 </div>
               </div>
