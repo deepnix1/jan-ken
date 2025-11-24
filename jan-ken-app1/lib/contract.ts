@@ -288,3 +288,46 @@ export const CONTRACT_ABI = [
   },
 ] as const;
 
+import { parseEther } from 'viem';
+
+/**
+ * Contract Bet Levels (must match RockPaperScissors.sol)
+ * These are the exact ETH amounts that the contract expects
+ */
+export const CONTRACT_BET_LEVELS = [
+  { level: 1, eth: '0.0015', wei: parseEther('0.0015') }, // BET_LEVEL_1
+  { level: 2, eth: '0.003', wei: parseEther('0.003') },   // BET_LEVEL_2
+  { level: 3, eth: '0.015', wei: parseEther('0.015') },   // BET_LEVEL_3
+  { level: 4, eth: '0.03', wei: parseEther('0.03') },     // BET_LEVEL_4
+  { level: 5, eth: '0.15', wei: parseEther('0.15') },      // BET_LEVEL_5
+  { level: 6, eth: '0.3', wei: parseEther('0.3') },       // BET_LEVEL_6
+] as const;
+
+/**
+ * Convert betAmount (bigint in wei) to betLevel (1-6)
+ * Contract expects betLevel, not betAmount!
+ * 
+ * @param betAmount - Bet amount in wei (bigint)
+ * @returns betLevel (1-6) or null if invalid
+ */
+export function getBetLevelFromAmount(betAmount: bigint): number | null {
+  for (const betLevel of CONTRACT_BET_LEVELS) {
+    if (betAmount === betLevel.wei) {
+      return betLevel.level;
+    }
+  }
+  console.error('❌ Invalid betAmount, no matching betLevel:', betAmount.toString());
+  return null;
+}
+
+/**
+ * Get betLevel wei amount from level number
+ * 
+ * @param level - Bet level (1-6)
+ * @returns betAmount in wei (bigint) or null if invalid
+ */
+export function getBetAmountFromLevel(level: number): bigint | null {
+  const betLevel = CONTRACT_BET_LEVELS.find(b => b.level === level);
+  return betLevel?.wei || null;
+}
+

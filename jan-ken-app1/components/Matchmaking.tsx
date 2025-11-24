@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useWriteContract, useWaitForTransactionReceipt, useAccount, useWatchContractEvent, useSimulateContract, useChainId, useConnectorClient, useReadContract } from 'wagmi';
 import { sdk } from '@farcaster/miniapp-sdk';
 import { formatEther } from 'viem';
-import { CONTRACT_ADDRESS, CONTRACT_ABI } from '@/lib/contract';
+import { CONTRACT_ADDRESS, CONTRACT_ABI, getBetLevelFromAmount } from '@/lib/contract';
 import { isValidBetAmount, isValidAddress } from '@/lib/security';
 
 interface MatchmakingProps {
@@ -20,6 +20,25 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
   const [isMatching, setIsMatching] = useState(true);
   const [hasJoinedQueue, setHasJoinedQueue] = useState(false);
   const [txError, setTxError] = useState<string | null>(null);
+  
+  // Convert betAmount to betLevel (CRITICAL FIX!)
+  const betLevel = getBetLevelFromAmount(betAmount);
+  
+  if (!betLevel) {
+    console.error('❌ CRITICAL: Invalid betAmount, cannot determine betLevel:', betAmount.toString());
+    return (
+      <div className="text-center p-8">
+        <p className="text-red-400 font-bold">Error: Invalid bet amount</p>
+        <p className="text-gray-400 text-sm mt-2">Please select a valid bet level</p>
+      </div>
+    );
+  }
+  
+  console.log('🎯 Matchmaking initialized:', {
+    betAmount: betAmount.toString(),
+    betLevel,
+    address,
+  });
   
   const { data: hash, writeContract, isPending, error: writeError, reset: resetWriteContract, status } = useWriteContract({
     mutation: {
@@ -160,14 +179,15 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
   
   // Simulate contract call before sending transaction (per Wagmi best practices)
   // This validates the transaction and provides gas estimation
+  // CRITICAL FIX: Contract expects betLevel, not betAmount!
   const { data: simulateData, error: simulateError, status: simulateStatus } = useSimulateContract({
     address: CONTRACT_ADDRESS as `0x${string}`,
     abi: CONTRACT_ABI,
     functionName: 'joinQueue',
-    args: [betAmount],
-    value: betAmount,
+    args: [BigInt(betLevel)], // ✅ FIX: Use betLevel instead of betAmount
+    value: betAmount, // Value is still betAmount (ETH to send)
     query: {
-      enabled: isConnected && !!address && !!betAmount && !hasJoinedQueue && !!connectorClient,
+      enabled: isConnected && !!address && !!betAmount && !!betLevel && !hasJoinedQueue && !!connectorClient,
       retry: 3,
       retryDelay: 1000,
     },
@@ -331,7 +351,7 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
         isConnected,
       });
     }
-  }, [writeError, resetWriteContract, betAmount, address, chainId, isConnected]);
+  }, [writeError, resetWriteContract, betAmount, betLevel, address, chainId, isConnected]);
   
   // Monitor transaction status and detect stuck transactions
   useEffect(() => {
@@ -894,20 +914,22 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
         setTxStartTime(Date.now());
         
         // Prepare transaction parameters
+        // CRITICAL FIX: Contract expects betLevel, not betAmount!
         const txParams = {
           address: CONTRACT_ADDRESS as `0x${string}`,
           abi: CONTRACT_ABI,
           functionName: 'joinQueue' as const,
-          args: [betAmount] as [bigint],
-          value: betAmount,
+          args: [BigInt(betLevel)] as [bigint], // ✅ FIX: Use betLevel instead of betAmount
+          value: betAmount, // Value is still betAmount (ETH to send)
         };
         
         // Send transaction with proper gas estimation
         console.log('📤 Sending transaction to contract...');
         console.log('Contract:', CONTRACT_ADDRESS);
         console.log('Function: joinQueue');
-        console.log('Args:', [betAmount.toString()]);
+        console.log('Args (betLevel):', [betLevel]); // ✅ FIX: Log betLevel
         console.log('Value:', betAmount.toString(), 'wei =', (Number(betAmount) / 1e18).toFixed(6), 'ETH');
+        console.log('🎯 betLevel:', betLevel, '(contract expects this, not betAmount!)');
         console.log('From:', address);
         console.log('Chain ID:', chainId);
         console.log('writeContract function type:', typeof writeContract);
@@ -1228,16 +1250,17 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
       const timeoutId = setTimeout(sendTransaction, 500);
       return () => clearTimeout(timeoutId);
     }
-  }, [isConnected, writeContract, betAmount, hasJoinedQueue, address, simulateData, simulateStatus, simulateError, chainId, connectorClient, resetWriteContract, currentGame, refetchGame]);
+  }, [isConnected, writeContract, betAmount, betLevel, hasJoinedQueue, address, simulateData, simulateStatus, simulateError, chainId, connectorClient, resetWriteContract, currentGame, refetchGame]);
 
   // Read queue count for this bet level
+  // CRITICAL FIX: Contract expects betLevel, not betAmount!
   const { data: queueCount, refetch: refetchQueueCount } = useReadContract({
     address: CONTRACT_ADDRESS as `0x${string}`,
     abi: CONTRACT_ABI,
     functionName: 'getWaitingPlayersCount',
-    args: [betAmount],
+    args: [BigInt(betLevel)], // ✅ FIX: Use betLevel instead of betAmount
     query: {
-      enabled: isConnected && !!address && !!betAmount && (hasJoinedQueue || isMatching), // Enable when matching too
+      enabled: isConnected && !!address && !!betLevel && (hasJoinedQueue || isMatching), // Enable when matching too
       refetchInterval: 2000, // Refetch every 2 seconds when enabled (more aggressive)
     },
   });
@@ -1282,7 +1305,7 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
         // Log queue count
         if (queueData?.data !== undefined) {
           const count = Number(queueData.data);
-            console.log('👥 Queue count for bet level:', count, 'betAmount:', betAmount.toString());
+          console.log('👥 Queue count for betLevel', betLevel, ':', count, 'betAmount:', betAmount.toString());
           if (count >= 2 && isMatching) {
             console.warn('⚠️ Queue has 2+ players but no match yet - forcing multiple checks');
             console.warn('⚠️ This could mean:');
@@ -1383,7 +1406,7 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
       clearInterval(pollInterval);
       clearTimeout(timeout);
     };
-  }, [isConnected, hasJoinedQueue, isMatching, address, refetchGame, refetchQueueCount, onMatchFound, hash, queueCount]);
+  }, [isConnected, hasJoinedQueue, isMatching, address, refetchGame, refetchQueueCount, onMatchFound, hash, queueCount, betLevel, betAmount]);
 
   return (
     <div className="relative">
