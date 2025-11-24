@@ -157,6 +157,21 @@ function MatchmakingComponent({ betAmount, onMatchFound, onCancel, showMatchFoun
   const [txHash, setTxHash] = useState<string | null>(null);
   const [txStartTime, setTxStartTime] = useState<number | null>(null);
   
+  // Reset all state when component mounts or betAmount changes
+  // This ensures that every time a user wants to play again, a new transaction is sent
+  useEffect(() => {
+    console.log('[Matchmaking] 🔄 Resetting state for new game/matchmaking - betAmount:', betAmount.toString());
+    setHasJoinedQueue(false);
+    setTxError(null);
+    setTxHash(null);
+    setTxStartTime(null);
+    setIsMatching(true);
+    
+    // Reset writeContract hook to clear any previous transaction state
+    // This ensures a fresh transaction is sent for each new game
+    resetWriteContract?.();
+  }, [betAmount]); // Reset when betAmount changes (new game) or component mounts
+  
   // Check user's current game status before joining queue
   // This helps prevent E15 error (player already in queue)
   const { data: currentGame, refetch: refetchGame } = useReadContract({
