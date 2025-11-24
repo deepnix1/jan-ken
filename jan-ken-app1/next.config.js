@@ -1,6 +1,30 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
+  // Allow images from Farcaster/Neynar CDNs
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'imagedelivery.net',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'i.imgur.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'res.cloudinary.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.warpcast.com',
+      },
+    ],
+  },
   // Disable static optimization for dynamic content
   experimental: {
     serverComponentsExternalPackages: ['viem', 'wagmi', '@farcaster/miniapp-sdk', '@farcaster/miniapp-wagmi-connector'],

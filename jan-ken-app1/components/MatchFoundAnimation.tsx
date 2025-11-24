@@ -12,6 +12,7 @@ interface MatchFoundAnimationProps {
 
 export function MatchFoundAnimation({ player1Address, player2Address, currentUserAddress }: MatchFoundAnimationProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const hasShownRef = useRef(false); // Prevent multiple renders
   const [showAnimation, setShowAnimation] = useState(true);
   const [opponentProfile, setOpponentProfile] = useState<{ pfpUrl: string | null; username: string | null } | null>(null);
   const [currentUserProfile, setCurrentUserProfile] = useState<{ pfpUrl: string | null; username: string | null } | null>(null);
@@ -21,17 +22,36 @@ export function MatchFoundAnimation({ player1Address, player2Address, currentUse
     ? (player1Address?.toLowerCase() === currentUserAddress.toLowerCase() ? player2Address : player1Address)
     : (player1Address || player2Address);
 
+  // Prevent multiple instances
+  useEffect(() => {
+    if (hasShownRef.current) {
+      console.log('[MatchFound] ⚠️ Animation already shown, hiding duplicate');
+      setShowAnimation(false);
+      return;
+    }
+    hasShownRef.current = true;
+    console.log('[MatchFound] ✅ Showing animation (first time)');
+  }, []);
+
   useEffect(() => {
     // Fetch opponent profile
     const fetchProfiles = async () => {
+      console.log('[MatchFound] 🔍 Fetching profiles...');
+      console.log('[MatchFound] Opponent address:', opponentAddress);
+      console.log('[MatchFound] Current user address:', currentUserAddress);
+      
       if (opponentAddress) {
+        console.log('[MatchFound] 📥 Fetching opponent profile:', opponentAddress);
         const opponentProfile = await getFarcasterProfileByAddress(opponentAddress);
+        console.log('[MatchFound] 📦 Opponent profile received:', opponentProfile);
         setOpponentProfile(opponentProfile);
       }
       
       // Fetch current user profile
       if (currentUserAddress) {
+        console.log('[MatchFound] 📥 Fetching current user profile:', currentUserAddress);
         const userProfile = await getFarcasterProfileByAddress(currentUserAddress);
+        console.log('[MatchFound] 📦 Current user profile received:', userProfile);
         setCurrentUserProfile(userProfile);
       }
     };
@@ -130,6 +150,13 @@ export function MatchFoundAnimation({ player1Address, player2Address, currentUse
                       fill
                       className="object-cover"
                       unoptimized
+                      onError={(e) => {
+                        console.error('[MatchFound] ❌ Failed to load current user image:', currentUserProfile.pfpUrl);
+                        e.currentTarget.style.display = 'none';
+                      }}
+                      onLoad={() => {
+                        console.log('[MatchFound] ✅ Current user image loaded:', currentUserProfile.pfpUrl);
+                      }}
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-500 to-cyan-500 text-white text-2xl sm:text-3xl font-black">
@@ -155,6 +182,13 @@ export function MatchFoundAnimation({ player1Address, player2Address, currentUse
                       fill
                       className="object-cover"
                       unoptimized
+                      onError={(e) => {
+                        console.error('[MatchFound] ❌ Failed to load opponent image:', opponentProfile.pfpUrl);
+                        e.currentTarget.style.display = 'none';
+                      }}
+                      onLoad={() => {
+                        console.log('[MatchFound] ✅ Opponent image loaded:', opponentProfile.pfpUrl);
+                      }}
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-red-500 to-pink-500 text-white text-2xl sm:text-3xl font-black">
