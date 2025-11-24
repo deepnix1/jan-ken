@@ -32,11 +32,16 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
   const { data: hash, writeContract, isPending, error: writeError, reset: resetWriteContract, status } = useWriteContract();
   const [txStartTime, setTxStartTime] = useState<number | null>(null);
   
-  // Debug logging for connector client
+  // Debug logging for connector client - ENHANCED VISIBILITY
   useEffect(() => {
-    console.log('[GameBoard] Connector client available:', !!connectorClient);
-    console.log('[GameBoard] writeContract available:', typeof writeContract === 'function');
-    console.log('[GameBoard] Address:', address);
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('🔍 [GameBoard] DEBUG INFO');
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('✅ Connector client available:', !!connectorClient);
+    console.log('✅ writeContract available:', typeof writeContract === 'function');
+    console.log('✅ Address:', address);
+    console.log('✅ Component mounted at:', new Date().toISOString());
+    console.log('═══════════════════════════════════════════════════════════');
   }, [connectorClient, writeContract, address]);
   
   // Simulate contract call to get gas estimates
@@ -223,12 +228,17 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
       return;
     }
 
-    console.log('[GameBoard] ✅ All checks passed, preparing transaction...');
-    console.log('[GameBoard] Choice ID:', choiceId);
-    console.log('[GameBoard] Connector client:', !!connectorClient);
-    console.log('[GameBoard] writeContract type:', typeof writeContract);
-    console.log('[GameBoard] Connector client account:', connectorClient?.account?.address);
-    console.log('[GameBoard] Connector client chain:', connectorClient?.chain?.id);
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('🎮 [GameBoard] MAKING CHOICE - TRANSACTION START');
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('✅ All checks passed, preparing transaction...');
+    console.log('📋 Choice ID:', choiceId);
+    console.log('🔌 Connector client:', !!connectorClient);
+    console.log('📝 writeContract type:', typeof writeContract);
+    console.log('👤 Connector client account:', connectorClient?.account?.address);
+    console.log('⛓️ Connector client chain:', connectorClient?.chain?.id);
+    console.log('⏰ Timestamp:', new Date().toISOString());
+    console.log('═══════════════════════════════════════════════════════════');
 
     setSelectedChoice(choiceId);
     setTxStartTime(Date.now());
@@ -243,7 +253,7 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
         args: [choiceId] as const,
       };
       
-      console.log('[GameBoard] 📤 Transaction parameters:', {
+      console.log('📤 [GameBoard] Transaction parameters:', {
         address: txParams.address,
         functionName: txParams.functionName,
         args: txParams.args,
@@ -253,10 +263,10 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
       // Otherwise use direct params
       let finalParams: any;
       if (simulateData && (simulateData as any).request) {
-        console.log('[GameBoard] 📤 Using simulateData.request (includes gas estimation)');
+        console.log('📤 [GameBoard] Using simulateData.request (includes gas estimation)');
         finalParams = (simulateData as any).request;
       } else {
-        console.log('[GameBoard] 📤 Using direct params (wallet will estimate gas)');
+        console.log('📤 [GameBoard] Using direct params (wallet will estimate gas)');
         finalParams = txParams;
       }
       
@@ -284,22 +294,27 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
         await new Promise(resolve => setTimeout(resolve, 200));
       }
       
-      console.log('[GameBoard] 📤 Calling writeContract NOW...');
-      console.log('[GameBoard] 📤 Final params:', {
+      console.log('═══════════════════════════════════════════════════════════');
+      console.log('🚀 [GameBoard] CALLING writeContract NOW!');
+      console.log('═══════════════════════════════════════════════════════════');
+      console.log('📤 Final params:', {
         address: finalParams.address || txParams.address,
         functionName: finalParams.functionName || txParams.functionName,
         args: finalParams.args ? finalParams.args.map((a: any) => a.toString()) : txParams.args,
       });
-      console.log('[GameBoard] 📤 Connector client ready:', !!connectorClient);
-      console.log('[GameBoard] 📤 Farcaster provider ready:', !!farcasterProvider);
+      console.log('🔌 Connector client ready:', !!connectorClient);
+      console.log('📱 Farcaster provider ready:', !!farcasterProvider);
+      console.log('⏰ Calling at:', new Date().toISOString());
+      console.log('═══════════════════════════════════════════════════════════');
       
       // Call writeContract - this MUST trigger wallet popup
       // In Wagmi v3, writeContract returns void but triggers the mutation
       writeContract(finalParams);
       
-      console.log('[GameBoard] ✅ writeContract called');
-      console.log('[GameBoard] 📊 Status immediately after call:', status);
-      console.log('[GameBoard] 📊 isPending immediately after call:', isPending);
+      console.log('✅ [GameBoard] writeContract CALLED!');
+      console.log('📊 Status immediately after call:', status);
+      console.log('📊 isPending immediately after call:', isPending);
+      console.log('⏰ Called at:', new Date().toISOString());
       
       // Monitor status changes to detect if wallet popup appeared
       const statusCheckInterval = setInterval(() => {

@@ -512,16 +512,19 @@ function MatchmakingComponent({ betAmount, onMatchFound, onCancel, showMatchFoun
     onLogs: handleGameCreatedLogs,
   });
 
-  // Debug logging for connector client and writeContract
+  // Debug logging for connector client and writeContract - ENHANCED VISIBILITY
   useEffect(() => {
-    console.log('[Matchmaking] 🔍 State check:', {
-      connectorClient: !!connectorClient,
-      writeContract: typeof writeContract,
-      isConnected,
-      address,
-      hasJoinedQueue,
-      betLevel,
-    });
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('🔍 [Matchmaking] DEBUG INFO');
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('✅ Connector client:', !!connectorClient);
+    console.log('✅ writeContract type:', typeof writeContract);
+    console.log('✅ isConnected:', isConnected);
+    console.log('✅ Address:', address);
+    console.log('✅ hasJoinedQueue:', hasJoinedQueue);
+    console.log('✅ betLevel:', betLevel);
+    console.log('⏰ Timestamp:', new Date().toISOString());
+    console.log('═══════════════════════════════════════════════════════════');
   }, [connectorClient, writeContract, isConnected, address, hasJoinedQueue, betLevel]);
 
   // Join queue via contract - PRODUCTION MODE
@@ -571,13 +574,18 @@ function MatchmakingComponent({ betAmount, onMatchFound, onCancel, showMatchFoun
     }
     
     // Show notification that wallet approval is needed
-    console.log('[Matchmaking] 📤 Sending transaction - wallet approval required');
-    console.log('[Matchmaking] 📤 Transaction parameters:', {
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('🎯 [Matchmaking] JOINING QUEUE - TRANSACTION START');
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('📤 Sending transaction - wallet approval required');
+    console.log('📤 Transaction parameters:', {
       address: CONTRACT_ADDRESS,
       functionName: 'joinQueue',
       args: [betLevel],
       betAmount: betAmount.toString(),
     });
+    console.log('⏰ Timestamp:', new Date().toISOString());
+    console.log('═══════════════════════════════════════════════════════════');
     
     // Small delay to ensure UI is ready before showing wallet popup
     const sendTransaction = async () => {
@@ -1068,15 +1076,20 @@ function MatchmakingComponent({ betAmount, onMatchFound, onCancel, showMatchFoun
               await new Promise(resolve => setTimeout(resolve, 200));
             }
             
-            console.log('[Matchmaking] 📤 Calling writeContract NOW...');
-            console.log('[Matchmaking] 📤 Connector client:', !!connectorClient);
-            console.log('[Matchmaking] 📤 Farcaster provider:', farcasterProviderReady);
+            console.log('═══════════════════════════════════════════════════════════');
+            console.log('🚀 [Matchmaking] CALLING writeContract NOW! (with simulation)');
+            console.log('═══════════════════════════════════════════════════════════');
+            console.log('🔌 Connector client:', !!connectorClient);
+            console.log('📱 Farcaster provider:', farcasterProviderReady);
+            console.log('⏰ Calling at:', new Date().toISOString());
+            console.log('═══════════════════════════════════════════════════════════');
             
             try {
               writeContract(simRequest);
-              console.log('[Matchmaking] ✅ writeContract called successfully (with simulation request)');
-              console.log('[Matchmaking] ✅ Transaction status after call:', status);
-              console.log('[Matchmaking] ✅ isPending after call:', isPending);
+              console.log('✅ [Matchmaking] writeContract CALLED! (with simulation request)');
+              console.log('📊 Status after call:', status);
+              console.log('📊 isPending after call:', isPending);
+              console.log('⏰ Called at:', new Date().toISOString());
               
               // Monitor status to detect wallet popup
               const statusCheckInterval = setInterval(() => {
@@ -1139,15 +1152,20 @@ function MatchmakingComponent({ betAmount, onMatchFound, onCancel, showMatchFoun
               await new Promise(resolve => setTimeout(resolve, 200));
             }
             
-            console.log('[Matchmaking] 📤 Calling writeContract NOW...');
-            console.log('[Matchmaking] 📤 Connector client:', !!connectorClient);
-            console.log('[Matchmaking] 📤 Farcaster provider:', farcasterProviderReady);
+            console.log('═══════════════════════════════════════════════════════════');
+            console.log('🚀 [Matchmaking] CALLING writeContract NOW! (direct)');
+            console.log('═══════════════════════════════════════════════════════════');
+            console.log('🔌 Connector client:', !!connectorClient);
+            console.log('📱 Farcaster provider:', farcasterProviderReady);
+            console.log('⏰ Calling at:', new Date().toISOString());
+            console.log('═══════════════════════════════════════════════════════════');
             
             try {
               writeContract(txParams);
-              console.log('[Matchmaking] ✅ writeContract called successfully (direct)');
-              console.log('[Matchmaking] ✅ Transaction status after call:', status);
-              console.log('[Matchmaking] ✅ isPending after call:', isPending);
+              console.log('✅ [Matchmaking] writeContract CALLED! (direct)');
+              console.log('📊 Status after call:', status);
+              console.log('📊 isPending after call:', isPending);
+              console.log('⏰ Called at:', new Date().toISOString());
               
               // Monitor status to detect wallet popup
               const statusCheckInterval = setInterval(() => {
