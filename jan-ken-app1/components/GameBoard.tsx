@@ -404,58 +404,92 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
         })}
       </div>
 
-      {/* Transaction Approved Notification */}
+      {/* Transaction Approved Notification - Enhanced */}
       {showApproved && (
         <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 animate-fade-in">
-          <div className="relative bg-black/95 backdrop-blur-lg px-8 py-6 rounded-xl shadow-[0_0_60px_rgba(34,211,238,1)] border-2 border-cyan-400">
-            <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/20 via-blue-500/20 to-green-500/20 blur-xl"></div>
-            <div className="relative flex items-center gap-4">
-              <div className="text-5xl animate-bounce drop-shadow-[0_0_30px_rgba(34,211,238,1)]">✅</div>
-              <div>
-                <h3 className="text-2xl font-black mb-1 bg-gradient-to-r from-cyan-400 via-blue-400 to-green-400 bg-clip-text text-transparent drop-shadow-[0_0_20px_rgba(34,211,238,0.8)]">
-                  TRANSACTION APPROVED
+          <div className="relative bg-black/95 backdrop-blur-lg px-8 py-6 rounded-xl shadow-[0_0_60px_rgba(34,197,94,1)] border-3 border-green-500 min-w-[350px]">
+            <div className="absolute inset-0 bg-gradient-to-r from-green-500/20 via-emerald-500/20 to-green-500/20 blur-xl"></div>
+            <div className="relative flex flex-col items-center gap-3">
+              <div className="text-6xl animate-bounce drop-shadow-[0_0_30px_rgba(34,197,94,1)]">✅</div>
+              <div className="text-center">
+                <h3 className="text-2xl font-black mb-2 bg-gradient-to-r from-green-400 via-emerald-400 to-green-400 bg-clip-text text-transparent drop-shadow-[0_0_20px_rgba(34,197,94,0.8)]">
+                  TRANSACTION CONFIRMED!
                 </h3>
-                <p className="text-cyan-300 font-mono font-bold uppercase tracking-wider text-sm">
-                  Choice submitted successfully
+                <p className="text-green-300 font-mono font-bold uppercase tracking-wider text-sm mb-2">
+                  Your choice has been submitted
                 </p>
+                {hash && (
+                  <a
+                    href={`https://sepolia.basescan.org/tx/${hash}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-green-400 hover:text-green-300 font-mono text-xs underline bg-green-500/20 px-3 py-1 rounded inline-block mt-2"
+                  >
+                    🔗 View Transaction
+                  </a>
+                )}
               </div>
             </div>
-            {/* Japanese Corner Accents with Neon */}
-            <div className="absolute top-2 left-2 w-6 h-6 border-t-2 border-l-2 border-cyan-400 shadow-[0_0_10px_rgba(34,211,238,1)]"></div>
-            <div className="absolute top-2 right-2 w-6 h-6 border-t-2 border-r-2 border-cyan-400 shadow-[0_0_10px_rgba(34,211,238,1)]"></div>
-            <div className="absolute bottom-2 left-2 w-6 h-6 border-b-2 border-l-2 border-cyan-400 shadow-[0_0_10px_rgba(34,211,238,1)]"></div>
-            <div className="absolute bottom-2 right-2 w-6 h-6 border-b-2 border-r-2 border-cyan-400 shadow-[0_0_10px_rgba(34,211,238,1)]"></div>
+            {/* Corner accents */}
+            <div className="absolute top-2 left-2 w-4 h-4 border-t-2 border-l-2 border-green-400"></div>
+            <div className="absolute top-2 right-2 w-4 h-4 border-t-2 border-r-2 border-green-400"></div>
+            <div className="absolute bottom-2 left-2 w-4 h-4 border-b-2 border-l-2 border-green-400"></div>
+            <div className="absolute bottom-2 right-2 w-4 h-4 border-b-2 border-r-2 border-green-400"></div>
             {/* Pulse effect */}
-            <div className="absolute inset-0 border-2 border-cyan-400 rounded-xl animate-ping opacity-20"></div>
+            <div className="absolute inset-0 border-2 border-green-400 rounded-xl animate-ping opacity-20"></div>
           </div>
         </div>
       )}
 
-      {/* Status Messages */}
+      {/* Transaction Status - Enhanced Visibility */}
       {(isPending || isConfirming) && (
-        <div className="text-center py-6">
-          <div className="inline-flex flex-col items-center gap-3 px-8 py-4 bg-black/60 border-2 border-blue-500/40 rounded-lg shadow-[0_0_30px_rgba(59,130,246,0.4)]">
+        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 animate-fade-in-down">
+          <div className="inline-flex flex-col items-center gap-4 px-8 py-6 bg-black/95 backdrop-blur-lg border-3 border-red-500 rounded-xl shadow-[0_0_60px_rgba(220,20,60,0.8)] min-w-[300px]">
             <div className="flex items-center gap-4">
-              <div className="w-6 h-6 border-3 border-blue-400 border-t-transparent rounded-full animate-spin shadow-[0_0_10px_rgba(59,130,246,1)]"></div>
-              <p className="text-blue-400 font-mono font-bold uppercase tracking-wider">
-                {isPending && !hash ? (status === 'pending' ? 'Waiting for wallet approval...' : 'Sending Transaction...') : 'Confirming transaction...'}
-              </p>
+              <div className="w-8 h-8 border-3 border-red-400 border-t-transparent rounded-full animate-spin shadow-[0_0_15px_rgba(220,20,60,1)]"></div>
+              <div className="flex flex-col">
+                <p className="text-red-400 font-black text-lg uppercase tracking-wider">
+                  {isPending && !hash 
+                    ? (status === 'pending' ? '⏳ Waiting for wallet...' : '📤 Sending transaction...') 
+                    : '✅ Confirming...'}
+                </p>
+                {isPending && !hash && (
+                  <p className="text-yellow-400 font-mono text-sm mt-1">
+                    Please approve in your wallet
+                  </p>
+                )}
+                {hash && (
+                  <p className="text-green-400 font-mono text-sm mt-1">
+                    Transaction sent! Waiting for confirmation...
+                  </p>
+                )}
+              </div>
             </div>
             {txStartTime && !hash && (
-              <p className="text-gray-400 font-mono text-xs text-center mt-2">
+              <p className="text-gray-400 font-mono text-xs text-center">
                 Waiting {Math.floor((Date.now() - txStartTime) / 1000)}s...
               </p>
             )}
             {hash && (
-              <a
-                href={`https://sepolia.basescan.org/tx/${hash}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-300 hover:text-blue-200 font-mono text-xs underline"
-              >
-                View on BaseScan
-              </a>
+              <div className="flex flex-col items-center gap-2 mt-2">
+                <a
+                  href={`https://sepolia.basescan.org/tx/${hash}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-red-300 hover:text-red-200 font-mono text-xs underline bg-red-500/20 px-3 py-1 rounded"
+                >
+                  🔗 View on BaseScan
+                </a>
+                <p className="text-gray-500 font-mono text-xs">
+                  Hash: {hash.slice(0, 10)}...{hash.slice(-8)}
+                </p>
+              </div>
             )}
+            {/* Corner accents */}
+            <div className="absolute top-2 left-2 w-4 h-4 border-t-2 border-l-2 border-red-400"></div>
+            <div className="absolute top-2 right-2 w-4 h-4 border-t-2 border-r-2 border-red-400"></div>
+            <div className="absolute bottom-2 left-2 w-4 h-4 border-b-2 border-l-2 border-red-400"></div>
+            <div className="absolute bottom-2 right-2 w-4 h-4 border-b-2 border-r-2 border-red-400"></div>
           </div>
         </div>
       )}

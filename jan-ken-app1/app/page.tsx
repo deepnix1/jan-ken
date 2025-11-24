@@ -466,7 +466,7 @@ export default function Home() {
                   ) : (
                     <>
                       <span className="text-red-400 font-bold text-sm tracking-wide">
-                        {userProfile?.username || 'SAMURAI'}
+                        {userProfile?.username || 'PLAYER'}
                       </span>
                       <span className="text-yellow-400/80 font-mono text-xs">
                         {address?.slice(0, 6)}...{address?.slice(-4)}
@@ -524,13 +524,13 @@ export default function Home() {
                   unoptimized
                 />
                 
-                {/* Kanji Subtitle */}
+                {/* Subtitle */}
                 <div className="mt-2 text-center">
                   <p className="text-red-400 text-sm sm:text-base font-bold tracking-[0.3em] animate-neon-flicker">
-                    じゃんけん
+                    ROCK • PAPER • SCISSORS
                   </p>
                   <p className="text-yellow-400/60 text-xs font-mono">
-                    ROCK • PAPER • SCISSORS
+                    On Base Network
                   </p>
                 </div>
               </div>
@@ -594,30 +594,62 @@ export default function Home() {
                  )}
               </div>
             ) : !showGame ? (
-              /* Let's Play Landing Screen - Japanese Gaming */
+              /* Let's Play Landing Screen */
               <div className="flex flex-col items-center gap-8 py-16 animate-fade-in-up">
                 <div className="text-center space-y-6">
-                  {/* Main Title with Kanji */}
+                  {/* Main Title */}
                   <div className="relative">
                     <h2 className="text-6xl sm:text-7xl md:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-yellow-400 to-red-500 animate-neon-flicker" style={{
                       textShadow: '0 0 20px rgba(220,20,60,0.8), 0 0 40px rgba(220,20,60,0.5)'
                     }}>
-                      勝負！
+                      JAN-KEN
                     </h2>
                     <p className="text-2xl sm:text-3xl text-yellow-400 font-bold tracking-[0.2em] mt-2">
-                      SHŌBU!
+                      ROCK • PAPER • SCISSORS
                     </p>
                   </div>
                   
-                  <p className="text-xl sm:text-2xl text-red-400 font-bold tracking-wide">
-                    グー • チョキ • パー
-                  </p>
                   <p className="text-lg text-gray-300 max-w-md font-mono">
-                    Challenge warriors on Base Network • Win ETH rewards
+                    Play on Base Network • Win ETH rewards
                   </p>
                 </div>
                 
-                {/* Let's Play Button - Arcade Style */}
+                {/* How to Play Section */}
+                <div className="w-full max-w-2xl bg-black/60 backdrop-blur-sm border-2 border-red-500/30 rounded-xl p-6 sm:p-8 mt-4 animate-fade-in-up animation-delay-200">
+                  <h3 className="text-2xl font-black text-red-400 mb-4 text-center">HOW TO PLAY</h3>
+                  <div className="space-y-4 text-left">
+                    <div className="flex items-start gap-3">
+                      <span className="text-2xl">1️⃣</span>
+                      <div>
+                        <p className="text-white font-bold mb-1">Select Your Bet</p>
+                        <p className="text-gray-400 text-sm">Choose a bet level (0.0015 ETH to 0.3 ETH). Winner takes all!</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <span className="text-2xl">2️⃣</span>
+                      <div>
+                        <p className="text-white font-bold mb-1">Find an Opponent</p>
+                        <p className="text-gray-400 text-sm">Wait for another player with the same bet level. Match happens automatically!</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <span className="text-2xl">3️⃣</span>
+                      <div>
+                        <p className="text-white font-bold mb-1">Make Your Choice</p>
+                        <p className="text-gray-400 text-sm">Select Rock 🪨, Paper 📄, or Scissors ✂️. You have 20 seconds!</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <span className="text-2xl">4️⃣</span>
+                      <div>
+                        <p className="text-white font-bold mb-1">Win or Lose</p>
+                        <p className="text-gray-400 text-sm">Rock beats Scissors, Scissors beats Paper, Paper beats Rock. Winner gets the pot!</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Let's Play Button */}
                 <button
                   onClick={() => {
                     setIsTransitioning(true);
@@ -630,10 +662,9 @@ export default function Home() {
                 >
                   <div className="absolute inset-0 bg-gradient-to-br from-red-700 via-red-800 to-black opacity-0 group-hover:opacity-100 transition-opacity"></div>
                   <div className="relative flex items-center gap-4">
-                    <span className="text-5xl">⚔️</span>
+                    <span className="text-5xl">🎮</span>
                     <div className="flex flex-col items-center">
-                      <span className="animate-neon-flicker">はじめる</span>
-                      <span className="text-lg">START BATTLE!</span>
+                      <span className="animate-neon-flicker">LET&apos;S PLAY!</span>
                     </div>
                   </div>
                   
@@ -644,19 +675,16 @@ export default function Home() {
                   <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-yellow-400"></div>
                 </button>
                 
-                {/* Stats - Japanese Gaming Style */}
+                {/* Stats */}
                 <div className="flex flex-wrap justify-center gap-4 mt-8 animate-fade-in-up animation-delay-400">
                   <div className="bg-red-900/30 backdrop-blur-sm px-6 py-3 rounded-lg border-2 border-red-500/50 hover:border-red-500 transition-all duration-300 hover:scale-105 cursor-pointer">
-                    <p className="text-red-400 text-sm font-bold tracking-wide">⚡ 即座マッチ</p>
-                    <p className="text-red-300/60 text-xs text-center">INSTANT</p>
+                    <p className="text-red-400 text-sm font-bold tracking-wide">⚡ INSTANT MATCHES</p>
                   </div>
                   <div className="bg-yellow-900/30 backdrop-blur-sm px-6 py-3 rounded-lg border-2 border-yellow-500/50 hover:border-yellow-500 transition-all duration-300 hover:scale-105 cursor-pointer">
-                    <p className="text-yellow-400 text-sm font-bold tracking-wide">💰 賞金獲得</p>
-                    <p className="text-yellow-300/60 text-xs text-center">WIN ETH</p>
+                    <p className="text-yellow-400 text-sm font-bold tracking-wide">💰 WIN ETH</p>
                   </div>
                   <div className="bg-gray-900/30 backdrop-blur-sm px-6 py-3 rounded-lg border-2 border-gray-500/50 hover:border-gray-400 transition-all duration-300 hover:scale-105 cursor-pointer">
-                    <p className="text-gray-300 text-sm font-bold tracking-wide">🔒 安全保証</p>
-                    <p className="text-gray-400/60 text-xs text-center">SECURE</p>
+                    <p className="text-gray-300 text-sm font-bold tracking-wide">🔒 SECURE</p>
                   </div>
                 </div>
               </div>
