@@ -60,9 +60,9 @@ async function fetchProfileByFID(fid: number) {
   console.log(`[API] 🔍 Fetching profile for FID: ${fid}`);
 
   try {
-    // Use Neynar SDK's fetchBulkUsers method
-    // This is the official and most reliable way per Neynar docs
-    const response = await neynarClient.fetchBulkUsers([fid]);
+    // Use Neynar SDK's fetchBulkUsers method with proper v3 API signature
+    // Per docs: https://docs.neynar.com/reference/user-bulk
+    const response = await neynarClient.fetchBulkUsers({ fids: [fid] });
     
     console.log(`[API] 🌐 Neynar SDK response for FID ${fid}:`, response);
 
@@ -90,9 +90,9 @@ async function fetchProfileByAddress(address: string) {
   console.log(`[API] 🔍 Fetching profile for address: ${normalizedAddress}`);
 
   try {
-    // Use Neynar SDK's fetchBulkUsersByEthereumAddress method
-    // This is the official way to lookup users by wallet address per Neynar docs
-    const response = await neynarClient.fetchBulkUsersByEthereumAddress([normalizedAddress]);
+    // Use Neynar SDK's fetchBulkUsersByEthereumAddress method with proper v3 API signature
+    // Per docs: https://docs.neynar.com/reference/user-bulk-by-address
+    const response = await neynarClient.fetchBulkUsersByEthereumAddress({ addresses: [normalizedAddress] });
     
     console.log(`[API] 🌐 Neynar SDK address lookup response:`, response);
 
