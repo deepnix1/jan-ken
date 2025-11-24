@@ -1,9 +1,17 @@
 /**
  * Farcaster Profile Helper Functions
  * 
- * Fetches user profile images via our API route (bypasses CORS)
- * Server-side proxy provides reliable access to Farcaster data
+ * Uses Neynar API via our server-side proxy route
+ * Following best practices from: https://docs.neynar.com/docs/getting-started-with-neynar
+ * 
+ * Architecture:
+ * - Client calls these functions
+ * - Functions call /api/farcaster route (server-side)
+ * - Server uses official Neynar SDK
+ * - This bypasses CORS and provides reliable access
  */
+
+import { logApiKeyWarning } from './neynar-config';
 
 export interface FarcasterProfile {
   pfpUrl: string | null;
@@ -13,8 +21,8 @@ export interface FarcasterProfile {
 }
 
 /**
- * Fetch profile using our server-side API route
- * This bypasses CORS and provides more reliable access
+ * Fetch profile using our Neynar-powered server-side API route
+ * This bypasses CORS and uses official Neynar SDK on the server
  */
 async function fetchViaProxy(params: { fid?: number; address?: string }): Promise<FarcasterProfile> {
   try {
@@ -22,7 +30,13 @@ async function fetchViaProxy(params: { fid?: number; address?: string }): Promis
     if (params.fid) queryParams.set('fid', params.fid.toString());
     if (params.address) queryParams.set('address', params.address);
 
-    console.log(`[Farcaster] 🌐 Fetching via proxy API:`, params);
+    console.log(`[Farcaster] 🌐 Fetching via Neynar proxy:`, params);
+    
+    // Log warning if using demo key (only once)
+    if (typeof window !== 'undefined' && !window.__neynarKeyWarningShown) {
+      logApiKeyWarning();
+      window.__neynarKeyWarningShown = true;
+    }
 
     const response = await fetch(`/api/farcaster?${queryParams.toString()}`, {
       method: 'GET',
@@ -34,16 +48,23 @@ async function fetchViaProxy(params: { fid?: number; address?: string }): Promis
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      console.error('[Farcaster] ❌ Proxy API error:', response.status, errorData);
+      console.error('[Farcaster] ❌ Neynar API error:', response.status, errorData);
       return { pfpUrl: null, username: null, displayName: null, fid: null };
     }
 
     const data = await response.json();
-    console.log('[Farcaster] ✅ Proxy API response:', data);
+    console.log('[Farcaster] ✅ Neynar API success:', data);
     return data;
   } catch (error) {
-    console.error('[Farcaster] ❌ Proxy API fetch error:', error);
+    console.error('[Farcaster] ❌ Network error:', error);
     return { pfpUrl: null, username: null, displayName: null, fid: null };
+  }
+}
+
+// Type augmentation for window
+declare global {
+  interface Window {
+    __neynarKeyWarningShown?: boolean;
   }
 }
 

@@ -145,12 +145,12 @@ export function DebugPanel() {
         removeIssue('farcaster');
         
         // Show success message
-        if (logStr.includes('Proxy API response')) {
+        if (logStr.includes('Neynar API success')) {
           addIssue({
             id: 'farcaster-ok',
             title: 'Farcaster Profile Loaded',
             status: 'ok',
-            message: 'Profile pictures loaded successfully via server proxy.',
+            message: 'Profile pictures loaded successfully via Neynar SDK.',
           });
           
           // Auto-remove after 5 seconds
@@ -170,6 +170,16 @@ export function DebugPanel() {
         } else if (logStr.includes('✅')) {
           removeIssue('api-error');
         }
+      }
+      
+      // Check for Neynar API key warnings
+      if (logStr.includes('[Neynar]') && logStr.includes('⚠️')) {
+        addIssue({
+          id: 'neynar-demo-key',
+          title: 'Neynar Demo Key',
+          status: 'warning',
+          message: 'Using demo API key. For production, set NEYNAR_API_KEY. Get key: https://neynar.com',
+        });
       }
       
       // Check for match found
