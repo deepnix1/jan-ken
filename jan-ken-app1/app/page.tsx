@@ -31,6 +31,7 @@ export default function Home() {
   const [appReady, setAppReady] = useState(false);
   const previousAddressRef = useRef<string | undefined>(undefined);
   const [userProfile, setUserProfile] = useState<{ pfpUrl: string | null; username: string | null } | null>(null);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(false);
   const [showGame, setShowGame] = useState(false); // For "Let's Play" button
   const [isConnecting, setIsConnecting] = useState(false); // For loading screen
   const [isTransitioning, setIsTransitioning] = useState(false); // For page transitions
@@ -138,6 +139,34 @@ export default function Home() {
     };
   }, []);
 
+  // Auto-connect wallet when app is ready (Farcaster Mini App)
+  useEffect(() => {
+    if (!appReady || isConnected || isPending) return;
+    
+    console.log('🔄 Auto-connecting wallet in Farcaster Mini App...');
+    console.log('Connectors available:', connectors.map(c => c.name));
+    
+    // Auto-connect with Farcaster connector
+    const farcasterConnector = connectors.find(c => 
+      c.name === 'Farcaster Mini App' || 
+      c.name?.includes('Farcaster')
+    );
+    
+    if (farcasterConnector) {
+      console.log('✅ Found Farcaster connector, auto-connecting...');
+      setIsConnecting(true);
+      connect({ connector: farcasterConnector });
+      
+      // Hide loading after attempt
+      setTimeout(() => {
+        setIsConnecting(false);
+      }, 3000);
+    } else {
+      console.warn('⚠️ Farcaster connector not found');
+      console.log('Available connectors:', connectors);
+    }
+  }, [appReady, isConnected, isPending, connectors, connect]);
+
   useEffect(() => {
     if (!isConnected) {
       // Reset all game state when wallet disconnects
@@ -145,6 +174,7 @@ export default function Home() {
       setSelectedBet(null);
       setGameId(null);
       setShowMatchFound(false);
+      setShowGame(false);
       previousAddressRef.current = undefined;
     }
   }, [isConnected]);
@@ -248,16 +278,37 @@ export default function Home() {
     }
   }, [isConnected, address, connectorClient, connectors, connect, disconnect]);
 
-  // Fetch user profile when connected
+  // Fetch user profile when connected - IMMEDIATE
   useEffect(() => {
-    if (address && isConnected) {
-      console.log('[Home] 📥 Fetching user profile:', address);
-      getFarcasterProfileByAddress(address).then((profile) => {
-        console.log('[Home] 📦 User profile received:', profile);
-        setUserProfile(profile);
-      });
+    if (address && isConnected && !userProfile) {
+      console.log('[Home] 📥 Fetching user profile IMMEDIATELY:', address);
+      setIsLoadingProfile(true);
+      
+      // Fetch with timeout
+      const fetchWithTimeout = Promise.race([
+        getFarcasterProfileByAddress(address),
+        new Promise<{ pfpUrl: null; username: null }>((resolve) => 
+          setTimeout(() => {
+            console.warn('[Home] ⏱️ Profile fetch timeout - showing fallback');
+            resolve({ pfpUrl: null, username: null });
+          }, 5000) // 5 second timeout
+        )
+      ]);
+      
+      fetchWithTimeout
+        .then((profile) => {
+          console.log('[Home] 📦 User profile received:', profile);
+          setUserProfile(profile);
+        })
+        .catch((error) => {
+          console.error('[Home] ❌ Profile fetch error:', error);
+          setUserProfile({ pfpUrl: null, username: null });
+        })
+        .finally(() => {
+          setIsLoadingProfile(false);
+        });
     }
-  }, [address, isConnected]);
+  }, [address, isConnected, userProfile]);
 
   // Also watch for address changes via useAccount
   useEffect(() => {
@@ -375,28 +426,45 @@ export default function Home() {
           {/* Header */}
           <header className="flex flex-col items-center mb-8 sm:mb-12 relative">
             {/* User Profile - Top Right (if connected) */}
-            {isConnected && userProfile && (
-              <div className="absolute top-0 right-0 flex items-center gap-3">
+            {isConnected && (
+              <div className="absolute top-0 right-0 flex items-center gap-3 animate-fade-in-down">
                 <div className="hidden sm:flex flex-col items-end">
-                  <span className="text-cyan-400 font-bold text-sm">
-                    {userProfile.username || 'Player'}
-                  </span>
-                  <span className="text-cyan-400/60 font-mono text-xs">
-                    {address?.slice(0, 6)}...{address?.slice(-4)}
-                  </span>
+                  {isLoadingProfile ? (
+                    <>
+                      <div className="h-4 w-24 bg-cyan-400/20 rounded animate-pulse"></div>
+                      <div className="h-3 w-20 bg-cyan-400/10 rounded animate-pulse mt-1"></div>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-cyan-400 font-bold text-sm">
+                        {userProfile?.username || 'Player'}
+                      </span>
+                      <span className="text-cyan-400/60 font-mono text-xs">
+                        {address?.slice(0, 6)}...{address?.slice(-4)}
+                      </span>
+                    </>
+                  )}
                 </div>
                 <div className="relative group">
                   <div className="absolute inset-0 bg-cyan-500 rounded-full blur-lg opacity-50 group-hover:opacity-75 transition-opacity"></div>
                   <div className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-full border-2 border-cyan-400 overflow-hidden shadow-[0_0_20px_rgba(34,211,238,0.6)] bg-gradient-to-br from-cyan-600 to-blue-600">
-                    {userProfile.pfpUrl ? (
+                    {isLoadingProfile ? (
+                      <div className="w-full h-full flex items-center justify-center animate-pulse">
+                        <div className="w-8 h-8 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin"></div>
+                      </div>
+                    ) : userProfile?.pfpUrl ? (
                       <Image
                         src={userProfile.pfpUrl}
                         alt={userProfile.username || 'You'}
                         fill
-                        className="object-cover"
+                        className="object-cover animate-scale-in"
                         unoptimized
                         onError={(e) => {
+                          console.error('[Profile] ❌ Image load failed:', userProfile.pfpUrl);
                           e.currentTarget.style.display = 'none';
+                        }}
+                        onLoad={() => {
+                          console.log('[Profile] ✅ Image loaded:', userProfile.pfpUrl);
                         }}
                       />
                     ) : (
@@ -429,21 +497,33 @@ export default function Home() {
           {/* Main Content - Mobile Optimized */}
           <div className="relative bg-black/60 backdrop-blur-xl rounded-2xl sm:rounded-3xl border-2 border-cyan-400/30 shadow-[0_0_60px_rgba(34,211,238,0.2)] p-4 sm:p-6 md:p-8 lg:p-12 min-h-[50vh] sm:min-h-[60vh] flex items-center justify-center">
             {!isConnected ? (
-              <div className="flex flex-col items-center gap-8 py-16">
+              <div className="flex flex-col items-center gap-8 py-16 animate-fade-in-up">
                   <div className="text-center space-y-4">
-                    <h2 className="text-4xl sm:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400 drop-shadow-[0_0_20px_rgba(34,211,238,0.6)]">
+                    <div className="flex justify-center mb-6">
+                      <div className="relative w-24 h-24">
+                        <div className="absolute inset-0 animate-spin-slow">
+                          <svg width="96" height="96" viewBox="0 0 24 24" className="text-cyan-400 drop-shadow-[0_0_20px_rgba(34,211,238,1)]">
+                            <path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5L12 2Z" fill="currentColor" />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                    <h2 className="text-4xl sm:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400 drop-shadow-[0_0_20px_rgba(34,211,238,0.6)] animate-pulse">
                       CONNECTING...
                     </h2>
                     <p className="text-lg sm:text-xl text-gray-300 text-center max-w-lg font-medium leading-relaxed">
-                      Connecting to Farcaster Mini App...
+                      Initializing Farcaster Mini App...
                       <br />
-                      <span className="text-gray-400 text-base">Your wallet will connect automatically.</span>
+                      <span className="text-gray-400 text-base">Your wallet will connect automatically ✨</span>
                     </p>
                   </div>
                  {connectError && (
-                   <div className="mt-4 p-3 sm:p-4 bg-red-500/20 border border-red-500/50 rounded-lg w-full max-w-md">
-                     <p className="text-red-400 text-xs sm:text-sm font-mono">
-                       Connection error: {
+                   <div className="mt-4 p-3 sm:p-4 bg-red-500/20 border border-red-500/50 rounded-lg w-full max-w-md animate-shake">
+                     <p className="text-red-400 text-xs sm:text-sm font-mono text-center mb-2">
+                       ⚠️ Connection Failed
+                     </p>
+                     <p className="text-red-300 text-xs sm:text-sm font-mono text-center">
+                       {
                          (connectError && typeof connectError === 'object' && 'shortMessage' in connectError) 
                            ? (connectError as any).shortMessage
                            : (connectError && typeof connectError === 'object' && 'message' in connectError)
@@ -453,6 +533,12 @@ export default function Home() {
                            : 'Unknown error'
                        }
                      </p>
+                     <button
+                       onClick={handleConnect}
+                       className="mt-3 w-full px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-white font-bold rounded-lg transition-colors"
+                     >
+                       Retry Connection
+                     </button>
                    </div>
                  )}
               </div>
@@ -471,47 +557,26 @@ export default function Home() {
                   </p>
                 </div>
                 
-                {/* Button Group */}
-                <div className="flex flex-col sm:flex-row items-center gap-4">
-                  {/* Let's Play Button */}
-                  <button
-                    onClick={() => {
-                      setIsTransitioning(true);
-                      setTimeout(() => {
-                        setShowGame(true);
-                        setIsTransitioning(false);
-                      }, 400);
-                    }}
-                    className="group relative px-12 py-6 text-3xl font-black text-white bg-gradient-to-r from-red-500 via-yellow-500 to-blue-500 rounded-2xl overflow-hidden transition-all duration-300 hover:scale-110 hover:shadow-[0_0_60px_rgba(239,68,68,1)] active:scale-95 animate-scale-in"
-                  >
-                    <div className="absolute inset-0 bg-gradient-to-r from-red-600 via-yellow-600 to-blue-600 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                    <div className="relative flex items-center gap-4">
-                      <span className="text-5xl">🎮</span>
-                      <span>LET&apos;S PLAY!</span>
-                    </div>
-                    
-                    {/* Animated border */}
-                    <div className="absolute inset-0 rounded-2xl border-4 border-white/50 animate-pulse"></div>
-                  </button>
+                {/* Let's Play Button */}
+                <button
+                  onClick={() => {
+                    setIsTransitioning(true);
+                    setTimeout(() => {
+                      setShowGame(true);
+                      setIsTransitioning(false);
+                    }, 400);
+                  }}
+                  className="group relative px-12 py-6 text-3xl font-black text-white bg-gradient-to-r from-red-500 via-yellow-500 to-blue-500 rounded-2xl overflow-hidden transition-all duration-300 hover:scale-110 hover:shadow-[0_0_60px_rgba(239,68,68,1)] active:scale-95 animate-scale-in"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-red-600 via-yellow-600 to-blue-600 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                  <div className="relative flex items-center gap-4">
+                    <span className="text-5xl">🎮</span>
+                    <span>LET&apos;S PLAY!</span>
+                  </div>
                   
-                  {/* Connect Wallet Button (if not connected) */}
-                  {!isConnected && (
-                    <button
-                      onClick={handleConnect}
-                      disabled={isPending}
-                      className="group relative px-8 py-4 text-xl font-bold text-cyan-400 bg-black/60 backdrop-blur-lg rounded-xl border-2 border-cyan-400/50 overflow-hidden transition-all duration-300 hover:scale-105 hover:shadow-[0_0_30px_rgba(34,211,238,0.6)] hover:border-cyan-400 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed animate-scale-in animation-delay-200"
-                    >
-                      <div className="absolute inset-0 bg-cyan-500/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                      <div className="relative flex items-center gap-3">
-                        <span className="text-2xl">👛</span>
-                        <span>{isPending ? 'CONNECTING...' : 'CONNECT WALLET'}</span>
-                      </div>
-                      
-                      {/* Glow effect */}
-                      <div className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity blur-xl bg-cyan-500/30"></div>
-                    </button>
-                  )}
-                </div>
+                  {/* Animated border */}
+                  <div className="absolute inset-0 rounded-2xl border-4 border-white/50 animate-pulse"></div>
+                </button>
                 
                 {/* Stats or Info */}
                 <div className="flex flex-wrap justify-center gap-4 mt-8 animate-fade-in-up animation-delay-400">
