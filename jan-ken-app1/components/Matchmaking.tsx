@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useWriteContract, useWaitForTransactionReceipt, useAccount, useWatchContractEvent, useSimulateContract, useChainId, useConnectorClient, useReadContract } from 'wagmi';
 import { sdk } from '@farcaster/miniapp-sdk';
 import { formatEther } from 'viem';
@@ -14,7 +14,7 @@ interface MatchmakingProps {
   showMatchFound?: boolean;
 }
 
-export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound = false }: MatchmakingProps) {
+function MatchmakingComponent({ betAmount, onMatchFound, onCancel, showMatchFound = false }: MatchmakingProps) {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const [isMatching, setIsMatching] = useState(true);
@@ -22,10 +22,9 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
   const [txError, setTxError] = useState<string | null>(null);
   
   // Convert betAmount to betLevel (CRITICAL FIX!)
-  const betLevel = getBetLevelFromAmount(betAmount);
+  const betLevel = useMemo(() => getBetLevelFromAmount(betAmount), [betAmount]);
   
   if (!betLevel) {
-    console.error('❌ CRITICAL: Invalid betAmount, cannot determine betLevel:', betAmount.toString());
     return (
       <div className="text-center p-8">
         <p className="text-red-400 font-bold">Error: Invalid bet amount</p>
@@ -33,12 +32,6 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
       </div>
     );
   }
-  
-  console.log('🎯 Matchmaking initialized:', {
-    betAmount: betAmount.toString(),
-    betLevel,
-    address,
-  });
   
   const { data: hash, writeContract, isPending, error: writeError, reset: resetWriteContract, status } = useWriteContract({
     mutation: {
@@ -420,89 +413,69 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
 
   // Watch for PlayerJoinedQueue event - track when players join queue
   // This helps us detect if 2 players are in queue but match hasn't happened
+  // OPTIMIZED: Memoized callback and debounced refetch
+  const playerJoinedQueueTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  const handlePlayerJoinedQueue = useCallback((logs: any[]) => {
+    // If we're waiting for a match and someone joined, check game status
+    if (isMatching && hasJoinedQueue && logs.length > 0) {
+      // Clear previous timeout
+      if (playerJoinedQueueTimeoutRef.current) {
+        clearTimeout(playerJoinedQueueTimeoutRef.current);
+      }
+      
+      // Debounced refetch - only check once after a short delay
+      playerJoinedQueueTimeoutRef.current = setTimeout(() => {
+        refetchGame();
+        playerJoinedQueueTimeoutRef.current = null;
+      }, 1000);
+    }
+  }, [isMatching, hasJoinedQueue, refetchGame]);
+
   useWatchContractEvent({
     address: CONTRACT_ADDRESS as `0x${string}`,
     abi: CONTRACT_ABI,
     eventName: 'PlayerJoinedQueue',
     enabled: isConnected && !!address && hasJoinedQueue, // Only watch when we're in queue
-    onLogs(logs) {
-      console.log('👥 PlayerJoinedQueue event received:', logs.length, 'events');
-      logs.forEach((log: any) => {
-        console.log('👥 Player joined queue:', {
-          player: log.args?.player,
-          betLevel: log.args?.betLevel?.toString(),
-          transactionHash: log.transactionHash,
-        });
-      });
-      
-      // If we're waiting for a match and someone joined, IMMEDIATELY check multiple times
-      if (isMatching && hasJoinedQueue) {
-        console.log('👥 🚨 Someone joined queue - AGGRESSIVE MATCH CHECK!');
-        // Immediate checks at different intervals
-        refetchGame(); // Immediate
-        setTimeout(() => refetchGame(), 500);
-        setTimeout(() => refetchGame(), 1000);
-        setTimeout(() => refetchGame(), 2000);
-        setTimeout(() => refetchGame(), 3000);
-        // Also check queue count
-        setTimeout(() => refetchQueueCount(), 1500);
-      }
-    },
+    pollingInterval: 3000, // Poll every 3 seconds (optimized)
+    onLogs: handlePlayerJoinedQueue,
   });
 
   // Watch for GameCreated event - this means a match was found
   // IMPORTANT: Event listener should be active even before transaction completes
   // because match can happen when another player joins after us
+  // OPTIMIZED: Memoized callback and increased polling interval
+  const handleGameCreatedLogs = useCallback((logs: any[]) => {
+    // Check ALL logs, not just one
+    logs.forEach((log: any) => {
+      const player1 = log.args?.player1?.toLowerCase();
+      const player2 = log.args?.player2?.toLowerCase();
+      const currentAddress = address?.toLowerCase();
+      const isMatch = player1 === currentAddress || player2 === currentAddress;
+      
+      if (isMatch) {
+        console.log('[Matchmaking] ✅ MATCH FOUND! GameCreated event received!');
+        
+        // Stop matching
+        setIsMatching(false);
+        
+        // Use gameId from event or transaction hash
+        const gameId = log.args?.gameId?.toString() || log.transactionHash || hash || `game-${Date.now()}`;
+        const p1 = log.args?.player1;
+        const p2 = log.args?.player2;
+        
+        onMatchFound(gameId, p1, p2);
+      }
+    });
+  }, [address, hash, onMatchFound]);
+
   useWatchContractEvent({
     address: CONTRACT_ADDRESS as `0x${string}`,
     abi: CONTRACT_ABI,
     eventName: 'GameCreated',
     enabled: isConnected && !!address, // Always enabled when connected, not just after joining queue
-    pollingInterval: 1000, // Poll every 1 second for events (more aggressive)
-    onLogs(logs) {
-      console.log('🎮 GameCreated event logs received:', logs.length, 'events');
-      
-      // Check ALL logs, not just one
-      logs.forEach((log: any) => {
-        const player1 = log.args?.player1?.toLowerCase();
-        const player2 = log.args?.player2?.toLowerCase();
-        const currentAddress = address?.toLowerCase();
-        const isMatch = player1 === currentAddress || player2 === currentAddress;
-        
-        console.log('🎮 Checking game log:', {
-          player1,
-          player2,
-          currentAddress,
-          isMatch,
-          gameId: log.args?.gameId?.toString(),
-          betAmount: log.args?.betAmount?.toString(),
-          transactionHash: log.transactionHash,
-          blockNumber: log.blockNumber,
-        });
-        
-        if (isMatch) {
-          console.log('🎮 ✅✅✅ MATCH FOUND! GameCreated event received!');
-          console.log('🎮 Event details:', {
-            player1: log.args?.player1,
-            player2: log.args?.player2,
-            gameId: log.args?.gameId?.toString(),
-            betAmount: log.args?.betAmount?.toString(),
-            transactionHash: log.transactionHash,
-            blockNumber: log.blockNumber,
-          });
-          
-          // Stop matching
-          setIsMatching(false);
-          
-          // Use gameId from event or transaction hash
-          const gameId = log.args?.gameId?.toString() || log.transactionHash || hash || `game-${Date.now()}`;
-          const p1 = log.args?.player1;
-          const p2 = log.args?.player2;
-          console.log('🎮 🚀 Calling onMatchFound with gameId:', gameId, 'player1:', p1, 'player2:', p2);
-          onMatchFound(gameId, p1, p2);
-        }
-      });
-    },
+    pollingInterval: 3000, // Poll every 3 seconds for events (optimized - less aggressive)
+    onLogs: handleGameCreatedLogs,
   });
 
   // Join queue via contract - PRODUCTION MODE
@@ -1252,7 +1225,7 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
     }
   }, [isConnected, writeContract, betAmount, betLevel, hasJoinedQueue, address, simulateData, simulateStatus, simulateError, chainId, connectorClient, resetWriteContract, currentGame, refetchGame]);
 
-  // Read queue count for this bet level
+  // Read queue count for this bet level - Optimized polling interval
   // CRITICAL FIX: Contract expects betLevel, not betAmount!
   const { data: queueCount, refetch: refetchQueueCount } = useReadContract({
     address: CONTRACT_ADDRESS as `0x${string}`,
@@ -1261,152 +1234,154 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
     args: [BigInt(betLevel)], // ✅ FIX: Use betLevel instead of betAmount
     query: {
       enabled: isConnected && !!address && !!betLevel && (hasJoinedQueue || isMatching), // Enable when matching too
-      refetchInterval: 2000, // Refetch every 2 seconds when enabled (more aggressive)
+      refetchInterval: 4000, // Refetch every 4 seconds (optimized - less aggressive)
+      staleTime: 2000, // Consider data fresh for 2 seconds
     },
   });
 
-  // Poll game status as fallback if event doesn't fire
+  // Memoize callbacks to prevent unnecessary re-renders
+  const handleMatchFound = useCallback((gameId: string, p1?: string, p2?: string) => {
+    setIsMatching(false);
+    setHasJoinedQueue(true);
+    onMatchFound(gameId, p1, p2);
+  }, [onMatchFound]);
+
+  // Memoize betLevel to prevent unnecessary recalculations
+  const memoizedBetLevel = useMemo(() => betLevel, [betLevel]);
+
+  // Poll game status as fallback if event doesn't fire - OPTIMIZED
   // This handles cases where event listener might miss the event
   // Also handles cases where user is already in queue (E5 error)
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pollCountRef = useRef(0);
+
   useEffect(() => {
     // Start polling if:
     // 1. User is connected and has joined queue, OR
     // 2. User is in matching state (waiting for match)
-    if (!isConnected || !address) return;
+    if (!isConnected || !address) {
+      // Cleanup if disconnected
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+      return;
+    }
     
     // Check if we should start polling
     const shouldPoll = hasJoinedQueue || isMatching;
-    if (!shouldPoll) return;
-    
-    console.log('🔄 Starting game status polling (fallback mechanism)');
-    console.log('🔄 Polling conditions:', {
-      hasJoinedQueue,
-      isMatching,
-      address,
-      queueCount: queueCount?.toString(),
-    });
-    
-    let pollCount = 0;
-    const maxPolls = 90; // Poll for 180 seconds (90 * 2 seconds) - very aggressive
-    
-    // Poll every 1.5 seconds to check if game was created
-    // VERY AGGRESSIVE polling for matchmaking
-    const pollInterval = setInterval(async () => {
-      pollCount++;
-      console.log(`🔄 🔥 AGGRESSIVE POLLING (attempt ${pollCount}/${maxPolls})...`);
-      
-      try {
-        // Refetch queue count and game status
-        const [gameData, queueData] = await Promise.all([
-          refetchGame(),
-          refetchQueueCount(),
-        ]);
-        
-        // Log queue count
-        if (queueData?.data !== undefined) {
-          const count = Number(queueData.data);
-          console.log('👥 Queue count for betLevel', betLevel, ':', count, 'betAmount:', betAmount.toString());
-          if (count >= 2 && isMatching) {
-            console.warn('⚠️ Queue has 2+ players but no match yet - forcing multiple checks');
-            console.warn('⚠️ This could mean:');
-            console.warn('   - Transactions in different blocks');
-            console.warn('   - Contract matching issue (E18 - bet amounts mismatch?)');
-            console.warn('   - Contract state not updated yet');
-            // Force multiple aggressive checks
-            console.log('🔄 Forcing immediate game status check...');
-            setTimeout(() => refetchGame(), 500);
-            setTimeout(() => refetchGame(), 1500);
-            setTimeout(() => refetchGame(), 3000);
-            // Also refetch queue count to confirm
-            setTimeout(() => refetchQueueCount(), 2000);
-          } else if (count === 1 && isMatching) {
-            console.log('⏳ Queue has 1 player (us) - waiting for another player...');
-          } else if (count === 0 && isMatching) {
-            console.warn('⚠️ Queue is empty but we think we\'re matching - refreshing state');
-            // Refresh game state to check if we're actually still in queue
-            setTimeout(() => refetchGame(), 500);
-          }
-        }
-        
-        if (gameData?.data) {
-          const game = gameData.data;
-          const gameStatus = game.status;
-          const hasPlayer2 = game.player2 && game.player2 !== '0x0000000000000000000000000000000000000000';
-          
-          console.log('🔄 Polled game status:', {
-            status: gameStatus,
-            player1: game.player1,
-            player2: game.player2,
-            hasPlayer2,
-            betAmount: game.betAmount?.toString(),
-          });
-          
-          // Status 2 = InProgress (matched and game started)
-          // Status 1 = Matched (if contract uses this)
-          // Status 0 = Waiting (still in queue)
-          if (gameStatus === 2 || (gameStatus === 1 && hasPlayer2)) {
-            console.log('✅ Match found via polling! Game status:', gameStatus);
-            console.log('✅ Game details:', {
-              player1: game.player1,
-              player2: game.player2,
-              betAmount: game.betAmount?.toString(),
-            });
-            
-            setIsMatching(false);
-            setHasJoinedQueue(true); // Ensure this is set
-            // Generate gameId from player addresses
-            const gameId = game.player1 && game.player2 
-              ? `game-${game.player1.toLowerCase()}-${game.player2.toLowerCase()}-${Date.now()}`
-              : hash || `game-${Date.now()}`;
-            console.log('✅ Calling onMatchFound with gameId:', gameId);
-            onMatchFound(gameId, game.player1, game.player2);
-            clearInterval(pollInterval);
-            return;
-          } else if (gameStatus === 0 && !hasPlayer2) {
-            // Status 0 = Waiting, no player2 yet - user is in queue waiting for match
-            console.log('⏳ Still waiting in queue (status: Waiting, no player2 yet)');
-            // Continue polling
-          } else if (gameStatus === 0 && hasPlayer2) {
-            // Status 0 = Waiting but has player2 - might be transitioning
-            console.log('⏳ Waiting status but has player2 - might be transitioning to InProgress');
-            // Continue polling, should transition soon
-          } else {
-            console.log('⚠️ Unexpected game status:', gameStatus, 'hasPlayer2:', hasPlayer2);
-          }
-        } else {
-          console.log('⚠️ No game data returned from contract');
-          // If no game data but we think we're in queue, might be an issue
-          // Continue polling anyway
-        }
-        
-        // Stop polling after max attempts
-        if (pollCount >= maxPolls) {
-          console.warn('⚠️ Polling timeout - no match found after 180 seconds');
-          console.warn('⚠️ This might indicate a problem with matchmaking');
-          console.warn('⚠️ Possible causes:');
-          console.warn('   - No other players in queue');
-          console.warn('   - Contract matchmaking logic issue');
-          console.warn('   - Network/RPC issues');
-          clearInterval(pollInterval);
-        }
-      } catch (error) {
-        console.error('❌ Error polling game status:', error);
-        // Continue polling on error (might be temporary network issue)
+    if (!shouldPoll) {
+      // Cleanup if not polling
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
       }
-    }, 1500); // Poll every 1.5 seconds - VERY AGGRESSIVE
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+      pollCountRef.current = 0;
+      return;
+    }
     
-    // Stop polling after 180 seconds (match should happen by then)
-    const timeout = setTimeout(() => {
-      console.log('⏰ Polling timeout reached (180 seconds)');
-      clearInterval(pollInterval);
-    }, 180000); // Increased to 180 seconds
+    // Reset poll count when starting new polling session
+    if (!pollingRef.current) {
+      pollCountRef.current = 0;
+    }
+    
+    const maxPolls = 60; // Poll for 180 seconds (60 * 3 seconds) - optimized
+    
+    // Poll every 3 seconds (optimized - less aggressive)
+    if (!pollingRef.current) {
+      pollingRef.current = setInterval(async () => {
+        pollCountRef.current++;
+        
+        // Only log every 5th poll to reduce console spam
+        if (pollCountRef.current % 5 === 0) {
+          console.log(`[Matchmaking] 🔄 Polling (${pollCountRef.current}/${maxPolls})...`);
+        }
+        
+        try {
+          // Refetch game status (queue count is handled by useReadContract)
+          const gameData = await refetchGame();
+          
+          if (gameData?.data) {
+            const game = gameData.data;
+            const gameStatus = game.status;
+            const hasPlayer2 = game.player2 && game.player2 !== '0x0000000000000000000000000000000000000000';
+            
+            // Status 2 = InProgress (matched and game started)
+            // Status 1 = Matched (if contract uses this)
+            // Status 0 = Waiting (still in queue)
+            if (gameStatus === 2 || (gameStatus === 1 && hasPlayer2)) {
+              console.log('[Matchmaking] ✅ Match found via polling!');
+              
+              // Cleanup
+              if (pollingRef.current) {
+                clearInterval(pollingRef.current);
+                pollingRef.current = null;
+              }
+              if (timeoutRef.current) {
+                clearTimeout(timeoutRef.current);
+                timeoutRef.current = null;
+              }
+              
+              // Generate gameId from player addresses
+              const gameId = game.player1 && game.player2 
+                ? `game-${game.player1.toLowerCase()}-${game.player2.toLowerCase()}-${Date.now()}`
+                : hash || `game-${Date.now()}`;
+              
+              handleMatchFound(gameId, game.player1, game.player2);
+              return;
+            }
+          }
+          
+          // Stop polling after max attempts
+          if (pollCountRef.current >= maxPolls) {
+            console.warn('[Matchmaking] ⚠️ Polling timeout - no match found after 180 seconds');
+            if (pollingRef.current) {
+              clearInterval(pollingRef.current);
+              pollingRef.current = null;
+            }
+          }
+        } catch (error) {
+          // Only log errors, don't spam console
+          if (pollCountRef.current % 10 === 0) {
+            console.error('[Matchmaking] ❌ Error polling game status:', error);
+          }
+        }
+      }, 3000); // Poll every 3 seconds (optimized)
+    }
+    
+    // Stop polling after 180 seconds
+    if (!timeoutRef.current) {
+      timeoutRef.current = setTimeout(() => {
+        console.log('[Matchmaking] ⏰ Polling timeout reached (180 seconds)');
+        if (pollingRef.current) {
+          clearInterval(pollingRef.current);
+          pollingRef.current = null;
+        }
+        timeoutRef.current = null;
+      }, 180000);
+    }
     
     return () => {
-      console.log('🛑 Stopping game status polling');
-      clearInterval(pollInterval);
-      clearTimeout(timeout);
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+      pollCountRef.current = 0;
     };
-  }, [isConnected, hasJoinedQueue, isMatching, address, refetchGame, refetchQueueCount, onMatchFound, hash, queueCount, betLevel, betAmount]);
+  }, [isConnected, hasJoinedQueue, isMatching, address, refetchGame, handleMatchFound, hash]);
 
   return (
     <div className="relative">
@@ -1599,4 +1574,7 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
     </div>
   );
 }
+
+// Memoize component to prevent unnecessary re-renders
+export const Matchmaking = React.memo(MatchmakingComponent);
 
