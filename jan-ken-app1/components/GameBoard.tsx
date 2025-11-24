@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { useWriteContract, useReadContract, useAccount, useWaitForTransactionReceipt, useSimulateContract, useConnectorClient } from 'wagmi';
+import { sdk } from '@farcaster/miniapp-sdk';
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from '@/lib/contract';
 import { isValidChoice, isValidBetAmount } from '@/lib/security';
 
@@ -226,43 +227,108 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
     console.log('[GameBoard] Choice ID:', choiceId);
     console.log('[GameBoard] Connector client:', !!connectorClient);
     console.log('[GameBoard] writeContract type:', typeof writeContract);
+    console.log('[GameBoard] Connector client account:', connectorClient?.account?.address);
+    console.log('[GameBoard] Connector client chain:', connectorClient?.chain?.id);
 
     setSelectedChoice(choiceId);
     setTxStartTime(Date.now());
     setTxError(null);
     
     try {
-      let txParams: any;
+      // Prepare transaction parameters
+      const txParams = {
+        address: CONTRACT_ADDRESS as `0x${string}`,
+        abi: CONTRACT_ABI,
+        functionName: 'makeChoice' as const,
+        args: [choiceId] as const,
+      };
       
-      // Wagmi v3 best practice: Use simulateData.request if available
-      // This includes all gas parameters and ensures wallet shows correct fee
-      if (simulateData && (simulateData as any).request) {
-        console.log('[GameBoard] 📤 Using simulateData.request for makeChoice (Wagmi v3 best practice)');
-        txParams = (simulateData as any).request;
-      } else {
-        // Fallback: send without simulation data (wallet will estimate)
-        console.log('[GameBoard] 📤 Sending makeChoice transaction (wallet will estimate gas)');
-        txParams = {
-          address: CONTRACT_ADDRESS as `0x${string}`,
-          abi: CONTRACT_ABI,
-          functionName: 'makeChoice',
-          args: [choiceId],
-        };
-      }
-      
-      console.log('[GameBoard] 📤 Calling writeContract with params:', {
+      console.log('[GameBoard] 📤 Transaction parameters:', {
         address: txParams.address,
-        functionName: txParams.functionName || 'makeChoice',
-        args: txParams.args ? txParams.args.map((a: any) => a.toString()) : [choiceId],
+        functionName: txParams.functionName,
+        args: txParams.args,
       });
       
-      // Call writeContract - this should trigger wallet popup
-      writeContract(txParams);
+      // CRITICAL: Use simulateData.request if available (includes gas estimation)
+      // Otherwise use direct params
+      let finalParams: any;
+      if (simulateData && (simulateData as any).request) {
+        console.log('[GameBoard] 📤 Using simulateData.request (includes gas estimation)');
+        finalParams = (simulateData as any).request;
+      } else {
+        console.log('[GameBoard] 📤 Using direct params (wallet will estimate gas)');
+        finalParams = txParams;
+      }
       
-      console.log('[GameBoard] ✅ writeContract called successfully');
-      console.log('[GameBoard] Transaction status:', status);
-      console.log('[GameBoard] isPending:', isPending);
-      console.log('[GameBoard] Waiting for wallet approval and hash...');
+      // CRITICAL: Try to get Farcaster wallet provider directly
+      // This ensures the wallet popup appears in Farcaster Mini App
+      let farcasterProvider: any = null;
+      if (sdk && sdk.wallet) {
+        try {
+          farcasterProvider = await sdk.wallet.getEthereumProvider();
+          console.log('[GameBoard] ✅ Farcaster wallet provider obtained:', !!farcasterProvider);
+          if (farcasterProvider) {
+            console.log('[GameBoard] 📱 Provider chainId:', await farcasterProvider.request({ method: 'eth_chainId' }));
+          }
+        } catch (err) {
+          console.warn('[GameBoard] ⚠️ Could not get Farcaster provider:', err);
+        }
+      }
+      
+      // CRITICAL: Force wallet popup by ensuring we're not in a pending state
+      // Reset any previous transaction state
+      if (isPending) {
+        console.warn('[GameBoard] ⚠️ Previous transaction still pending, resetting...');
+        resetWriteContract?.();
+        // Wait a bit for reset to complete
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+      
+      console.log('[GameBoard] 📤 Calling writeContract NOW...');
+      console.log('[GameBoard] 📤 Final params:', {
+        address: finalParams.address || txParams.address,
+        functionName: finalParams.functionName || txParams.functionName,
+        args: finalParams.args ? finalParams.args.map((a: any) => a.toString()) : txParams.args,
+      });
+      console.log('[GameBoard] 📤 Connector client ready:', !!connectorClient);
+      console.log('[GameBoard] 📤 Farcaster provider ready:', !!farcasterProvider);
+      
+      // Call writeContract - this MUST trigger wallet popup
+      // In Wagmi v3, writeContract returns void but triggers the mutation
+      writeContract(finalParams);
+      
+      console.log('[GameBoard] ✅ writeContract called');
+      console.log('[GameBoard] 📊 Status immediately after call:', status);
+      console.log('[GameBoard] 📊 isPending immediately after call:', isPending);
+      
+      // Monitor status changes to detect if wallet popup appeared
+      const statusCheckInterval = setInterval(() => {
+        console.log('[GameBoard] 📊 Status check:', {
+          status,
+          isPending,
+          hasHash: !!hash,
+          timestamp: new Date().toISOString(),
+        });
+        
+        // If status changed to pending, wallet popup likely appeared
+        if (status === 'pending' || isPending) {
+          console.log('[GameBoard] ✅ Transaction status is pending - wallet popup should be visible');
+          clearInterval(statusCheckInterval);
+        }
+        
+        // If we have a hash, transaction was sent
+        if (hash) {
+          console.log('[GameBoard] ✅ Transaction hash received:', hash);
+          clearInterval(statusCheckInterval);
+        }
+      }, 200);
+      
+      // Clear interval after 10 seconds
+      setTimeout(() => {
+        clearInterval(statusCheckInterval);
+      }, 10000);
+      
+      console.log('[GameBoard] ⏳ Waiting for wallet popup and transaction hash...');
     } catch (error: any) {
       console.error('[GameBoard] ❌ Error making choice:', error);
       console.error('[GameBoard] Error details:', {

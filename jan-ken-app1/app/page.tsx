@@ -39,135 +39,91 @@ export default function Home() {
   // Call sdk.actions.ready() when interface is ready (per Farcaster docs)
   // https://miniapps.farcaster.xyz/docs/getting-started#making-your-app-display
   // "After your app loads, you must call sdk.actions.ready() to hide the splash screen and display your content"
-  // Important: If you don't call ready(), users will see an infinite loading screen
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
     let mounted = true;
-    let readyCalled = false;
-    let checkInterval: NodeJS.Timeout | null = null;
     
     // Function to call ready() when SDK is available
-    // Per docs: await sdk.actions.ready()
+    // Per docs: "await sdk.actions.ready()"
     const callReady = async () => {
-      // Don't call multiple times
-      if (readyCalled) {
-        console.log('[Farcaster] ⚠️ ready() already called, skipping');
-        return true;
-      }
-      
       try {
-        // Try imported SDK first (most common case)
+        // Try imported SDK first
         if (sdk && sdk.actions && typeof sdk.actions.ready === 'function') {
-          console.log('[Farcaster] 📞 Calling sdk.actions.ready() (imported SDK)...');
           await sdk.actions.ready();
-          readyCalled = true;
           if (mounted) {
             setAppReady(true);
-            console.log('[Farcaster] ✅ SDK ready() called successfully (imported SDK) - splash screen hidden');
-          }
-          if (checkInterval) {
-            clearInterval(checkInterval);
-            checkInterval = null;
+            console.log('✅ Farcaster SDK ready() called (imported SDK) - splash screen hidden');
           }
           return true;
         }
         
-        // Try window SDK (PC Debug Tool or alternative loading method)
-        const windowSDK = (window as any).farcaster?.sdk;
-        if (windowSDK && windowSDK.actions && typeof windowSDK.actions.ready === 'function') {
-          console.log('[Farcaster] 📞 Calling sdk.actions.ready() (window SDK)...');
-          await windowSDK.actions.ready();
-          readyCalled = true;
+        // Try window SDK (PC Debug Tool or web environment)
+        if ((window as any).farcaster?.sdk?.actions?.ready) {
+          await (window as any).farcaster.sdk.actions.ready();
           if (mounted) {
             setAppReady(true);
-            console.log('[Farcaster] ✅ SDK ready() called successfully (window SDK) - splash screen hidden');
-          }
-          if (checkInterval) {
-            clearInterval(checkInterval);
-            checkInterval = null;
+            console.log('✅ Farcaster SDK ready() called (window SDK) - splash screen hidden');
           }
           return true;
         }
         
         return false;
       } catch (error) {
-        console.error('[Farcaster] ❌ Error calling sdk.actions.ready():', error);
-        // Continue checking even on error
+        console.error('Error calling sdk.actions.ready():', error);
+        // If we're not in Farcaster environment, continue anyway
+        if (mounted) {
+          setAppReady(true);
+        }
         return false;
       }
     };
     
-    // Aggressive approach: Always try to call ready() if SDK is available
-    // Don't check environment - just try to call if SDK exists
-    const attemptReady = async () => {
-      // Try immediately
-      const success = await callReady();
+    // Try immediately
+    callReady().then((success) => {
       if (success) {
         return;
       }
       
-      // If not successful, start polling
+      // If SDK not ready, wait for it with polling
       let attempts = 0;
-      const maxAttempts = 100; // 10 seconds max (100 * 100ms)
+      const maxAttempts = 50; // 5 seconds max (50 * 100ms)
       
-      checkInterval = setInterval(async () => {
+      const checkSDK = setInterval(async () => {
         attempts++;
         
         const success = await callReady();
         if (success) {
-          if (checkInterval) {
-            clearInterval(checkInterval);
-            checkInterval = null;
-          }
+          clearInterval(checkSDK);
           return;
         }
         
-        // Log debug info every 5 attempts (0.5 seconds)
-        if (attempts % 5 === 0) {
-          console.log(`[Farcaster] 🔍 Attempting to call ready()... (attempt ${attempts}/${maxAttempts})`, {
+        // Log debug info every 10 attempts (1 second)
+        if (attempts % 10 === 0) {
+          console.log(`🔍 Checking for Farcaster SDK... (attempt ${attempts}/${maxAttempts})`, {
             hasImportedSDK: !!sdk,
             hasSDKActions: !!(sdk && sdk.actions),
             hasReadyFunction: !!(sdk && sdk.actions && typeof sdk.actions.ready === 'function'),
             hasWindowSDK: !!(window as any).farcaster?.sdk,
-            hasWindowSDKActions: !!(window as any).farcaster?.sdk?.actions,
-            hasWindowReadyFunction: !!(window as any).farcaster?.sdk?.actions?.ready,
             userAgent: navigator.userAgent,
           });
         }
         
         if (attempts >= maxAttempts) {
-          if (checkInterval) {
-            clearInterval(checkInterval);
-            checkInterval = null;
-          }
-          console.error('[Farcaster] ❌ SDK ready() not called after waiting!');
-          console.error('[Farcaster] ❌ SDK state:', {
-            sdk: !!sdk,
-            sdkActions: !!(sdk && sdk.actions),
-            sdkReady: !!(sdk && sdk.actions && typeof sdk.actions.ready === 'function'),
-            windowFarcaster: !!(window as any).farcaster,
-            windowSDK: !!(window as any).farcaster?.sdk,
-            windowSDKActions: !!(window as any).farcaster?.sdk?.actions,
-            windowReady: !!(window as any).farcaster?.sdk?.actions?.ready,
-          });
-          // Still set appReady to prevent app from being stuck
+          clearInterval(checkSDK);
+          // SDK not available - might be normal web browser (not Farcaster Mini App)
+          console.log('ℹ️ Farcaster SDK not available - this is normal if running in a regular web browser');
           if (mounted) {
             setAppReady(true);
           }
         }
       }, 100); // Check every 100ms
-    };
-    
-    // Start attempting immediately
-    attemptReady();
+      
+      return () => clearInterval(checkSDK);
+    });
     
     return () => {
       mounted = false;
-      if (checkInterval) {
-        clearInterval(checkInterval);
-        checkInterval = null;
-      }
     };
   }, []);
 
@@ -437,7 +393,7 @@ export default function Home() {
     // For now, we just reset the UI state
   };
 
-        return (
+  return (
           <>
           {/* Loading Screens */}
           {isConnecting && (
@@ -550,14 +506,14 @@ export default function Home() {
                 
                 {/* Logo Container */}
                 <div className="relative z-10 flex flex-col items-center justify-center w-full">
-                  <Image
+        <Image
                     src="/new_logo.png"
                     alt="Jan-Ken"
                     width={200}
                     height={67}
                     className="object-contain w-full h-auto"
                     style={{ filter: 'drop-shadow(0 0 20px rgba(220,20,60,0.6))' }}
-                    priority
+          priority
                     unoptimized
                   />
                   
@@ -783,5 +739,5 @@ export default function Home() {
           {/* Debug Panel - Always visible for mobile debugging */}
           <DebugPanel />
           </>
-        );
-      }
+  );
+}

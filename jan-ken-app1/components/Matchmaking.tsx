@@ -1049,11 +1049,47 @@ function MatchmakingComponent({ betAmount, onMatchFound, onCancel, showMatchFoun
               return;
             }
             
+            // CRITICAL: Ensure Farcaster wallet provider is ready
+            let farcasterProviderReady = false;
+            if (sdk && sdk.wallet) {
+              try {
+                const provider = await sdk.wallet.getEthereumProvider();
+                farcasterProviderReady = !!provider;
+                console.log('[Matchmaking] ✅ Farcaster wallet provider ready:', farcasterProviderReady);
+              } catch (err) {
+                console.warn('[Matchmaking] ⚠️ Could not verify Farcaster provider:', err);
+              }
+            }
+            
+            // Reset any pending transaction state
+            if (isPending) {
+              console.warn('[Matchmaking] ⚠️ Previous transaction pending, resetting...');
+              resetWriteContract?.();
+              await new Promise(resolve => setTimeout(resolve, 200));
+            }
+            
+            console.log('[Matchmaking] 📤 Calling writeContract NOW...');
+            console.log('[Matchmaking] 📤 Connector client:', !!connectorClient);
+            console.log('[Matchmaking] 📤 Farcaster provider:', farcasterProviderReady);
+            
             try {
               writeContract(simRequest);
               console.log('[Matchmaking] ✅ writeContract called successfully (with simulation request)');
               console.log('[Matchmaking] ✅ Transaction status after call:', status);
               console.log('[Matchmaking] ✅ isPending after call:', isPending);
+              
+              // Monitor status to detect wallet popup
+              const statusCheckInterval = setInterval(() => {
+                console.log('[Matchmaking] 📊 Status check:', {
+                  status,
+                  isPending,
+                  hasHash: !!hash,
+                });
+                if (status === 'pending' || isPending || hash) {
+                  clearInterval(statusCheckInterval);
+                }
+              }, 200);
+              setTimeout(() => clearInterval(statusCheckInterval), 10000);
             } catch (writeErr: any) {
               console.error('❌ Error calling writeContract with simulation request:', writeErr);
               // Safely extract error message
@@ -1084,12 +1120,47 @@ function MatchmakingComponent({ betAmount, onMatchFound, onCancel, showMatchFoun
               return;
             }
             
-            console.log('[Matchmaking] 📤 Calling writeContract...');
+            // CRITICAL: Ensure Farcaster wallet provider is ready
+            let farcasterProviderReady = false;
+            if (sdk && sdk.wallet) {
+              try {
+                const provider = await sdk.wallet.getEthereumProvider();
+                farcasterProviderReady = !!provider;
+                console.log('[Matchmaking] ✅ Farcaster wallet provider ready:', farcasterProviderReady);
+              } catch (err) {
+                console.warn('[Matchmaking] ⚠️ Could not verify Farcaster provider:', err);
+              }
+            }
+            
+            // Reset any pending transaction state
+            if (isPending) {
+              console.warn('[Matchmaking] ⚠️ Previous transaction pending, resetting...');
+              resetWriteContract?.();
+              await new Promise(resolve => setTimeout(resolve, 200));
+            }
+            
+            console.log('[Matchmaking] 📤 Calling writeContract NOW...');
+            console.log('[Matchmaking] 📤 Connector client:', !!connectorClient);
+            console.log('[Matchmaking] 📤 Farcaster provider:', farcasterProviderReady);
+            
             try {
               writeContract(txParams);
               console.log('[Matchmaking] ✅ writeContract called successfully (direct)');
               console.log('[Matchmaking] ✅ Transaction status after call:', status);
               console.log('[Matchmaking] ✅ isPending after call:', isPending);
+              
+              // Monitor status to detect wallet popup
+              const statusCheckInterval = setInterval(() => {
+                console.log('[Matchmaking] 📊 Status check:', {
+                  status,
+                  isPending,
+                  hasHash: !!hash,
+                });
+                if (status === 'pending' || isPending || hash) {
+                  clearInterval(statusCheckInterval);
+                }
+              }, 200);
+              setTimeout(() => clearInterval(statusCheckInterval), 10000);
             } catch (writeErr: any) {
               console.error('❌ Error calling writeContract directly:', writeErr);
               // Safely extract error message
