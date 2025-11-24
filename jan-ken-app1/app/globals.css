@@ -935,3 +935,66 @@
 .animate-neon-flicker {
   animation: neon-flicker 4s ease-in-out infinite;
 }
+
+/* Match Found Animation - Fade in with scale */
+@keyframes fade-in-scale {
+  0% {
+    opacity: 0;
+    transform: scale(0.8) translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-fade-in-scale {
+  animation: fade-in-scale 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* Opponent Ready Card - Slide up with fade */
+@keyframes slide-up-fade {
+  0% {
+    opacity: 0;
+    transform: translateY(40px) scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-slide-up-fade {
+  animation: slide-up-fade 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* Slow Bounce Animation */
+@keyframes bounce-slow {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.animate-bounce-slow {
+  animation: bounce-slow 2s ease-in-out infinite;
+}
+
+/* Scale In Animation */
+@keyframes scale-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-scale-in {
+  animation: scale-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  opacity: 0;
+}
