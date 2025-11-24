@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { NeynarAPIClient } from '@neynar/nodejs-sdk';
+import { NeynarAPIClient, Configuration } from '@neynar/nodejs-sdk';
 
 // Note: Edge runtime doesn't support some Node.js APIs that Neynar SDK needs
 // Using Node.js runtime instead
 export const runtime = 'nodejs';
 
-// Initialize Neynar client
-const neynarClient = new NeynarAPIClient(
-  process.env.NEYNAR_API_KEY || 'NEYNAR_API_DOCS'
-);
+// Initialize Neynar client with Configuration object
+const config = new Configuration({
+  apiKey: process.env.NEYNAR_API_KEY || 'NEYNAR_API_DOCS',
+});
+const neynarClient = new NeynarAPIClient(config);
 
 /**
  * Farcaster Profile API Proxy
