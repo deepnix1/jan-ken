@@ -103,12 +103,12 @@ export function BetSelector({ onSelect }: BetSelectorProps) {
               key={bet.level}
               onClick={() => handleSelect(bet.level, bet.amount)}
               disabled={isDisabled || loading || !ethPrice}
-              className={`group relative overflow-hidden rounded-lg p-6 sm:p-8 md:p-10 transition-all duration-300 transform ${
+              className={`group relative overflow-hidden rounded-lg p-6 sm:p-8 md:p-10 transition-all-smooth transform animate-fade-in-up ${
                 isSelected
-                  ? 'scale-105 shadow-[0_0_40px_rgba(34,211,238,0.6)] border-2 border-cyan-400'
+                  ? 'scale-105 shadow-[0_0_40px_rgba(34,211,238,0.6)] border-2 border-cyan-400 animate-glow-pulse-strong'
                   : isDisabled
                   ? 'opacity-30 cursor-not-allowed'
-                  : 'hover:scale-105 hover:shadow-[0_0_30px_rgba(34,211,238,0.4)] cursor-pointer'
+                  : 'hover:scale-110 hover:shadow-[0_0_30px_rgba(34,211,238,0.4)] active:scale-95 cursor-pointer'
               } bg-gradient-to-br ${getGamingColor(bet.level)} border-2 bg-black/40 backdrop-blur-sm`}
               style={{ animationDelay: `${index * 100}ms` }}
             >

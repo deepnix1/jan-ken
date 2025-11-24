@@ -10,6 +10,7 @@ import { GameBoard } from '@/components/GameBoard';
 import { Result } from '@/components/Result';
 import { MatchFoundAnimation } from '@/components/MatchFoundAnimation';
 import { DebugPanel } from '@/components/DebugPanel';
+import { LoadingScreen } from '@/components/LoadingScreen';
 import { getFarcasterProfileByAddress } from '@/lib/farcasterProfile';
 
 // Disable SSR for this page (Wagmi doesn't work with SSR)
@@ -31,6 +32,8 @@ export default function Home() {
   const previousAddressRef = useRef<string | undefined>(undefined);
   const [userProfile, setUserProfile] = useState<{ pfpUrl: string | null; username: string | null } | null>(null);
   const [showGame, setShowGame] = useState(false); // For "Let's Play" button
+  const [isConnecting, setIsConnecting] = useState(false); // For loading screen
+  const [isTransitioning, setIsTransitioning] = useState(false); // For page transitions
 
   // Call sdk.actions.ready() when interface is ready (per Farcaster docs)
   // https://miniapps.farcaster.xyz/docs/guides/loading
@@ -280,6 +283,8 @@ export default function Home() {
       return;
     }
     
+    setIsConnecting(true); // Show loading screen
+    
     // Per Farcaster docs: In Mini Apps, connector automatically connects if user has wallet
     // Try Farcaster Mini App connector first (it should be first in array)
     const farcasterConnector = connectors.find(c => c.name === 'Farcaster Mini App' || c.name?.includes('Farcaster'));
@@ -287,13 +292,22 @@ export default function Home() {
     
     // Per Farcaster docs: connect({ connector: connectors[0] })
     connect({ connector });
+    
+    // Hide loading after attempt (success or fail will be handled by useEffect)
+    setTimeout(() => {
+      setIsConnecting(false);
+    }, 2000);
   };
 
   const handleBetSelect = (betAmount: bigint) => {
-    // Wallet connection is already enforced at page level
-    setSelectedBet(betAmount);
-    setGameState('matching');
-    setShowMatchFound(false);
+    // Transition animation
+    setIsTransitioning(true);
+    setTimeout(() => {
+      setSelectedBet(betAmount);
+      setGameState('matching');
+      setShowMatchFound(false);
+      setIsTransitioning(false);
+    }, 400);
   };
 
   const handleMatchFound = (id: string, p1Address?: string, p2Address?: string) => {
@@ -338,6 +352,14 @@ export default function Home() {
 
         return (
           <>
+          {/* Loading Screens */}
+          {isConnecting && (
+            <LoadingScreen 
+              message="CONNECTING WALLET" 
+              subMessage="Please approve in your wallet"
+            />
+          )}
+          
           <main className="min-h-screen bg-black relative overflow-hidden">
       {/* Background Effects */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
@@ -436,7 +458,7 @@ export default function Home() {
               </div>
             ) : !showGame ? (
               /* Let's Play Landing Screen */
-              <div className="flex flex-col items-center gap-8 py-16">
+              <div className="flex flex-col items-center gap-8 py-16 animate-fade-in-up">
                 <div className="text-center space-y-6">
                   <h2 className="text-5xl sm:text-6xl md:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-yellow-400 to-blue-400 drop-shadow-[0_0_30px_rgba(239,68,68,0.8)] animate-pulse">
                     READY TO BATTLE?
@@ -449,30 +471,57 @@ export default function Home() {
                   </p>
                 </div>
                 
-                {/* Let's Play Button */}
-                <button
-                  onClick={() => setShowGame(true)}
-                  className="group relative px-12 py-6 text-3xl font-black text-white bg-gradient-to-r from-red-500 via-yellow-500 to-blue-500 rounded-2xl overflow-hidden transition-all duration-300 hover:scale-110 hover:shadow-[0_0_60px_rgba(239,68,68,1)] active:scale-95"
-                >
-                  <div className="absolute inset-0 bg-gradient-to-r from-red-600 via-yellow-600 to-blue-600 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                  <div className="relative flex items-center gap-4">
-                    <span className="text-5xl">🎮</span>
-                    <span>LET&apos;S PLAY!</span>
-                  </div>
+                {/* Button Group */}
+                <div className="flex flex-col sm:flex-row items-center gap-4">
+                  {/* Let's Play Button */}
+                  <button
+                    onClick={() => {
+                      setIsTransitioning(true);
+                      setTimeout(() => {
+                        setShowGame(true);
+                        setIsTransitioning(false);
+                      }, 400);
+                    }}
+                    className="group relative px-12 py-6 text-3xl font-black text-white bg-gradient-to-r from-red-500 via-yellow-500 to-blue-500 rounded-2xl overflow-hidden transition-all duration-300 hover:scale-110 hover:shadow-[0_0_60px_rgba(239,68,68,1)] active:scale-95 animate-scale-in"
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-r from-red-600 via-yellow-600 to-blue-600 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                    <div className="relative flex items-center gap-4">
+                      <span className="text-5xl">🎮</span>
+                      <span>LET&apos;S PLAY!</span>
+                    </div>
+                    
+                    {/* Animated border */}
+                    <div className="absolute inset-0 rounded-2xl border-4 border-white/50 animate-pulse"></div>
+                  </button>
                   
-                  {/* Animated border */}
-                  <div className="absolute inset-0 rounded-2xl border-4 border-white/50 animate-pulse"></div>
-                </button>
+                  {/* Connect Wallet Button (if not connected) */}
+                  {!isConnected && (
+                    <button
+                      onClick={handleConnect}
+                      disabled={isPending}
+                      className="group relative px-8 py-4 text-xl font-bold text-cyan-400 bg-black/60 backdrop-blur-lg rounded-xl border-2 border-cyan-400/50 overflow-hidden transition-all duration-300 hover:scale-105 hover:shadow-[0_0_30px_rgba(34,211,238,0.6)] hover:border-cyan-400 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed animate-scale-in animation-delay-200"
+                    >
+                      <div className="absolute inset-0 bg-cyan-500/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                      <div className="relative flex items-center gap-3">
+                        <span className="text-2xl">👛</span>
+                        <span>{isPending ? 'CONNECTING...' : 'CONNECT WALLET'}</span>
+                      </div>
+                      
+                      {/* Glow effect */}
+                      <div className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity blur-xl bg-cyan-500/30"></div>
+                    </button>
+                  )}
+                </div>
                 
                 {/* Stats or Info */}
-                <div className="flex flex-wrap justify-center gap-4 mt-8">
-                  <div className="bg-cyan-500/10 backdrop-blur-sm px-6 py-3 rounded-xl border border-cyan-400/30">
+                <div className="flex flex-wrap justify-center gap-4 mt-8 animate-fade-in-up animation-delay-400">
+                  <div className="bg-cyan-500/10 backdrop-blur-sm px-6 py-3 rounded-xl border border-cyan-400/30 hover:border-cyan-400 transition-all duration-300 hover:scale-105 cursor-pointer">
                     <p className="text-cyan-400 text-sm font-mono">⚡ Instant Matches</p>
                   </div>
-                  <div className="bg-yellow-500/10 backdrop-blur-sm px-6 py-3 rounded-xl border border-yellow-400/30">
+                  <div className="bg-yellow-500/10 backdrop-blur-sm px-6 py-3 rounded-xl border border-yellow-400/30 hover:border-yellow-400 transition-all duration-300 hover:scale-105 cursor-pointer">
                     <p className="text-yellow-400 text-sm font-mono">💰 Win ETH</p>
                   </div>
-                  <div className="bg-purple-500/10 backdrop-blur-sm px-6 py-3 rounded-xl border border-purple-400/30">
+                  <div className="bg-purple-500/10 backdrop-blur-sm px-6 py-3 rounded-xl border border-purple-400/30 hover:border-purple-400 transition-all duration-300 hover:scale-105 cursor-pointer">
                     <p className="text-purple-400 text-sm font-mono">🔒 Secure</p>
                   </div>
                 </div>
@@ -486,29 +535,41 @@ export default function Home() {
                     currentUserAddress={address}
                   />
                 )}
-                {gameState === 'select' && (
-                  <BetSelector onSelect={handleBetSelect} />
-                )}
-                
-                {gameState === 'matching' && selectedBet && (
-                  <Matchmaking 
-                    betAmount={selectedBet} 
-                    onMatchFound={handleMatchFound}
-                    onCancel={handleCancelMatchmaking}
-                    showMatchFound={showMatchFound}
-                  />
-                )}
-                
-                {gameState === 'playing' && selectedBet && gameId && (
-                  <GameBoard 
-                    betAmount={selectedBet}
-                    gameId={gameId}
-                    onGameEnd={handleGameEnd}
-                  />
-                )}
-                
-                {gameState === 'result' && (
-                  <Result onPlayAgain={handlePlayAgain} onTieRematch={handleTieRematch} />
+                {!isTransitioning && (
+                  <>
+                    {gameState === 'select' && (
+                      <div className="w-full animate-fade-in-up">
+                        <BetSelector onSelect={handleBetSelect} />
+                      </div>
+                    )}
+                    
+                    {gameState === 'matching' && selectedBet && (
+                      <div className="w-full animate-scale-in">
+                        <Matchmaking 
+                          betAmount={selectedBet} 
+                          onMatchFound={handleMatchFound}
+                          onCancel={handleCancelMatchmaking}
+                          showMatchFound={showMatchFound}
+                        />
+                      </div>
+                    )}
+                    
+                    {gameState === 'playing' && selectedBet && gameId && (
+                      <div className="w-full animate-rotate-scale-in">
+                        <GameBoard 
+                          betAmount={selectedBet}
+                          gameId={gameId}
+                          onGameEnd={handleGameEnd}
+                        />
+                      </div>
+                    )}
+                    
+                    {gameState === 'result' && (
+                      <div className="w-full animate-fade-in-up">
+                        <Result onPlayAgain={handlePlayAgain} onTieRematch={handleTieRematch} />
+                      </div>
+                    )}
+                  </>
                 )}
               </>
             )}
