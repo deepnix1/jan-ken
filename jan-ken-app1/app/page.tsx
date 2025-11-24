@@ -45,123 +45,129 @@ export default function Home() {
     
     let mounted = true;
     let readyCalled = false;
+    let checkInterval: NodeJS.Timeout | null = null;
     
     // Function to call ready() when SDK is available
     // Per docs: await sdk.actions.ready()
     const callReady = async () => {
       // Don't call multiple times
-      if (readyCalled) return true;
+      if (readyCalled) {
+        console.log('[Farcaster] ⚠️ ready() already called, skipping');
+        return true;
+      }
       
       try {
         // Try imported SDK first (most common case)
         if (sdk && sdk.actions && typeof sdk.actions.ready === 'function') {
+          console.log('[Farcaster] 📞 Calling sdk.actions.ready() (imported SDK)...');
           await sdk.actions.ready();
           readyCalled = true;
           if (mounted) {
             setAppReady(true);
-            console.log('[Farcaster] ✅ SDK ready() called (imported SDK) - splash screen hidden');
+            console.log('[Farcaster] ✅ SDK ready() called successfully (imported SDK) - splash screen hidden');
+          }
+          if (checkInterval) {
+            clearInterval(checkInterval);
+            checkInterval = null;
           }
           return true;
         }
         
         // Try window SDK (PC Debug Tool or alternative loading method)
-        if ((window as any).farcaster?.sdk?.actions?.ready) {
-          const windowSDK = (window as any).farcaster.sdk;
-          if (typeof windowSDK.actions.ready === 'function') {
-            await windowSDK.actions.ready();
-            readyCalled = true;
-            if (mounted) {
-              setAppReady(true);
-              console.log('[Farcaster] ✅ SDK ready() called (window SDK) - splash screen hidden');
-            }
-            return true;
+        const windowSDK = (window as any).farcaster?.sdk;
+        if (windowSDK && windowSDK.actions && typeof windowSDK.actions.ready === 'function') {
+          console.log('[Farcaster] 📞 Calling sdk.actions.ready() (window SDK)...');
+          await windowSDK.actions.ready();
+          readyCalled = true;
+          if (mounted) {
+            setAppReady(true);
+            console.log('[Farcaster] ✅ SDK ready() called successfully (window SDK) - splash screen hidden');
           }
+          if (checkInterval) {
+            clearInterval(checkInterval);
+            checkInterval = null;
+          }
+          return true;
         }
         
         return false;
       } catch (error) {
         console.error('[Farcaster] ❌ Error calling sdk.actions.ready():', error);
-        // Don't set appReady on error - let it continue checking
+        // Continue checking even on error
         return false;
       }
     };
     
-    // Check if we're in a Farcaster Mini App environment
-    // If not, we don't need to call ready() and can proceed normally
-    const isFarcasterMiniApp = () => {
-      try {
-        // Check user agent for Farcaster clients
-        const ua = navigator.userAgent.toLowerCase();
-        const isFarcasterUA = ua.includes('farcaster') || ua.includes('warpcast');
-        
-        // Check if SDK is available (indicates Mini App environment)
-        const hasSDK = !!(sdk && sdk.actions) || !!(window as any).farcaster?.sdk;
-        
-        return isFarcasterUA || hasSDK;
-      } catch {
-        return false;
-      }
-    };
-    
-    // If not in Farcaster Mini App environment, proceed without calling ready()
-    if (!isFarcasterMiniApp()) {
-      console.log('[Farcaster] ℹ️ Not in Farcaster Mini App environment - proceeding without ready() call');
-      if (mounted) {
-        setAppReady(true);
-      }
-      return;
-    }
-    
-    // In Farcaster Mini App environment - must call ready()
-    console.log('[Farcaster] 🔍 Detected Farcaster Mini App environment - calling ready()');
-    
-    // Try immediately
-    callReady().then((success) => {
-      if (success && mounted) {
-        return; // Success, cleanup will happen on unmount
+    // Aggressive approach: Always try to call ready() if SDK is available
+    // Don't check environment - just try to call if SDK exists
+    const attemptReady = async () => {
+      // Try immediately
+      const success = await callReady();
+      if (success) {
+        return;
       }
       
-      // If SDK not ready, wait for it with polling
+      // If not successful, start polling
       let attempts = 0;
-      const maxAttempts = 50; // 5 seconds max (50 * 100ms)
+      const maxAttempts = 100; // 10 seconds max (100 * 100ms)
       
-      const checkSDK = setInterval(async () => {
+      checkInterval = setInterval(async () => {
         attempts++;
         
         const success = await callReady();
         if (success) {
-          clearInterval(checkSDK);
+          if (checkInterval) {
+            clearInterval(checkInterval);
+            checkInterval = null;
+          }
           return;
         }
         
-        // Log debug info every 10 attempts (1 second)
-        if (attempts % 10 === 0) {
-          console.log(`[Farcaster] 🔍 Checking for SDK... (attempt ${attempts}/${maxAttempts})`, {
+        // Log debug info every 5 attempts (0.5 seconds)
+        if (attempts % 5 === 0) {
+          console.log(`[Farcaster] 🔍 Attempting to call ready()... (attempt ${attempts}/${maxAttempts})`, {
             hasImportedSDK: !!sdk,
             hasSDKActions: !!(sdk && sdk.actions),
             hasReadyFunction: !!(sdk && sdk.actions && typeof sdk.actions.ready === 'function'),
             hasWindowSDK: !!(window as any).farcaster?.sdk,
+            hasWindowSDKActions: !!(window as any).farcaster?.sdk?.actions,
+            hasWindowReadyFunction: !!(window as any).farcaster?.sdk?.actions?.ready,
+            userAgent: navigator.userAgent,
           });
         }
         
         if (attempts >= maxAttempts) {
-          clearInterval(checkSDK);
-          console.error('[Farcaster] ❌ SDK ready() not called after waiting - this will cause infinite loading screen!');
-          console.error('[Farcaster] ❌ Please check that @farcaster/miniapp-sdk is properly installed and imported');
+          if (checkInterval) {
+            clearInterval(checkInterval);
+            checkInterval = null;
+          }
+          console.error('[Farcaster] ❌ SDK ready() not called after waiting!');
+          console.error('[Farcaster] ❌ SDK state:', {
+            sdk: !!sdk,
+            sdkActions: !!(sdk && sdk.actions),
+            sdkReady: !!(sdk && sdk.actions && typeof sdk.actions.ready === 'function'),
+            windowFarcaster: !!(window as any).farcaster,
+            windowSDK: !!(window as any).farcaster?.sdk,
+            windowSDKActions: !!(window as any).farcaster?.sdk?.actions,
+            windowReady: !!(window as any).farcaster?.sdk?.actions?.ready,
+          });
           // Still set appReady to prevent app from being stuck
           if (mounted) {
             setAppReady(true);
           }
         }
       }, 100); // Check every 100ms
-      
-      return () => {
-        clearInterval(checkSDK);
-      };
-    });
+    };
+    
+    // Start attempting immediately
+    attemptReady();
     
     return () => {
       mounted = false;
+      if (checkInterval) {
+        clearInterval(checkInterval);
+        checkInterval = null;
+      }
     };
   }, []);
 
