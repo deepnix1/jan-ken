@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { getFarcasterProfileByAddress } from '@/lib/farcasterProfile';
 import Image from 'next/image';
 
@@ -22,6 +23,12 @@ export function MatchFoundAnimation({ player1Address, player2Address, currentUse
   const [currentUserProfile, setCurrentUserProfile] = useState<{ pfpUrl: string | null; username: string | null } | null>(null);
   const [imagesLoaded, setImagesLoaded] = useState({ opponent: false, user: false });
   const [countdown, setCountdown] = useState(5); // Countdown from 5 to 0
+  const [mounted, setMounted] = useState(false);
+
+  // Ensure component is mounted (client-side only)
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Determine opponent address
   const opponentAddress = currentUserAddress 
@@ -263,12 +270,13 @@ export function MatchFoundAnimation({ player1Address, player2Address, currentUse
     );
   }
 
-  if (!showAnimation) return null;
+  if (!showAnimation || !mounted) return null;
 
-  return (
+  // Render content using portal to body (bypasses any parent container constraints)
+  const content = (
     <>
       {/* Background overlay with glow - Full screen blocking */}
-      <div className="fixed inset-0 z-[99998] bg-black/90 backdrop-blur-md"></div>
+      <div className="fixed inset-0 z-[99998] bg-black/90 backdrop-blur-md" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}></div>
       
       {/* Stage 1: MATCH FOUND! Animation */}
       {showMatchFound && (
@@ -492,5 +500,12 @@ export function MatchFoundAnimation({ player1Address, player2Address, currentUse
       )}
     </>
   );
+
+  // Use portal to render directly to body, bypassing any parent container overflow/z-index issues
+  if (typeof window !== 'undefined') {
+    return createPortal(content, document.body);
+  }
+  
+  return null;
 }
 
