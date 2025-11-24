@@ -257,6 +257,83 @@ export function MatchFoundAnimation({ player1Address, player2Address, currentUse
     }
   }, [countdown, showOpponentReady, onClose]);
 
+  // DEBUG: Log state changes
+  useEffect(() => {
+    console.log('[MatchFound] 🔍 STATE DEBUG:', {
+      showAnimation,
+      showMatchFound,
+      showOpponentReady,
+      isLoadingProfiles,
+      countdown,
+      mounted,
+      hasOpponentProfile: !!opponentProfile,
+      hasUserProfile: !!currentUserProfile,
+      imagesLoaded,
+    });
+  }, [showAnimation, showMatchFound, showOpponentReady, isLoadingProfiles, countdown, mounted, opponentProfile, currentUserProfile, imagesLoaded]);
+
+  // DEBUG: Log DOM visibility
+  useEffect(() => {
+    if (showOpponentReady && mounted) {
+      const checkVisibility = () => {
+        const cardElement = document.querySelector('[data-opponent-ready-card]');
+        if (cardElement) {
+          const rect = cardElement.getBoundingClientRect();
+          const isVisible = rect.top >= 0 && rect.left >= 0 && 
+                           rect.bottom <= window.innerHeight && 
+                           rect.right <= window.innerWidth;
+          const isPartiallyVisible = rect.top < window.innerHeight && rect.bottom > 0 &&
+                                    rect.left < window.innerWidth && rect.right > 0;
+          
+          console.log('[MatchFound] 🔍 CARD VISIBILITY DEBUG:', {
+            exists: !!cardElement,
+            isVisible,
+            isPartiallyVisible,
+            rect: {
+              top: rect.top,
+              left: rect.left,
+              bottom: rect.bottom,
+              right: rect.right,
+              width: rect.width,
+              height: rect.height,
+            },
+            viewport: {
+              width: window.innerWidth,
+              height: window.innerHeight,
+            },
+            computedStyle: {
+              display: window.getComputedStyle(cardElement).display,
+              visibility: window.getComputedStyle(cardElement).visibility,
+              opacity: window.getComputedStyle(cardElement).opacity,
+              zIndex: window.getComputedStyle(cardElement).zIndex,
+              position: window.getComputedStyle(cardElement).position,
+              overflow: window.getComputedStyle(cardElement).overflow,
+            },
+            parent: {
+              tagName: cardElement.parentElement?.tagName,
+              className: cardElement.parentElement?.className,
+              overflow: cardElement.parentElement ? window.getComputedStyle(cardElement.parentElement).overflow : 'N/A',
+              zIndex: cardElement.parentElement ? window.getComputedStyle(cardElement.parentElement).zIndex : 'N/A',
+            },
+          });
+        } else {
+          console.warn('[MatchFound] ⚠️ Opponent Ready card element not found in DOM!');
+        }
+      };
+
+      // Check immediately
+      setTimeout(checkVisibility, 100);
+      
+      // Check after animation
+      setTimeout(checkVisibility, 1000);
+      
+      // Check periodically
+      const interval = setInterval(checkVisibility, 2000);
+      
+      return () => clearInterval(interval);
+    }
+  }, [showOpponentReady, mounted]);
+
   // Show loading state while profiles are being fetched
   if (isLoadingProfiles) {
     return (
@@ -402,6 +479,7 @@ export function MatchFoundAnimation({ player1Address, player2Address, currentUse
             overflowY: 'auto',
             overflowX: 'hidden',
           }}
+          data-opponent-ready-container
         >
           <div 
             className="relative w-full max-w-md mx-auto animate-slide-up-fade"
@@ -409,8 +487,12 @@ export function MatchFoundAnimation({ player1Address, player2Address, currentUse
               marginTop: 'auto',
               marginBottom: 'auto',
             }}
+            data-opponent-ready-wrapper
           >
-          <div className="relative bg-gradient-to-br from-red-600/95 via-blue-600/95 to-yellow-600/95 text-white px-6 sm:px-8 md:px-10 py-8 sm:py-10 md:py-12 rounded-2xl sm:rounded-3xl shadow-2xl border-4 border-white/60 backdrop-blur-xl">
+          <div 
+            className="relative bg-gradient-to-br from-red-600/95 via-blue-600/95 to-yellow-600/95 text-white px-6 sm:px-8 md:px-10 py-8 sm:py-10 md:py-12 rounded-2xl sm:rounded-3xl shadow-2xl border-4 border-white/60 backdrop-blur-xl"
+            data-opponent-ready-card
+          >
             {/* Decorative corner elements */}
             <div className="absolute top-2 left-2 w-6 h-6 border-t-4 border-l-4 border-white/90"></div>
             <div className="absolute top-2 right-2 w-6 h-6 border-t-4 border-r-4 border-white/90"></div>
