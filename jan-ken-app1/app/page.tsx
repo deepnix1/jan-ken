@@ -617,16 +617,7 @@ export default function Home() {
                   className="group relative px-10 py-5 text-2xl font-black text-yellow-400 bg-gradient-to-br from-red-600 via-red-700 to-black rounded-lg overflow-hidden transition-all duration-300 hover:scale-105 hover:shadow-[0_0_50px_rgba(220,20,60,0.9)] active:scale-95 border-2 border-red-500"
                 >
                   <div className="absolute inset-0 bg-gradient-to-br from-red-700 via-red-800 to-black opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                  <div className="relative flex items-center gap-4">
-                    {/* Custom RPS Icon */}
-                    <div className="relative w-10 h-10 flex items-center justify-center">
-                      <div className="absolute inset-0 bg-red-500/20 rounded-full blur-md"></div>
-                      <div className="relative flex items-center gap-0.5 text-xl">
-                        <span className="transform rotate-12">🪨</span>
-                        <span className="transform -rotate-12">📄</span>
-                        <span className="transform rotate-12">✂️</span>
-                      </div>
-                    </div>
+                  <div className="relative">
                     <span>LET&apos;S PLAY!</span>
                   </div>
                   {/* Corner accents */}

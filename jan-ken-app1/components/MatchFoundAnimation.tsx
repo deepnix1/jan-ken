@@ -17,6 +17,7 @@ export function MatchFoundAnimation({ player1Address, player2Address, currentUse
   const [isLoadingProfiles, setIsLoadingProfiles] = useState(true);
   const [opponentProfile, setOpponentProfile] = useState<{ pfpUrl: string | null; username: string | null } | null>(null);
   const [currentUserProfile, setCurrentUserProfile] = useState<{ pfpUrl: string | null; username: string | null } | null>(null);
+  const [imagesLoaded, setImagesLoaded] = useState({ opponent: false, user: false });
 
   // Determine opponent address
   const opponentAddress = currentUserAddress 
@@ -41,13 +42,14 @@ export function MatchFoundAnimation({ player1Address, player2Address, currentUse
       
       setIsLoadingProfiles(true);
       
-      // Timeout: Show animation after 5 seconds even if profiles aren't loaded
+      // Timeout: Show animation after 8 seconds even if images aren't loaded
       const timeoutId = setTimeout(() => {
-        console.warn('[MatchFound] ⏱️ Profile fetch timeout, showing animation with fallback data');
+        console.warn('[MatchFound] ⏱️ Image loading timeout (8s), showing animation with fallback data');
         setIsLoadingProfiles(false);
+        setImagesLoaded({ opponent: true, user: true }); // Force mark as loaded
         setShowAnimation(true);
         hasShownRef.current = true;
-      }, 5000);
+      }, 8000);
       
       try {
         // Fetch both profiles in parallel
@@ -64,14 +66,21 @@ export function MatchFoundAnimation({ player1Address, player2Address, currentUse
         setOpponentProfile(opponentData);
         setCurrentUserProfile(userData);
         
-        // Wait a bit for images to potentially start loading
-        await new Promise(resolve => setTimeout(resolve, 300));
+        // Check if we have profile data (username + pfpUrl)
+        const hasOpponentData = opponentData && (opponentData.username || opponentData.pfpUrl);
+        const hasUserData = userData && (userData.username || userData.pfpUrl);
         
-        // Now show animation - profiles are loaded (even if images are still loading)
-        console.log('[MatchFound] ✅ Profiles loaded, showing animation');
-        setIsLoadingProfiles(false);
-        setShowAnimation(true);
-        hasShownRef.current = true;
+        // If no images to load, show immediately
+        if (!opponentData?.pfpUrl && !userData?.pfpUrl) {
+          console.log('[MatchFound] ✅ Profiles loaded (no images), showing animation');
+          setIsLoadingProfiles(false);
+          setShowAnimation(true);
+          hasShownRef.current = true;
+        } else {
+          // Wait for images to load - they will trigger onLoad handlers
+          console.log('[MatchFound] ⏳ Waiting for images to load...');
+          setIsLoadingProfiles(true);
+        }
       } catch (error) {
         clearTimeout(timeoutId);
         console.error('[MatchFound] ❌ Error fetching profiles:', error);
@@ -85,7 +94,32 @@ export function MatchFoundAnimation({ player1Address, player2Address, currentUse
     fetchProfiles();
   }, [player1Address, player2Address, currentUserAddress, opponentAddress]);
 
+  // Check if all images are loaded
   useEffect(() => {
+    const opponentHasImage = opponentProfile?.pfpUrl;
+    const userHasImage = currentUserProfile?.pfpUrl;
+    
+    // If no images to load, mark as loaded
+    if (!opponentHasImage && !userHasImage) {
+      setImagesLoaded({ opponent: true, user: true });
+      return;
+    }
+    
+    // Check if both images that need to load are loaded
+    const opponentLoaded = !opponentHasImage || imagesLoaded.opponent;
+    const userLoaded = !userHasImage || imagesLoaded.user;
+    
+    if (opponentLoaded && userLoaded && !showAnimation) {
+      console.log('[MatchFound] ✅ All images loaded, showing animation');
+      setIsLoadingProfiles(false);
+      setShowAnimation(true);
+      hasShownRef.current = true;
+    }
+  }, [imagesLoaded, opponentProfile, currentUserProfile, showAnimation]);
+
+  useEffect(() => {
+    if (!showAnimation) return; // Only play sound when animation is shown
+    
     // Play sound effect
     const playSound = () => {
       try {
@@ -125,7 +159,7 @@ export function MatchFoundAnimation({ player1Address, player2Address, currentUse
         audioRef.current.pause();
       }
     };
-  }, []);
+  }, [showAnimation]);
 
   // Show loading state while profiles are being fetched
   if (isLoadingProfiles) {
@@ -192,9 +226,12 @@ export function MatchFoundAnimation({ player1Address, player2Address, currentUse
                       onError={(e) => {
                         console.error('[MatchFound] ❌ Failed to load current user image:', currentUserProfile.pfpUrl);
                         e.currentTarget.style.display = 'none';
+                        // Mark as loaded even on error (so animation can show)
+                        setImagesLoaded(prev => ({ ...prev, user: true }));
                       }}
                       onLoad={() => {
                         console.log('[MatchFound] ✅ Current user image loaded:', currentUserProfile.pfpUrl);
+                        setImagesLoaded(prev => ({ ...prev, user: true }));
                       }}
                     />
                   ) : (
@@ -224,9 +261,12 @@ export function MatchFoundAnimation({ player1Address, player2Address, currentUse
                       onError={(e) => {
                         console.error('[MatchFound] ❌ Failed to load opponent image:', opponentProfile.pfpUrl);
                         e.currentTarget.style.display = 'none';
+                        // Mark as loaded even on error (so animation can show)
+                        setImagesLoaded(prev => ({ ...prev, opponent: true }));
                       }}
                       onLoad={() => {
                         console.log('[MatchFound] ✅ Opponent image loaded:', opponentProfile.pfpUrl);
+                        setImagesLoaded(prev => ({ ...prev, opponent: true }));
                       }}
                     />
                   ) : (
