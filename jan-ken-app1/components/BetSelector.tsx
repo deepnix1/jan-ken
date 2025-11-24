@@ -123,14 +123,14 @@ export function BetSelector({ onSelect }: BetSelectorProps) {
                 <div className="absolute inset-0 bg-cyan-400/10 blur-xl"></div>
               )}
               
-              <div className="relative z-10">
+              <div className="relative z-10 flex flex-col items-center justify-center text-center">
                 <div className="text-6xl sm:text-7xl md:text-8xl lg:text-9xl mb-5 sm:mb-7 transform group-hover:scale-110 transition-transform drop-shadow-[0_0_20px_currentColor]">
                   {bet.emoji}
                 </div>
-                <div className="text-4xl sm:text-5xl md:text-6xl font-black mb-3 sm:mb-4 drop-shadow-[0_0_10px_currentColor]">
+                <div className="text-4xl sm:text-5xl md:text-6xl font-black mb-3 sm:mb-4 drop-shadow-[0_0_10px_currentColor] break-words">
                   {bet.label}
                 </div>
-                <div className="text-lg sm:text-xl md:text-2xl font-mono font-semibold opacity-90">
+                <div className="text-lg sm:text-xl md:text-2xl font-mono font-semibold opacity-90 break-words">
                   {bet.eth}
                 </div>
               </div>

@@ -450,87 +450,89 @@ export default function Home() {
 
       <div className="relative z-10 min-h-screen p-3 sm:p-4 md:p-6 lg:p-8">
         <div className="w-full max-w-6xl mx-auto">
-          {/* Header - Clean Style */}
-          <header className="flex flex-col items-center mb-6 relative">
-            {/* User Profile - Top Right (Japanese Styled) */}
-            {isConnected && (
-              <div className="absolute top-0 right-0 flex items-center gap-3 animate-fade-in-down">
-                <div className="hidden sm:flex flex-col items-end">
-                  {isLoadingProfile ? (
-                    <>
-                      <div className="h-4 w-24 bg-red-600/20 rounded animate-pulse"></div>
-                      <div className="h-3 w-20 bg-red-600/10 rounded animate-pulse mt-1"></div>
-                    </>
-                  ) : (
-                    <>
-                      <span className="text-red-400 font-bold text-sm tracking-wide">
-                        {userProfile?.username || 'PLAYER'}
-                      </span>
-                      <span className="text-yellow-400/80 font-mono text-xs">
-                        {address?.slice(0, 6)}...{address?.slice(-4)}
-                      </span>
-                    </>
-                  )}
-                </div>
-                <div className="relative group">
-                  <div className="absolute inset-0 bg-red-600 rounded-full blur-lg opacity-50 group-hover:opacity-75 transition-opacity animate-lantern-glow"></div>
-                  <div className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-full border-3 border-red-500 overflow-hidden shadow-[0_0_20px_rgba(220,20,60,0.8)] bg-gradient-to-br from-red-900 to-black">
+          {/* Header - Clean Style - Hidden during matchmaking */}
+          {gameState !== 'matching' && (
+            <header className="flex flex-col items-center mb-6 relative">
+              {/* User Profile - Top Right (Japanese Styled) */}
+              {isConnected && (
+                <div className="absolute top-0 right-0 flex items-center gap-3 animate-fade-in-down">
+                  <div className="hidden sm:flex flex-col items-end">
                     {isLoadingProfile ? (
-                      <div className="w-full h-full flex items-center justify-center animate-pulse">
-                        <div className="w-8 h-8 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></div>
-                      </div>
-                    ) : userProfile?.pfpUrl ? (
-                      <Image
-                        src={userProfile.pfpUrl}
-                        alt={userProfile.username || 'You'}
-                        fill
-                        className="object-cover animate-scale-in"
-                        unoptimized
-                        onError={(e) => {
-                          console.error('[Profile] ❌ Image load failed:', userProfile.pfpUrl);
-                          e.currentTarget.style.display = 'none';
-                        }}
-                        onLoad={() => {
-                          console.log('[Profile] ✅ Image loaded:', userProfile.pfpUrl);
-                        }}
-                      />
+                      <>
+                        <div className="h-4 w-24 bg-red-600/20 rounded animate-pulse"></div>
+                        <div className="h-3 w-20 bg-red-600/10 rounded animate-pulse mt-1"></div>
+                      </>
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-red-400 text-xl font-black">
-                        {address?.slice(2, 4).toUpperCase() || '?'}
-                      </div>
+                      <>
+                        <span className="text-red-400 font-bold text-sm tracking-wide">
+                          {userProfile?.username || 'PLAYER'}
+                        </span>
+                        <span className="text-yellow-400/80 font-mono text-xs">
+                          {address?.slice(0, 6)}...{address?.slice(-4)}
+                        </span>
+                      </>
                     )}
+                  </div>
+                  <div className="relative group">
+                    <div className="absolute inset-0 bg-red-600 rounded-full blur-lg opacity-50 group-hover:opacity-75 transition-opacity animate-lantern-glow"></div>
+                    <div className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-full border-3 border-red-500 overflow-hidden shadow-[0_0_20px_rgba(220,20,60,0.8)] bg-gradient-to-br from-red-900 to-black">
+                      {isLoadingProfile ? (
+                        <div className="w-full h-full flex items-center justify-center animate-pulse">
+                          <div className="w-8 h-8 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></div>
+                        </div>
+                      ) : userProfile?.pfpUrl ? (
+                        <Image
+                          src={userProfile.pfpUrl}
+                          alt={userProfile.username || 'You'}
+                          fill
+                          className="object-cover animate-scale-in"
+                          unoptimized
+                          onError={(e) => {
+                            console.error('[Profile] ❌ Image load failed:', userProfile.pfpUrl);
+                            e.currentTarget.style.display = 'none';
+                          }}
+                          onLoad={() => {
+                            console.log('[Profile] ✅ Image loaded:', userProfile.pfpUrl);
+                          }}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-red-400 text-xl font-black">
+                          {address?.slice(2, 4).toUpperCase() || '?'}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Logo - Clean and Compact */}
+              <div className="relative w-full max-w-[180px] sm:max-w-[200px] mb-6 flex justify-center">
+                {/* Subtle Glow */}
+                <div className="absolute inset-0 bg-gradient-to-r from-red-600/20 via-yellow-500/10 to-red-600/20 blur-2xl"></div>
+                
+                {/* Logo Container */}
+                <div className="relative z-10 flex flex-col items-center justify-center w-full">
+                  <Image
+                    src="/new_logo.png"
+                    alt="Jan-Ken"
+                    width={200}
+                    height={67}
+                    className="object-contain w-full h-auto"
+                    style={{ filter: 'drop-shadow(0 0 20px rgba(220,20,60,0.6))' }}
+                    priority
+                    unoptimized
+                  />
+                  
+                  {/* Subtitle - Compact */}
+                  <div className="mt-1 text-center">
+                    <p className="text-red-400 text-xs sm:text-sm font-bold tracking-wider">
+                      ROCK • PAPER • SCISSORS
+                    </p>
                   </div>
                 </div>
               </div>
-            )}
-            
-            {/* Logo - Clean and Compact */}
-            <div className="relative w-full max-w-[180px] sm:max-w-[200px] mb-6 flex justify-center">
-              {/* Subtle Glow */}
-              <div className="absolute inset-0 bg-gradient-to-r from-red-600/20 via-yellow-500/10 to-red-600/20 blur-2xl"></div>
-              
-              {/* Logo Container */}
-              <div className="relative z-10 flex flex-col items-center justify-center w-full">
-                <Image
-                  src="/new_logo.png"
-                  alt="Jan-Ken"
-                  width={200}
-                  height={67}
-                  className="object-contain w-full h-auto"
-                  style={{ filter: 'drop-shadow(0 0 20px rgba(220,20,60,0.6))' }}
-                  priority
-                  unoptimized
-                />
-                
-                {/* Subtitle - Compact */}
-                <div className="mt-1 text-center">
-                  <p className="text-red-400 text-xs sm:text-sm font-bold tracking-wider">
-                    ROCK • PAPER • SCISSORS
-                  </p>
-                </div>
-              </div>
-            </div>
-          </header>
+            </header>
+          )}
           
           {/* Main Content - Clean Style */}
           <div className="relative bg-black/80 backdrop-blur-xl rounded-xl border border-red-600/30 shadow-[0_0_40px_rgba(220,20,60,0.2)] p-4 sm:p-6 md:p-8 min-h-[50vh] flex items-center justify-center overflow-hidden">
@@ -705,7 +707,7 @@ export default function Home() {
                     )}
                     
                     {gameState === 'matching' && selectedBet && (
-                      <div className="w-full animate-scale-in">
+                      <div className="w-full animate-scale-in -mt-8 sm:-mt-12 md:-mt-16">
                         <Matchmaking 
                           betAmount={selectedBet} 
                           onMatchFound={handleMatchFound}
