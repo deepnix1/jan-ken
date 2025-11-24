@@ -119,9 +119,9 @@ export function MatchFoundAnimation({ player1Address, player2Address, currentUse
     }
   }, [imagesLoaded, opponentProfile, currentUserProfile, showAnimation]);
 
-  // Countdown timer effect
+  // Countdown timer effect - Fixed to prevent stuttering
   useEffect(() => {
-    if (!showAnimation || countdown <= 0) return;
+    if (!showAnimation) return;
     
     // Play sound effect when animation starts
     const playSound = () => {
@@ -149,27 +149,47 @@ export function MatchFoundAnimation({ player1Address, player2Address, currentUse
 
     playSound();
     
-    // Start countdown from 5
+    // Reset countdown to 5 when animation starts
     setCountdown(5);
     
-    // Countdown timer: decrement every second
-    const countdownInterval = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          clearInterval(countdownInterval);
-          return 0;
+    // Countdown timer: decrement every second using a stable interval
+    let intervalId: NodeJS.Timeout | null = null;
+    
+    // Use a ref to track if we should continue counting
+    let shouldContinue = true;
+    
+    const startCountdown = () => {
+      intervalId = setInterval(() => {
+        if (!shouldContinue) {
+          if (intervalId) clearInterval(intervalId);
+          return;
         }
-        return prev - 1;
-      });
-    }, 1000);
+        
+        setCountdown((prev) => {
+          if (prev <= 1) {
+            shouldContinue = false;
+            if (intervalId) clearInterval(intervalId);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    };
+    
+    // Start countdown after a small delay to ensure state is ready
+    const timeoutId = setTimeout(() => {
+      startCountdown();
+    }, 100);
 
     return () => {
-      clearInterval(countdownInterval);
+      shouldContinue = false;
+      if (timeoutId) clearTimeout(timeoutId);
+      if (intervalId) clearInterval(intervalId);
       if (audioRef.current) {
         audioRef.current.pause();
       }
     };
-  }, [showAnimation]);
+  }, [showAnimation]); // Only depend on showAnimation
 
   // When countdown reaches 0, close animation
   useEffect(() => {
@@ -198,13 +218,13 @@ export function MatchFoundAnimation({ player1Address, player2Address, currentUse
   if (!showAnimation) return null;
 
   return (
-    <div className="fixed top-0 left-0 right-0 bottom-0 z-[99999] flex items-center justify-center p-4" style={{ margin: 0, padding: '1rem' }}>
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 overflow-auto">
       {/* Background overlay with glow - Full screen blocking */}
       <div className="absolute inset-0 bg-black/90 backdrop-blur-md"></div>
       
-      {/* Main animation container - FORCE CENTER */}
-      <div className="relative w-full max-w-lg mx-auto" style={{ transform: 'none' }}>
-        <div className="relative bg-gradient-to-br from-red-500/90 via-blue-500/90 to-yellow-500/90 text-white px-6 sm:px-8 py-6 sm:py-8 rounded-2xl sm:rounded-3xl shadow-2xl border-4 border-white/50 backdrop-blur-xl animate-pulse-slow">
+      {/* Main animation container - FORCE CENTER with proper scrolling */}
+      <div className="relative w-full max-w-lg mx-auto my-auto" style={{ minHeight: 'fit-content' }}>
+        <div className="relative bg-gradient-to-br from-red-500/90 via-blue-500/90 to-yellow-500/90 text-white px-4 sm:px-6 md:px-8 py-6 sm:py-8 md:py-10 rounded-2xl sm:rounded-3xl shadow-2xl border-4 border-white/50 backdrop-blur-xl animate-pulse-slow">
           {/* Decorative corner elements */}
           <div className="absolute top-2 left-2 w-6 h-6 border-t-4 border-l-4 border-white/80"></div>
           <div className="absolute top-2 right-2 w-6 h-6 border-t-4 border-r-4 border-white/80"></div>
