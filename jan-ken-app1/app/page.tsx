@@ -420,12 +420,12 @@ export default function Home() {
           backgroundSize: '100% 100px'
         }}></div>
         
-        {/* Cherry Blossoms */}
+        {/* Subtle Cherry Blossoms - Reduced */}
         <div className="absolute inset-0">
-          {Array.from({ length: 15 }).map((_, i) => (
+          {Array.from({ length: 8 }).map((_, i) => (
             <div
               key={`cherry-${i}`}
-              className="absolute text-pink-300 text-2xl animate-cherry-fall"
+              className="absolute text-pink-300/40 text-lg animate-cherry-fall"
               style={{
                 left: `${Math.random() * 100}%`,
                 animationDelay: `${Math.random() * 8}s`,
@@ -452,8 +452,8 @@ export default function Home() {
 
       <div className="relative z-10 min-h-screen p-3 sm:p-4 md:p-6 lg:p-8">
         <div className="w-full max-w-6xl mx-auto">
-          {/* Header - Japanese Style */}
-          <header className="flex flex-col items-center mb-8 sm:mb-12 relative">
+          {/* Header - Clean Style */}
+          <header className="flex flex-col items-center mb-6 relative">
             {/* User Profile - Top Right (Japanese Styled) */}
             {isConnected && (
               <div className="absolute top-0 right-0 flex items-center gap-3 animate-fade-in-down">
@@ -498,7 +498,7 @@ export default function Home() {
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-red-400 text-xl font-black">
-                        {address?.slice(2, 4).toUpperCase() || '侍'}
+                        {address?.slice(2, 4).toUpperCase() || '?'}
                       </div>
                     )}
                   </div>
@@ -506,44 +506,41 @@ export default function Home() {
               </div>
             )}
             
-            {/* Logo with Japanese Theme */}
-            <div className="relative w-full max-w-[200px] sm:max-w-[250px] md:max-w-[300px] mb-4 sm:mb-6 md:mb-8 flex justify-center">
-              {/* Red Lantern Glow */}
-              <div className="absolute inset-0 bg-gradient-to-r from-red-600/30 via-yellow-500/20 to-red-600/30 blur-3xl animate-lantern-glow"></div>
+            {/* Logo - Clean and Compact */}
+            <div className="relative w-full max-w-[180px] sm:max-w-[200px] mb-6 flex justify-center">
+              {/* Subtle Glow */}
+              <div className="absolute inset-0 bg-gradient-to-r from-red-600/20 via-yellow-500/10 to-red-600/20 blur-2xl"></div>
               
               {/* Logo Container */}
               <div className="relative z-10 flex flex-col items-center justify-center w-full">
                 <Image
                   src="/new_logo.png"
-                  alt="JaN KeN!"
-                  width={300}
-                  height={100}
-                  className="object-contain w-full h-auto animate-kanji-reveal"
-                  style={{ filter: 'drop-shadow(0 0 30px rgba(220,20,60,0.8))' }}
+                  alt="Jan-Ken"
+                  width={200}
+                  height={67}
+                  className="object-contain w-full h-auto"
+                  style={{ filter: 'drop-shadow(0 0 20px rgba(220,20,60,0.6))' }}
                   priority
                   unoptimized
                 />
                 
-                {/* Subtitle */}
-                <div className="mt-2 text-center">
-                  <p className="text-red-400 text-sm sm:text-base font-bold tracking-[0.3em] animate-neon-flicker">
+                {/* Subtitle - Compact */}
+                <div className="mt-1 text-center">
+                  <p className="text-red-400 text-xs sm:text-sm font-bold tracking-wider">
                     ROCK • PAPER • SCISSORS
-                  </p>
-                  <p className="text-yellow-400/60 text-xs font-mono">
-                    On Base Network
                   </p>
                 </div>
               </div>
             </div>
           </header>
           
-          {/* Main Content - Japanese Gaming Style */}
-          <div className="relative bg-black/80 backdrop-blur-xl rounded-2xl sm:rounded-3xl border-2 border-red-600/40 shadow-[0_0_60px_rgba(220,20,60,0.3)] p-4 sm:p-6 md:p-8 lg:p-12 min-h-[50vh] sm:min-h-[60vh] flex items-center justify-center overflow-hidden">
-            {/* Japanese Corner Accents */}
-            <div className="absolute top-0 left-0 w-16 h-16 border-t-4 border-l-4 border-red-500/50"></div>
-            <div className="absolute top-0 right-0 w-16 h-16 border-t-4 border-r-4 border-red-500/50"></div>
-            <div className="absolute bottom-0 left-0 w-16 h-16 border-b-4 border-l-4 border-red-500/50"></div>
-            <div className="absolute bottom-0 right-0 w-16 h-16 border-b-4 border-r-4 border-red-500/50"></div>
+          {/* Main Content - Clean Style */}
+          <div className="relative bg-black/80 backdrop-blur-xl rounded-xl border border-red-600/30 shadow-[0_0_40px_rgba(220,20,60,0.2)] p-4 sm:p-6 md:p-8 min-h-[50vh] flex items-center justify-center overflow-hidden">
+            {/* Subtle Corner Accents - Smaller */}
+            <div className="absolute top-0 left-0 w-8 h-8 border-t-2 border-l-2 border-red-500/30"></div>
+            <div className="absolute top-0 right-0 w-8 h-8 border-t-2 border-r-2 border-red-500/30"></div>
+            <div className="absolute bottom-0 left-0 w-8 h-8 border-b-2 border-l-2 border-red-500/30"></div>
+            <div className="absolute bottom-0 right-0 w-8 h-8 border-b-2 border-r-2 border-red-500/30"></div>
             
             {/* Content */}
             <div className="relative z-10 w-full">
@@ -594,62 +591,56 @@ export default function Home() {
                  )}
               </div>
             ) : !showGame ? (
-              /* Let's Play Landing Screen */
-              <div className="flex flex-col items-center gap-8 py-16 animate-fade-in-up">
-                <div className="text-center space-y-6">
-                  {/* Main Title */}
-                  <div className="relative">
-                    <h2 className="text-6xl sm:text-7xl md:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-yellow-400 to-red-500 animate-neon-flicker" style={{
-                      textShadow: '0 0 20px rgba(220,20,60,0.8), 0 0 40px rgba(220,20,60,0.5)'
-                    }}>
-                      JAN-KEN
-                    </h2>
-                    <p className="text-2xl sm:text-3xl text-yellow-400 font-bold tracking-[0.2em] mt-2">
-                      ROCK • PAPER • SCISSORS
-                    </p>
-                  </div>
-                  
-                  <p className="text-lg text-gray-300 max-w-md font-mono">
-                    Play on Base Network • Win ETH rewards
+              /* Let's Play Landing Screen - Clean Layout */
+              <div className="flex flex-col items-center gap-6 py-8 animate-fade-in-up">
+                {/* Main Title - Compact */}
+                <div className="text-center space-y-3">
+                  <h2 className="text-4xl sm:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-yellow-400 to-red-500" style={{
+                    textShadow: '0 0 15px rgba(220,20,60,0.6)'
+                  }}>
+                    JAN-KEN
+                  </h2>
+                  <p className="text-gray-300 text-sm max-w-md">
+                    Play Rock Paper Scissors on Base Network • Win ETH
                   </p>
                 </div>
                 
-                {/* How to Play Section */}
-                <div className="w-full max-w-2xl bg-black/60 backdrop-blur-sm border-2 border-red-500/30 rounded-xl p-6 sm:p-8 mt-4 animate-fade-in-up animation-delay-200">
-                  <h3 className="text-2xl font-black text-red-400 mb-4 text-center">HOW TO PLAY</h3>
-                  <div className="space-y-4 text-left">
-                    <div className="flex items-start gap-3">
-                      <span className="text-2xl">1️⃣</span>
+                {/* How to Play Section - Compact Grid */}
+                <div className="w-full max-w-xl bg-black/60 backdrop-blur-sm border border-red-500/30 rounded-lg p-4 sm:p-6">
+                  <h3 className="text-lg font-black text-red-400 mb-3 text-center">HOW TO PLAY</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
+                    <div className="flex items-start gap-2">
+                      <span className="text-lg">1️⃣</span>
                       <div>
-                        <p className="text-white font-bold mb-1">Select Your Bet</p>
-                        <p className="text-gray-400 text-sm">Choose a bet level (0.0015 ETH to 0.3 ETH). Winner takes all!</p>
+                        <p className="text-white font-bold text-sm mb-0.5">Select Bet</p>
+                        <p className="text-gray-400 text-xs">Choose bet level (0.0015-0.3 ETH)</p>
                       </div>
                     </div>
-                    <div className="flex items-start gap-3">
-                      <span className="text-2xl">2️⃣</span>
+                    <div className="flex items-start gap-2">
+                      <span className="text-lg">2️⃣</span>
                       <div>
-                        <p className="text-white font-bold mb-1">Find an Opponent</p>
-                        <p className="text-gray-400 text-sm">Wait for another player with the same bet level. Match happens automatically!</p>
+                        <p className="text-white font-bold text-sm mb-0.5">Find Opponent</p>
+                        <p className="text-gray-400 text-xs">Auto-match with same bet level</p>
                       </div>
                     </div>
-                    <div className="flex items-start gap-3">
-                      <span className="text-2xl">3️⃣</span>
+                    <div className="flex items-start gap-2">
+                      <span className="text-lg">3️⃣</span>
                       <div>
-                        <p className="text-white font-bold mb-1">Make Your Choice</p>
-                        <p className="text-gray-400 text-sm">Select Rock 🪨, Paper 📄, or Scissors ✂️. You have 20 seconds!</p>
+                        <p className="text-white font-bold text-sm mb-0.5">Make Choice</p>
+                        <p className="text-gray-400 text-xs">Rock 🪨 Paper 📄 Scissors ✂️ (20s)</p>
                       </div>
                     </div>
-                    <div className="flex items-start gap-3">
-                      <span className="text-2xl">4️⃣</span>
+                    <div className="flex items-start gap-2">
+                      <span className="text-lg">4️⃣</span>
                       <div>
-                        <p className="text-white font-bold mb-1">Win or Lose</p>
-                        <p className="text-gray-400 text-sm">Rock beats Scissors, Scissors beats Paper, Paper beats Rock. Winner gets the pot!</p>
+                        <p className="text-white font-bold text-sm mb-0.5">Win or Lose</p>
+                        <p className="text-gray-400 text-xs">Winner takes the pot!</p>
                       </div>
                     </div>
                   </div>
                 </div>
                 
-                {/* Let's Play Button */}
+                {/* Let's Play Button - Smaller */}
                 <button
                   onClick={() => {
                     setIsTransitioning(true);
@@ -658,33 +649,25 @@ export default function Home() {
                       setIsTransitioning(false);
                     }, 400);
                   }}
-                  className="group relative px-12 py-6 text-3xl font-black text-yellow-400 bg-gradient-to-br from-red-600 via-red-700 to-black rounded-xl overflow-hidden transition-all duration-300 hover:scale-110 hover:shadow-[0_0_60px_rgba(220,20,60,1)] active:scale-95 animate-scale-in border-4 border-red-500"
+                  className="group relative px-8 py-4 text-xl font-black text-yellow-400 bg-gradient-to-br from-red-600 via-red-700 to-black rounded-lg overflow-hidden transition-all duration-300 hover:scale-105 hover:shadow-[0_0_40px_rgba(220,20,60,0.8)] active:scale-95 border-2 border-red-500"
                 >
                   <div className="absolute inset-0 bg-gradient-to-br from-red-700 via-red-800 to-black opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                  <div className="relative flex items-center gap-4">
-                    <span className="text-5xl">🎮</span>
-                    <div className="flex flex-col items-center">
-                      <span className="animate-neon-flicker">LET&apos;S PLAY!</span>
-                    </div>
+                  <div className="relative flex items-center gap-3">
+                    <span className="text-3xl">🎮</span>
+                    <span>LET&apos;S PLAY!</span>
                   </div>
-                  
-                  {/* Animated corners */}
-                  <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-yellow-400"></div>
-                  <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-yellow-400"></div>
-                  <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-yellow-400"></div>
-                  <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-yellow-400"></div>
                 </button>
                 
-                {/* Stats */}
-                <div className="flex flex-wrap justify-center gap-4 mt-8 animate-fade-in-up animation-delay-400">
-                  <div className="bg-red-900/30 backdrop-blur-sm px-6 py-3 rounded-lg border-2 border-red-500/50 hover:border-red-500 transition-all duration-300 hover:scale-105 cursor-pointer">
-                    <p className="text-red-400 text-sm font-bold tracking-wide">⚡ INSTANT MATCHES</p>
+                {/* Stats - Compact */}
+                <div className="flex flex-wrap justify-center gap-3 mt-4">
+                  <div className="bg-red-900/20 backdrop-blur-sm px-4 py-2 rounded border border-red-500/30">
+                    <p className="text-red-400 text-xs font-bold">⚡ INSTANT</p>
                   </div>
-                  <div className="bg-yellow-900/30 backdrop-blur-sm px-6 py-3 rounded-lg border-2 border-yellow-500/50 hover:border-yellow-500 transition-all duration-300 hover:scale-105 cursor-pointer">
-                    <p className="text-yellow-400 text-sm font-bold tracking-wide">💰 WIN ETH</p>
+                  <div className="bg-yellow-900/20 backdrop-blur-sm px-4 py-2 rounded border border-yellow-500/30">
+                    <p className="text-yellow-400 text-xs font-bold">💰 WIN ETH</p>
                   </div>
-                  <div className="bg-gray-900/30 backdrop-blur-sm px-6 py-3 rounded-lg border-2 border-gray-500/50 hover:border-gray-400 transition-all duration-300 hover:scale-105 cursor-pointer">
-                    <p className="text-gray-300 text-sm font-bold tracking-wide">🔒 SECURE</p>
+                  <div className="bg-gray-900/20 backdrop-blur-sm px-4 py-2 rounded border border-gray-500/30">
+                    <p className="text-gray-300 text-xs font-bold">🔒 SECURE</p>
                   </div>
                 </div>
               </div>
