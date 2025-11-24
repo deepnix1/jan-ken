@@ -381,8 +381,27 @@ export function MatchFoundAnimation({ player1Address, player2Address, currentUse
       
       {/* Stage 2: Opponent Ready Card with Countdown */}
       {showOpponentReady && (
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 overflow-y-auto">
-          <div className="relative w-full max-w-md mx-auto my-auto animate-slide-up-fade">
+        <div 
+          className="fixed z-[99999] flex items-center justify-center animate-slide-up-fade"
+          style={{
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            width: '100vw',
+            height: '100vh',
+            padding: '1rem',
+            overflowY: 'auto',
+            overflowX: 'hidden',
+          }}
+        >
+          <div 
+            className="relative w-full max-w-md mx-auto animate-slide-up-fade"
+            style={{
+              marginTop: 'auto',
+              marginBottom: 'auto',
+            }}
+          >
           <div className="relative bg-gradient-to-br from-red-600/95 via-blue-600/95 to-yellow-600/95 text-white px-6 sm:px-8 md:px-10 py-8 sm:py-10 md:py-12 rounded-2xl sm:rounded-3xl shadow-2xl border-4 border-white/60 backdrop-blur-xl">
             {/* Decorative corner elements */}
             <div className="absolute top-2 left-2 w-6 h-6 border-t-4 border-l-4 border-white/90"></div>
