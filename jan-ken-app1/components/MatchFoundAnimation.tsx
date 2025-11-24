@@ -334,17 +334,9 @@ export function MatchFoundAnimation({ player1Address, player2Address, currentUse
     }
   }, [showOpponentReady, mounted]);
 
-  // Show loading state while profiles are being fetched
+  // Show loading state while profiles are being fetched - Hidden visually, works in background
   if (isLoadingProfiles) {
-    return (
-      <div className="fixed top-0 left-0 right-0 bottom-0 z-[9999] flex items-center justify-center pointer-events-none p-4">
-        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
-        <div className="relative z-10 flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-red-500 border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-white/80 font-mono text-sm">Loading opponent profile...</p>
-        </div>
-      </div>
-    );
+    return null; // Don't show loading UI, just work in background
   }
 
   if (!showAnimation || !mounted) return null;
