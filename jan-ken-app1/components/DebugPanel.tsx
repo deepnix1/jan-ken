@@ -83,11 +83,26 @@ export function DebugPanel() {
       
       // Check for Farcaster profile issues
       if (errorStr.includes('[Farcaster]') && errorStr.includes('❌')) {
+        // Extract more details from error
+        let details = 'Failed to load profile pictures.';
+        
+        if (errorStr.includes('Proxy API error')) {
+          const match = errorStr.match(/Proxy API error: (\d+)/);
+          if (match) {
+            const statusCode = match[1];
+            details = `Server API error (${statusCode}). Check /api/farcaster logs.`;
+          }
+        } else if (errorStr.includes('fetch error')) {
+          details = 'Network error. Check internet connection or CORS.';
+        } else if (errorStr.includes('No profile found')) {
+          details = 'No Farcaster profile linked to this wallet address.';
+        }
+        
         addIssue({
           id: 'farcaster',
           title: 'Farcaster Profile Failed',
           status: 'error',
-          message: 'Failed to load profile pictures. Check console for "[Farcaster]" logs.',
+          message: details,
         });
       }
       
@@ -128,6 +143,33 @@ export function DebugPanel() {
       // Check for Farcaster success
       if (logStr.includes('[Farcaster]') && logStr.includes('✅')) {
         removeIssue('farcaster');
+        
+        // Show success message
+        if (logStr.includes('Proxy API response')) {
+          addIssue({
+            id: 'farcaster-ok',
+            title: 'Farcaster Profile Loaded',
+            status: 'ok',
+            message: 'Profile pictures loaded successfully via server proxy.',
+          });
+          
+          // Auto-remove after 5 seconds
+          setTimeout(() => removeIssue('farcaster-ok'), 5000);
+        }
+      }
+      
+      // Check for API route logs
+      if (logStr.includes('[API]')) {
+        if (logStr.includes('❌')) {
+          addIssue({
+            id: 'api-error',
+            title: 'API Route Error',
+            status: 'error',
+            message: 'Server-side API error. Check Vercel logs for details.',
+          });
+        } else if (logStr.includes('✅')) {
+          removeIssue('api-error');
+        }
       }
       
       // Check for match found
