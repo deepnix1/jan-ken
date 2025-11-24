@@ -166,6 +166,43 @@ export function DebugPanel() {
     setIssues([]);
   };
 
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      alert('✅ Copied to clipboard!');
+    } catch (err) {
+      // Fallback for older browsers
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+      alert('✅ Copied to clipboard!');
+    }
+  };
+
+  const copyAllIssues = () => {
+    const text = issues.map(issue => 
+      `[${issue.status.toUpperCase()}] ${issue.title}\n${issue.message}\nTime: ${new Date(issue.timestamp).toLocaleString()}\n`
+    ).join('\n---\n\n');
+    
+    const summary = `
+JAN-KEN DEBUG REPORT
+Generated: ${new Date().toLocaleString()}
+Wallet: ${address ? `${address.slice(0, 6)}...${address.slice(-4)}` : 'Not connected'}
+Total Issues: ${issues.length}
+Errors: ${issues.filter(i => i.status === 'error').length}
+Warnings: ${issues.filter(i => i.status === 'warning').length}
+
+${text}
+    `.trim();
+    
+    copyToClipboard(summary);
+  };
+
   const getStatusColor = (status: DebugIssue['status']) => {
     switch (status) {
       case 'ok': return 'text-green-400 border-green-500 bg-green-500/10';
@@ -217,6 +254,15 @@ export function DebugPanel() {
               )}
             </div>
             <div className="flex gap-2">
+              {issues.length > 0 && (
+                <button
+                  onClick={copyAllIssues}
+                  className="text-white/80 hover:text-white text-xs px-2 py-1 bg-purple-700 rounded flex items-center gap-1"
+                  title="Copy all issues"
+                >
+                  📋 Copy
+                </button>
+              )}
               <button
                 onClick={clearIssues}
                 className="text-white/80 hover:text-white text-xs px-2 py-1 bg-purple-700 rounded"
@@ -250,7 +296,16 @@ export function DebugPanel() {
                   <div className="flex items-start gap-2">
                     <span className="text-lg flex-shrink-0">{getStatusEmoji(issue.status)}</span>
                     <div className="flex-1 min-w-0">
-                      <h4 className="font-bold text-sm">{issue.title}</h4>
+                      <div className="flex items-start justify-between gap-2">
+                        <h4 className="font-bold text-sm flex-1">{issue.title}</h4>
+                        <button
+                          onClick={() => copyToClipboard(`[${issue.status.toUpperCase()}] ${issue.title}\n${issue.message}\nTime: ${new Date(issue.timestamp).toLocaleString()}`)}
+                          className="text-xs opacity-60 hover:opacity-100 flex-shrink-0"
+                          title="Copy this issue"
+                        >
+                          📋
+                        </button>
+                      </div>
                       <p className="text-xs mt-1 opacity-90 break-words">{issue.message}</p>
                       <p className="text-xs mt-1 opacity-60">
                         {new Date(issue.timestamp).toLocaleTimeString()}

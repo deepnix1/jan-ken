@@ -19,36 +19,80 @@ export interface FarcasterProfile {
  */
 export async function getFarcasterProfileByFID(fid: number): Promise<FarcasterProfile> {
   try {
-    console.log(`[Farcaster] Fetching profile for FID: ${fid}`);
+    console.log(`[Farcaster] 🔍 Fetching profile for FID: ${fid}`);
     
-    // Try Neynar API first (more reliable, public endpoint)
+    // Try Airstack API first (free, no API key needed for basic queries)
     try {
-      const neynarResponse = await fetch(`https://api.neynar.com/v1/farcaster/user?fid=${fid}`, {
+      const airstackQuery = `
+        query {
+          Socials(input: {filter: {dappName: {_eq: farcaster}, userId: {_eq: "${fid}"}}, blockchain: ethereum}) {
+            Social {
+              profileName
+              profileImage
+              profileDisplayName
+              userId
+            }
+          }
+        }
+      `;
+      
+      const airstackResponse = await fetch('https://api.airstack.xyz/gql', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query: airstackQuery }),
+      });
+      
+      if (airstackResponse.ok) {
+        const airstackData = await airstackResponse.json();
+        console.log(`[Farcaster] 🌐 Airstack API response for FID ${fid}:`, airstackData);
+        
+        if (airstackData?.data?.Socials?.Social?.[0]) {
+          const user = airstackData.data.Socials.Social[0];
+          const profile = {
+            pfpUrl: user.profileImage || null,
+            username: user.profileName || null,
+            displayName: user.profileDisplayName || user.profileName || null,
+            fid: fid,
+          };
+          console.log(`[Farcaster] ✅ Airstack profile for FID ${fid}:`, profile);
+          if (profile.pfpUrl) return profile;
+        }
+      }
+    } catch (airstackError) {
+      console.warn(`[Farcaster] ⚠️ Airstack API failed, trying direct Hub:`, airstackError);
+    }
+    
+    // Try Neynar v2 API (public endpoint)
+    try {
+      const neynarResponse = await fetch(`https://api.neynar.com/v2/farcaster/user/bulk?fids=${fid}`, {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
+          'api_key': 'NEYNAR_API_DOCS', // Public demo key
         },
         cache: 'no-cache',
       });
       
       if (neynarResponse.ok) {
         const neynarData = await neynarResponse.json();
-        console.log(`[Farcaster] Neynar API response for FID ${fid}:`, neynarData);
+        console.log(`[Farcaster] 🌐 Neynar v2 API response for FID ${fid}:`, neynarData);
         
-        if (neynarData?.result?.user) {
-          const user = neynarData.result.user;
+        if (neynarData?.users?.[0]) {
+          const user = neynarData.users[0];
           const profile = {
-            pfpUrl: user.pfp?.url || user.pfp_url || user.pfpUrl || null,
+            pfpUrl: user.pfp_url || user.pfp?.url || null,
             username: user.username || null,
             displayName: user.display_name || user.displayName || null,
             fid: fid,
           };
-          console.log(`[Farcaster] ✅ Neynar profile for FID ${fid}:`, profile);
-          return profile;
+          console.log(`[Farcaster] ✅ Neynar v2 profile for FID ${fid}:`, profile);
+          if (profile.pfpUrl) return profile;
         }
       }
     } catch (neynarError) {
-      console.warn(`[Farcaster] Neynar API failed, trying Warpcast:`, neynarError);
+      console.warn(`[Farcaster] ⚠️ Neynar v2 failed, trying Warpcast:`, neynarError);
     }
     
     // Fallback to Warpcast API
@@ -100,22 +144,72 @@ export async function getFarcasterProfileByAddress(address: string): Promise<Far
     
     console.log(`[Farcaster] 🔍 Fetching profile for address: ${normalizedAddress}`);
     
-    // Try Neynar API first (more reliable for address lookup)
+    // Try Airstack API first (supports address to FID lookup)
     try {
-      const neynarResponse = await fetch(`https://api.neynar.com/v1/farcaster/user-by-verification?address=${normalizedAddress}`, {
+      const airstackQuery = `
+        query {
+          Socials(input: {filter: {dappName: {_eq: farcaster}, userAssociatedAddresses: {_eq: "${normalizedAddress}"}}, blockchain: ethereum}) {
+            Social {
+              profileName
+              profileImage
+              profileDisplayName
+              userId
+            }
+          }
+        }
+      `;
+      
+      const airstackResponse = await fetch('https://api.airstack.xyz/gql', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query: airstackQuery }),
+      });
+      
+      if (airstackResponse.ok) {
+        const airstackData = await airstackResponse.json();
+        console.log(`[Farcaster] 🌐 Airstack verifications response:`, airstackData);
+        
+        if (airstackData?.data?.Socials?.Social?.[0]) {
+          const user = airstackData.data.Socials.Social[0];
+          const fid = parseInt(user.userId);
+          console.log(`[Farcaster] ✅ Found FID ${fid} via Airstack for address ${normalizedAddress}`);
+          
+          const profile = {
+            pfpUrl: user.profileImage || null,
+            username: user.profileName || null,
+            displayName: user.profileDisplayName || user.profileName || null,
+            fid: fid,
+          };
+          
+          if (profile.pfpUrl) {
+            console.log(`[Farcaster] ✅ Airstack profile with image:`, profile);
+            return profile;
+          }
+        }
+      }
+    } catch (airstackError) {
+      console.warn(`[Farcaster] ⚠️ Airstack lookup failed, trying Neynar:`, airstackError);
+    }
+    
+    // Try Neynar v2 API for address lookup
+    try {
+      const neynarResponse = await fetch(`https://api.neynar.com/v2/farcaster/user/bulk-by-address?addresses=${normalizedAddress}`, {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
+          'api_key': 'NEYNAR_API_DOCS',
         },
         cache: 'no-cache',
       });
       
       if (neynarResponse.ok) {
         const neynarData = await neynarResponse.json();
-        console.log(`[Farcaster] Neynar verifications response:`, neynarData);
+        console.log(`[Farcaster] 🌐 Neynar v2 verifications response:`, neynarData);
         
-        if (neynarData?.result?.user) {
-          const user = neynarData.result.user;
+        if (neynarData?.[normalizedAddress]?.[0]) {
+          const user = neynarData[normalizedAddress][0];
           const fid = user.fid;
           console.log(`[Farcaster] ✅ Found FID ${fid} via Neynar for address ${normalizedAddress}`);
           const profile = await getFarcasterProfileByFID(fid);
@@ -123,7 +217,7 @@ export async function getFarcasterProfileByAddress(address: string): Promise<Far
         }
       }
     } catch (neynarError) {
-      console.warn(`[Farcaster] Neynar lookup failed, trying Warpcast:`, neynarError);
+      console.warn(`[Farcaster] ⚠️ Neynar v2 lookup failed, trying Warpcast:`, neynarError);
     }
     
     // Fallback to Warpcast API
