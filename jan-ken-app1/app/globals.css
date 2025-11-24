@@ -1,5 +1,16 @@
 @import "tailwindcss";
 
+/* Japanese Gaming Theme - Color Palette */
+:root {
+  --japanese-red: #DC143C;      /* Crimson red (traditional Japanese)  */
+  --japanese-black: #1a1a1a;    /* Deep black */
+  --japanese-gold: #FFD700;     /* Gold accent */
+  --japanese-white: #F5F5DC;    /* Off-white/beige */
+  --arcade-pink: #FF1493;       /* Neon pink */
+  --arcade-cyan: #00FFFF;       /* Neon cyan */
+  --arcade-purple: #9D00FF;     /* Neon purple */
+}
+
 @keyframes blob {
   0%, 100% {
     transform: translate(0, 0) scale(1);
@@ -811,4 +822,116 @@
 
 .transition-opacity-smooth {
   transition: opacity 0.3s ease-in-out;
+}
+
+/* Japanese Wave Pattern Animation */
+@keyframes wave-pattern {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+.animate-wave-pattern {
+  animation: wave-pattern 15s ease infinite;
+  background-size: 200% 100%;
+}
+
+/* Japanese Lantern Glow */
+@keyframes lantern-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(220, 20, 60, 0.6), 0 0 40px rgba(220, 20, 60, 0.3);
+    filter: brightness(1);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(220, 20, 60, 1), 0 0 80px rgba(220, 20, 60, 0.5);
+    filter: brightness(1.2);
+  }
+}
+
+.animate-lantern-glow {
+  animation: lantern-glow 3s ease-in-out infinite;
+}
+
+/* Kanji Reveal Animation */
+@keyframes kanji-reveal {
+  from {
+    opacity: 0;
+    transform: scale(0.5) rotateY(90deg);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) rotateY(0deg);
+  }
+}
+
+.animate-kanji-reveal {
+  animation: kanji-reveal 0.8s ease-out;
+}
+
+/* Arcade Scan Line */
+@keyframes arcade-scan {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(100%);
+  }
+}
+
+.animate-arcade-scan {
+  animation: arcade-scan 4s linear infinite;
+}
+
+/* Cherry Blossom Fall */
+@keyframes cherry-fall {
+  0% {
+    transform: translateY(-10vh) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(110vh) rotate(360deg);
+    opacity: 0;
+  }
+}
+
+.animate-cherry-fall {
+  animation: cherry-fall 8s linear infinite;
+}
+
+/* Japanese Brush Stroke */
+@keyframes brush-stroke {
+  from {
+    stroke-dashoffset: 1000;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.animate-brush-stroke {
+  stroke-dasharray: 1000;
+  animation: brush-stroke 2s ease-out forwards;
+}
+
+/* Neon Flicker (Arcade Style) */
+@keyframes neon-flicker {
+  0%, 100% {
+    opacity: 1;
+    text-shadow: 0 0 10px currentColor, 0 0 20px currentColor, 0 0 30px currentColor;
+  }
+  2%, 8%, 18%, 32% {
+    opacity: 0.8;
+    text-shadow: 0 0 5px currentColor, 0 0 10px currentColor;
+  }
+  6%, 12%, 24%, 36% {
+    opacity: 1;
+    text-shadow: 0 0 15px currentColor, 0 0 30px currentColor, 0 0 45px currentColor;
+  }
+}
+
+.animate-neon-flicker {
+  animation: neon-flicker 4s ease-in-out infinite;
 }

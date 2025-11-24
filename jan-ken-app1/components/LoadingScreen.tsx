@@ -19,59 +19,61 @@ export function LoadingScreen({ message = 'Loading...', subMessage }: LoadingScr
 
   return (
     <div className="fixed inset-0 z-[100] bg-black flex items-center justify-center overflow-hidden">
-      {/* Animated background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-blue-900 via-purple-900 to-red-900 opacity-50 animate-gradient-shift"></div>
+      {/* Japanese Background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-red-950 via-black to-red-950 opacity-80 animate-gradient-shift"></div>
       
-      {/* Grid pattern */}
-      <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:50px_50px] animate-pulse-slow"></div>
+      {/* Japanese Grid Pattern */}
+      <div className="absolute inset-0 bg-[linear-gradient(rgba(220,20,60,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(220,20,60,0.1)_1px,transparent_1px)] bg-[size:40px_40px]"></div>
       
       {/* Loading content */}
       <div className="relative z-10 flex flex-col items-center gap-8">
-        {/* Spinning shuriken */}
+        {/* Japanese Mon (Family Crest) - Spinning */}
         <div className="relative w-32 h-32">
           <div className="absolute inset-0 animate-spin-slow">
-            <svg width="128" height="128" viewBox="0 0 24 24" className="text-cyan-400 drop-shadow-[0_0_20px_rgba(34,211,238,1)]">
-              <path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5L12 2Z" fill="currentColor" />
-            </svg>
+            <div className="w-full h-full rounded-full border-8 border-red-500 flex items-center justify-center">
+              <div className="text-6xl animate-pulse">⚔️</div>
+            </div>
           </div>
-          <div className="absolute inset-0 animate-spin-reverse opacity-50">
-            <svg width="128" height="128" viewBox="0 0 24 24" className="text-red-400 drop-shadow-[0_0_20px_rgba(239,68,68,1)]">
-              <path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5L12 2Z" fill="currentColor" />
-            </svg>
+          <div className="absolute inset-0 animate-lantern-glow">
+            <div className="w-full h-full rounded-full border-4 border-yellow-400 opacity-50"></div>
           </div>
         </div>
         
-        {/* Loading text */}
+        {/* Loading text - Japanese */}
         <div className="flex flex-col items-center gap-2">
-          <h2 className="text-3xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400 drop-shadow-[0_0_20px_rgba(34,211,238,0.6)]">
+          <h2 className="text-3xl sm:text-4xl font-black text-red-400 animate-neon-flicker" style={{
+            textShadow: '0 0 20px rgba(220,20,60,0.8), 0 0 40px rgba(220,20,60,0.5)'
+          }}>
             {message}{dots}
           </h2>
           {subMessage && (
-            <p className="text-lg text-gray-400 animate-pulse">
+            <p className="text-lg text-yellow-400/80 animate-pulse font-mono">
               {subMessage}
             </p>
           )}
         </div>
         
-        {/* Loading bar */}
-        <div className="w-64 h-2 bg-gray-800 rounded-full overflow-hidden">
-          <div className="h-full bg-gradient-to-r from-cyan-500 via-purple-500 to-pink-500 rounded-full animate-loading-bar"></div>
+        {/* Loading bar - Japanese Style */}
+        <div className="w-64 h-3 bg-black/60 rounded-full overflow-hidden border-2 border-red-500/50">
+          <div className="h-full bg-gradient-to-r from-red-600 via-yellow-500 to-red-600 rounded-full animate-loading-bar"></div>
         </div>
       </div>
       
-      {/* Particles */}
+      {/* Cherry Blossoms */}
       <div className="absolute inset-0 pointer-events-none">
-        {Array.from({ length: 20 }).map((_, i) => (
+        {Array.from({ length: 15 }).map((_, i) => (
           <div
             key={i}
-            className="absolute w-2 h-2 bg-cyan-400 rounded-full animate-float"
+            className="absolute text-2xl animate-cherry-fall"
             style={{
               left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
+              top: `-10%`,
               animationDelay: `${Math.random() * 3}s`,
-              animationDuration: `${3 + Math.random() * 2}s`,
+              animationDuration: `${5 + Math.random() * 3}s`,
             }}
-          />
+          >
+            🌸
+          </div>
         ))}
       </div>
     </div>

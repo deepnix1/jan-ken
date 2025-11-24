@@ -411,46 +411,75 @@ export default function Home() {
             />
           )}
           
-          <main className="min-h-screen bg-black relative overflow-hidden">
-      {/* Background Effects */}
+          <main className="min-h-screen bg-gradient-to-b from-black via-gray-900 to-black relative overflow-hidden">
+      {/* Japanese Background Effects */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:50px_50px]"></div>
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-red-500/10 rounded-full filter blur-3xl animate-pulse"></div>
-        <div className="absolute top-1/2 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full filter blur-3xl animate-pulse animation-delay-2000"></div>
-        <div className="absolute bottom-0 left-1/2 w-96 h-96 bg-yellow-500/10 rounded-full filter blur-3xl animate-pulse animation-delay-4000"></div>
-        <div className="absolute inset-0 bg-[linear-gradient(transparent_50%,rgba(34,211,238,0.03)_50%)] bg-[length:100%_4px] animate-scanline"></div>
+        {/* Traditional Japanese Wave Pattern */}
+        <div className="absolute inset-0 opacity-10" style={{
+          backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 50px, rgba(220, 20, 60, 0.3) 50px, rgba(220, 20, 60, 0.3) 51px)',
+          backgroundSize: '100% 100px'
+        }}></div>
+        
+        {/* Cherry Blossoms */}
+        <div className="absolute inset-0">
+          {Array.from({ length: 15 }).map((_, i) => (
+            <div
+              key={`cherry-${i}`}
+              className="absolute text-pink-300 text-2xl animate-cherry-fall"
+              style={{
+                left: `${Math.random() * 100}%`,
+                animationDelay: `${Math.random() * 8}s`,
+                animationDuration: `${8 + Math.random() * 4}s`,
+              }}
+            >
+              🌸
+            </div>
+          ))}
+        </div>
+        
+        {/* Red Lantern Glows */}
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-red-600/20 rounded-full filter blur-3xl animate-lantern-glow"></div>
+        <div className="absolute top-1/2 right-1/4 w-96 h-96 bg-red-600/20 rounded-full filter blur-3xl animate-lantern-glow animation-delay-2000"></div>
+        <div className="absolute bottom-0 left-1/2 w-96 h-96 bg-yellow-500/10 rounded-full filter blur-3xl animate-lantern-glow animation-delay-4000"></div>
+        
+        {/* Arcade Scan Lines */}
+        <div className="absolute inset-0 bg-[linear-gradient(transparent_50%,rgba(220,20,60,0.05)_50%)] bg-[length:100%_4px]"></div>
+        <div className="absolute w-full h-1 bg-gradient-to-r from-transparent via-red-500/30 to-transparent animate-arcade-scan"></div>
+        
+        {/* Japanese Grid Pattern */}
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(220,20,60,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(220,20,60,0.05)_1px,transparent_1px)] bg-[size:40px_40px]"></div>
       </div>
 
       <div className="relative z-10 min-h-screen p-3 sm:p-4 md:p-6 lg:p-8">
         <div className="w-full max-w-6xl mx-auto">
-          {/* Header */}
+          {/* Header - Japanese Style */}
           <header className="flex flex-col items-center mb-8 sm:mb-12 relative">
-            {/* User Profile - Top Right (if connected) */}
+            {/* User Profile - Top Right (Japanese Styled) */}
             {isConnected && (
               <div className="absolute top-0 right-0 flex items-center gap-3 animate-fade-in-down">
                 <div className="hidden sm:flex flex-col items-end">
                   {isLoadingProfile ? (
                     <>
-                      <div className="h-4 w-24 bg-cyan-400/20 rounded animate-pulse"></div>
-                      <div className="h-3 w-20 bg-cyan-400/10 rounded animate-pulse mt-1"></div>
+                      <div className="h-4 w-24 bg-red-600/20 rounded animate-pulse"></div>
+                      <div className="h-3 w-20 bg-red-600/10 rounded animate-pulse mt-1"></div>
                     </>
                   ) : (
                     <>
-                      <span className="text-cyan-400 font-bold text-sm">
-                        {userProfile?.username || 'Player'}
+                      <span className="text-red-400 font-bold text-sm tracking-wide">
+                        {userProfile?.username || 'SAMURAI'}
                       </span>
-                      <span className="text-cyan-400/60 font-mono text-xs">
+                      <span className="text-yellow-400/80 font-mono text-xs">
                         {address?.slice(0, 6)}...{address?.slice(-4)}
                       </span>
                     </>
                   )}
                 </div>
                 <div className="relative group">
-                  <div className="absolute inset-0 bg-cyan-500 rounded-full blur-lg opacity-50 group-hover:opacity-75 transition-opacity"></div>
-                  <div className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-full border-2 border-cyan-400 overflow-hidden shadow-[0_0_20px_rgba(34,211,238,0.6)] bg-gradient-to-br from-cyan-600 to-blue-600">
+                  <div className="absolute inset-0 bg-red-600 rounded-full blur-lg opacity-50 group-hover:opacity-75 transition-opacity animate-lantern-glow"></div>
+                  <div className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-full border-3 border-red-500 overflow-hidden shadow-[0_0_20px_rgba(220,20,60,0.8)] bg-gradient-to-br from-red-900 to-black">
                     {isLoadingProfile ? (
                       <div className="w-full h-full flex items-center justify-center animate-pulse">
-                        <div className="w-8 h-8 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin"></div>
+                        <div className="w-8 h-8 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></div>
                       </div>
                     ) : userProfile?.pfpUrl ? (
                       <Image
@@ -468,8 +497,8 @@ export default function Home() {
                         }}
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-white text-xl font-black">
-                        {address?.slice(2, 4).toUpperCase() || '👤'}
+                      <div className="w-full h-full flex items-center justify-center text-red-400 text-xl font-black">
+                        {address?.slice(2, 4).toUpperCase() || '侍'}
                       </div>
                     )}
                   </div>
@@ -477,25 +506,47 @@ export default function Home() {
               </div>
             )}
             
-            {/* Logo - Centered and Smaller - Mobile Optimized */}
+            {/* Logo with Japanese Theme */}
             <div className="relative w-full max-w-[200px] sm:max-w-[250px] md:max-w-[300px] mb-4 sm:mb-6 md:mb-8 flex justify-center">
-              <div className="absolute inset-0 bg-gradient-to-r from-red-500/20 via-blue-500/20 to-yellow-500/20 blur-3xl"></div>
-              <div className="relative z-10 flex items-center justify-center w-full" style={{ filter: 'drop-shadow(0 0 30px rgba(239,68,68,0.5))' }}>
+              {/* Red Lantern Glow */}
+              <div className="absolute inset-0 bg-gradient-to-r from-red-600/30 via-yellow-500/20 to-red-600/30 blur-3xl animate-lantern-glow"></div>
+              
+              {/* Logo Container */}
+              <div className="relative z-10 flex flex-col items-center justify-center w-full">
                 <Image
                   src="/new_logo.png"
                   alt="JaN KeN!"
                   width={300}
                   height={100}
-                  className="object-contain w-full h-auto"
+                  className="object-contain w-full h-auto animate-kanji-reveal"
+                  style={{ filter: 'drop-shadow(0 0 30px rgba(220,20,60,0.8))' }}
                   priority
                   unoptimized
                 />
+                
+                {/* Kanji Subtitle */}
+                <div className="mt-2 text-center">
+                  <p className="text-red-400 text-sm sm:text-base font-bold tracking-[0.3em] animate-neon-flicker">
+                    じゃんけん
+                  </p>
+                  <p className="text-yellow-400/60 text-xs font-mono">
+                    ROCK • PAPER • SCISSORS
+                  </p>
+                </div>
               </div>
             </div>
           </header>
           
-          {/* Main Content - Mobile Optimized */}
-          <div className="relative bg-black/60 backdrop-blur-xl rounded-2xl sm:rounded-3xl border-2 border-cyan-400/30 shadow-[0_0_60px_rgba(34,211,238,0.2)] p-4 sm:p-6 md:p-8 lg:p-12 min-h-[50vh] sm:min-h-[60vh] flex items-center justify-center">
+          {/* Main Content - Japanese Gaming Style */}
+          <div className="relative bg-black/80 backdrop-blur-xl rounded-2xl sm:rounded-3xl border-2 border-red-600/40 shadow-[0_0_60px_rgba(220,20,60,0.3)] p-4 sm:p-6 md:p-8 lg:p-12 min-h-[50vh] sm:min-h-[60vh] flex items-center justify-center overflow-hidden">
+            {/* Japanese Corner Accents */}
+            <div className="absolute top-0 left-0 w-16 h-16 border-t-4 border-l-4 border-red-500/50"></div>
+            <div className="absolute top-0 right-0 w-16 h-16 border-t-4 border-r-4 border-red-500/50"></div>
+            <div className="absolute bottom-0 left-0 w-16 h-16 border-b-4 border-l-4 border-red-500/50"></div>
+            <div className="absolute bottom-0 right-0 w-16 h-16 border-b-4 border-r-4 border-red-500/50"></div>
+            
+            {/* Content */}
+            <div className="relative z-10 w-full">
             {!isConnected ? (
               <div className="flex flex-col items-center gap-8 py-16 animate-fade-in-up">
                   <div className="text-center space-y-4">
@@ -543,21 +594,30 @@ export default function Home() {
                  )}
               </div>
             ) : !showGame ? (
-              /* Let's Play Landing Screen */
+              /* Let's Play Landing Screen - Japanese Gaming */
               <div className="flex flex-col items-center gap-8 py-16 animate-fade-in-up">
                 <div className="text-center space-y-6">
-                  <h2 className="text-5xl sm:text-6xl md:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-yellow-400 to-blue-400 drop-shadow-[0_0_30px_rgba(239,68,68,0.8)] animate-pulse">
-                    READY TO BATTLE?
-                  </h2>
-                  <p className="text-xl sm:text-2xl text-gray-300 font-bold">
-                    Rock • Paper • Scissors
+                  {/* Main Title with Kanji */}
+                  <div className="relative">
+                    <h2 className="text-6xl sm:text-7xl md:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-yellow-400 to-red-500 animate-neon-flicker" style={{
+                      textShadow: '0 0 20px rgba(220,20,60,0.8), 0 0 40px rgba(220,20,60,0.5)'
+                    }}>
+                      勝負！
+                    </h2>
+                    <p className="text-2xl sm:text-3xl text-yellow-400 font-bold tracking-[0.2em] mt-2">
+                      SHŌBU!
+                    </p>
+                  </div>
+                  
+                  <p className="text-xl sm:text-2xl text-red-400 font-bold tracking-wide">
+                    グー • チョキ • パー
                   </p>
-                  <p className="text-lg text-gray-400 max-w-md">
-                    Challenge players on Base Network and win ETH!
+                  <p className="text-lg text-gray-300 max-w-md font-mono">
+                    Challenge warriors on Base Network • Win ETH rewards
                   </p>
                 </div>
                 
-                {/* Let's Play Button */}
+                {/* Let's Play Button - Arcade Style */}
                 <button
                   onClick={() => {
                     setIsTransitioning(true);
@@ -566,28 +626,37 @@ export default function Home() {
                       setIsTransitioning(false);
                     }, 400);
                   }}
-                  className="group relative px-12 py-6 text-3xl font-black text-white bg-gradient-to-r from-red-500 via-yellow-500 to-blue-500 rounded-2xl overflow-hidden transition-all duration-300 hover:scale-110 hover:shadow-[0_0_60px_rgba(239,68,68,1)] active:scale-95 animate-scale-in"
+                  className="group relative px-12 py-6 text-3xl font-black text-yellow-400 bg-gradient-to-br from-red-600 via-red-700 to-black rounded-xl overflow-hidden transition-all duration-300 hover:scale-110 hover:shadow-[0_0_60px_rgba(220,20,60,1)] active:scale-95 animate-scale-in border-4 border-red-500"
                 >
-                  <div className="absolute inset-0 bg-gradient-to-r from-red-600 via-yellow-600 to-blue-600 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                  <div className="absolute inset-0 bg-gradient-to-br from-red-700 via-red-800 to-black opacity-0 group-hover:opacity-100 transition-opacity"></div>
                   <div className="relative flex items-center gap-4">
-                    <span className="text-5xl">🎮</span>
-                    <span>LET&apos;S PLAY!</span>
+                    <span className="text-5xl">⚔️</span>
+                    <div className="flex flex-col items-center">
+                      <span className="animate-neon-flicker">はじめる</span>
+                      <span className="text-lg">START BATTLE!</span>
+                    </div>
                   </div>
                   
-                  {/* Animated border */}
-                  <div className="absolute inset-0 rounded-2xl border-4 border-white/50 animate-pulse"></div>
+                  {/* Animated corners */}
+                  <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-yellow-400"></div>
+                  <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-yellow-400"></div>
+                  <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-yellow-400"></div>
+                  <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-yellow-400"></div>
                 </button>
                 
-                {/* Stats or Info */}
+                {/* Stats - Japanese Gaming Style */}
                 <div className="flex flex-wrap justify-center gap-4 mt-8 animate-fade-in-up animation-delay-400">
-                  <div className="bg-cyan-500/10 backdrop-blur-sm px-6 py-3 rounded-xl border border-cyan-400/30 hover:border-cyan-400 transition-all duration-300 hover:scale-105 cursor-pointer">
-                    <p className="text-cyan-400 text-sm font-mono">⚡ Instant Matches</p>
+                  <div className="bg-red-900/30 backdrop-blur-sm px-6 py-3 rounded-lg border-2 border-red-500/50 hover:border-red-500 transition-all duration-300 hover:scale-105 cursor-pointer">
+                    <p className="text-red-400 text-sm font-bold tracking-wide">⚡ 即座マッチ</p>
+                    <p className="text-red-300/60 text-xs text-center">INSTANT</p>
                   </div>
-                  <div className="bg-yellow-500/10 backdrop-blur-sm px-6 py-3 rounded-xl border border-yellow-400/30 hover:border-yellow-400 transition-all duration-300 hover:scale-105 cursor-pointer">
-                    <p className="text-yellow-400 text-sm font-mono">💰 Win ETH</p>
+                  <div className="bg-yellow-900/30 backdrop-blur-sm px-6 py-3 rounded-lg border-2 border-yellow-500/50 hover:border-yellow-500 transition-all duration-300 hover:scale-105 cursor-pointer">
+                    <p className="text-yellow-400 text-sm font-bold tracking-wide">💰 賞金獲得</p>
+                    <p className="text-yellow-300/60 text-xs text-center">WIN ETH</p>
                   </div>
-                  <div className="bg-purple-500/10 backdrop-blur-sm px-6 py-3 rounded-xl border border-purple-400/30 hover:border-purple-400 transition-all duration-300 hover:scale-105 cursor-pointer">
-                    <p className="text-purple-400 text-sm font-mono">🔒 Secure</p>
+                  <div className="bg-gray-900/30 backdrop-blur-sm px-6 py-3 rounded-lg border-2 border-gray-500/50 hover:border-gray-400 transition-all duration-300 hover:scale-105 cursor-pointer">
+                    <p className="text-gray-300 text-sm font-bold tracking-wide">🔒 安全保証</p>
+                    <p className="text-gray-400/60 text-xs text-center">SECURE</p>
                   </div>
                 </div>
               </div>
@@ -638,6 +707,7 @@ export default function Home() {
                 )}
               </>
             )}
+            </div>
           </div>
         </div>
       </div>
