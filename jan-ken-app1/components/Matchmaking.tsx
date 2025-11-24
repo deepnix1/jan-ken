@@ -1290,22 +1290,26 @@ export function Matchmaking({ betAmount, onMatchFound, onCancel, showMatchFound 
         // Log queue count
         if (queueData?.data !== undefined) {
           const count = Number(queueData.data);
-          console.log('👥 Queue count for bet level:', count, 'betAmount:', betAmount.toString());
+            console.log('👥 Queue count for bet level:', count, 'betAmount:', betAmount.toString());
           if (count >= 2 && isMatching) {
-            console.warn('⚠️ Queue has 2+ players but no match yet - contract might have an issue');
+            console.warn('⚠️ Queue has 2+ players but no match yet - forcing multiple checks');
             console.warn('⚠️ This could mean:');
-            console.warn('   - Transaction\'lar farklı block\'larda onaylandı');
-            console.warn('   - _matchPlayers içinde bir hata oldu (E18 - bet amounts don\'t match?)');
-            console.warn('   - Contract state güncellenmedi');
-            // Force a more aggressive check
+            console.warn('   - Transactions in different blocks');
+            console.warn('   - Contract matching issue (E18 - bet amounts mismatch?)');
+            console.warn('   - Contract state not updated yet');
+            // Force multiple aggressive checks
             console.log('🔄 Forcing immediate game status check...');
-            setTimeout(() => {
-              refetchGame();
-            }, 500);
+            setTimeout(() => refetchGame(), 500);
+            setTimeout(() => refetchGame(), 1500);
+            setTimeout(() => refetchGame(), 3000);
+            // Also refetch queue count to confirm
+            setTimeout(() => refetchQueueCount(), 2000);
           } else if (count === 1 && isMatching) {
             console.log('⏳ Queue has 1 player (us) - waiting for another player...');
           } else if (count === 0 && isMatching) {
-            console.warn('⚠️ Queue is empty but we think we\'re matching - might be a state issue');
+            console.warn('⚠️ Queue is empty but we think we\'re matching - refreshing state');
+            // Refresh game state to check if we're actually still in queue
+            setTimeout(() => refetchGame(), 500);
           }
         }
         

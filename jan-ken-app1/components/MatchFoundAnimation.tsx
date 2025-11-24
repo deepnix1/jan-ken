@@ -110,16 +110,16 @@ export function MatchFoundAnimation({ player1Address, player2Address, currentUse
           </div>
           
           {/* Main content */}
-          <div className="relative z-10 flex flex-col items-center gap-4">
+          <div className="relative z-10 flex flex-col items-center justify-center gap-4">
             {/* Title with glow effect */}
-            <h3 className="text-4xl sm:text-5xl font-black text-center drop-shadow-[0_0_20px_rgba(255,255,255,0.8)] mb-4">
+            <h3 className="text-4xl sm:text-5xl font-black text-center drop-shadow-[0_0_20px_rgba(255,255,255,0.8)] mb-2">
               <span className="bg-gradient-to-r from-red-400 via-blue-400 to-yellow-400 bg-clip-text text-transparent">
                 MATCH FOUND!
               </span>
             </h3>
             
             {/* Player profiles - side by side */}
-            <div className="flex items-center justify-center gap-6 sm:gap-8 mb-4">
+            <div className="flex items-center justify-center gap-6 sm:gap-8 mb-2">
               {/* Current User Profile */}
               <div className="flex flex-col items-center gap-2">
                 <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-full border-4 border-white/80 overflow-hidden shadow-[0_0_20px_rgba(59,130,246,0.8)] bg-gradient-to-br from-blue-500/20 to-cyan-500/20">
@@ -169,14 +169,14 @@ export function MatchFoundAnimation({ player1Address, player2Address, currentUse
             </div>
             
             {/* Subtitle */}
-            <p className="text-white/90 font-bold text-lg sm:text-xl text-center mb-2">
+            <p className="text-white/90 font-bold text-lg sm:text-xl text-center mb-1">
               Opponent Ready
             </p>
             
             {/* Countdown */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center justify-center gap-2">
               <div className="w-3 h-3 bg-red-400 rounded-full animate-pulse shadow-[0_0_10px_rgba(239,68,68,1)]"></div>
-              <span className="text-white/80 font-mono text-sm">Game starting in 2 seconds...</span>
+              <span className="text-white/80 font-mono text-sm text-center">Game starting in 2 seconds...</span>
               <div className="w-3 h-3 bg-yellow-400 rounded-full animate-pulse shadow-[0_0_10px_rgba(234,179,8,1)]"></div>
             </div>
             

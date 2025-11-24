@@ -17,28 +17,40 @@ export interface FarcasterProfile {
  */
 export async function getFarcasterProfileByFID(fid: number): Promise<FarcasterProfile> {
   try {
+    console.log(`[Farcaster] Fetching profile for FID: ${fid}`);
+    
     // Farcaster API endpoint
-    const response = await fetch(`https://api.warpcast.com/v2/user-by-fid?fid=${fid}`);
+    const response = await fetch(`https://api.warpcast.com/v2/user-by-fid?fid=${fid}`, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+      },
+      cache: 'no-cache', // Disable cache to get fresh data
+    });
     
     if (!response.ok) {
-      console.warn(`Failed to fetch Farcaster profile for FID ${fid}:`, response.status);
+      console.warn(`[Farcaster] Failed to fetch profile for FID ${fid}:`, response.status, response.statusText);
       return { pfpUrl: null, username: null, displayName: null };
     }
     
     const data = await response.json();
+    console.log(`[Farcaster] User profile response for FID ${fid}:`, data);
     
     if (data?.result?.user) {
       const user = data.result.user;
-      return {
+      const profile = {
         pfpUrl: user.pfp?.url || user.pfpUrl || null,
         username: user.username || null,
         displayName: user.displayName || null,
       };
+      console.log(`[Farcaster] Extracted profile for FID ${fid}:`, profile);
+      return profile;
     }
     
+    console.log(`[Farcaster] No user data found for FID ${fid}`);
     return { pfpUrl: null, username: null, displayName: null };
   } catch (error) {
-    console.error('Error fetching Farcaster profile by FID:', error);
+    console.error('[Farcaster] Error fetching profile by FID:', error);
     return { pfpUrl: null, username: null, displayName: null };
   }
 }
@@ -50,25 +62,41 @@ export async function getFarcasterProfileByFID(fid: number): Promise<FarcasterPr
  */
 export async function getFarcasterProfileByAddress(address: string): Promise<FarcasterProfile> {
   try {
+    // Normalize address
+    const normalizedAddress = address.toLowerCase().trim();
+    
+    console.log(`[Farcaster] Fetching profile for address: ${normalizedAddress}`);
+    
     // First, try to get FID from address using Farcaster API
-    const response = await fetch(`https://api.warpcast.com/v2/verifications?address=${address.toLowerCase()}`);
+    const response = await fetch(`https://api.warpcast.com/v2/verifications?address=${normalizedAddress}`, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+      },
+      cache: 'no-cache', // Disable cache to get fresh data
+    });
     
     if (!response.ok) {
-      console.warn(`Failed to fetch Farcaster profile for address ${address}:`, response.status);
+      console.warn(`[Farcaster] Failed to fetch verifications for address ${normalizedAddress}:`, response.status, response.statusText);
       return { pfpUrl: null, username: null, displayName: null };
     }
     
     const data = await response.json();
+    console.log(`[Farcaster] Verifications response:`, data);
     
     // If we get a FID, use it to get the profile
     if (data?.result?.verifications && data.result.verifications.length > 0) {
       const fid = data.result.verifications[0].fid;
-      return await getFarcasterProfileByFID(fid);
+      console.log(`[Farcaster] Found FID ${fid} for address ${normalizedAddress}`);
+      const profile = await getFarcasterProfileByFID(fid);
+      console.log(`[Farcaster] Profile data:`, profile);
+      return profile;
     }
     
+    console.log(`[Farcaster] No verifications found for address ${normalizedAddress}`);
     return { pfpUrl: null, username: null, displayName: null };
   } catch (error) {
-    console.error('Error fetching Farcaster profile by address:', error);
+    console.error('[Farcaster] Error fetching profile by address:', error);
     return { pfpUrl: null, username: null, displayName: null };
   }
 }

@@ -21,8 +21,8 @@ const sourceCodePro = Source_Code_Pro({
 
 // Farcaster Mini App embed metadata
 // Per Farcaster docs: https://miniapps.farcaster.xyz/docs/guides/agents-checklist
-// Production domain: GitHub Pages (https://deepnix1.github.io/jan-ken)
-const domain = process.env.NEXT_PUBLIC_APP_URL || "https://deepnix1.github.io/jan-ken";
+// Production domain: https://jan-ken.vercel.app
+const domain = process.env.NEXT_PUBLIC_APP_URL || "https://jan-ken.vercel.app";
 
 const farcasterFrame = {
   version: "1", // Must be "1", not "next" (per Farcaster docs)

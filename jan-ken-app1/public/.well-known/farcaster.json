@@ -1,17 +1,17 @@
 {
   "accountAssociation": {
     "header": "eyJmaWQiOjI4Mzc3OSwidHlwZSI6ImF1dGgiLCJrZXkiOiIweDI0ZTc0MTgzNGM2ODlCNTdlNzc3RDI0MDMxNzVmRUY1NTU5OTgwZDgifQ",
-    "payload": "eyJkb21haW4iOiJkZWVwbml4MS5naXRodWIuaW8ifQ",
+    "payload": "eyJkb21haW4iOiJqYW4ta2VuLnZlcmNlbC5hcHAifQ",
     "signature": "FEQv4qF0aIwui05bvmk1tR385MCm2W4HRr8qPBMG9+ZOCyZBFCwGgJjzwPVHKgca1F2lwKAMkZKtIqpgSiMSeBs="
   },
   "frame": {
     "version": "1",
     "name": "JaN KeN!",
-    "iconUrl": "https://deepnix1.github.io/jan-ken/new_logo.png",
-    "homeUrl": "https://deepnix1.github.io/jan-ken",
-    "imageUrl": "https://deepnix1.github.io/jan-ken/new_logo.png",
+    "iconUrl": "https://jan-ken.vercel.app/new_logo.png",
+    "homeUrl": "https://jan-ken.vercel.app",
+    "imageUrl": "https://jan-ken.vercel.app/new_logo.png",
     "buttonTitle": "Play JaN KeN!",
-    "splashImageUrl": "https://deepnix1.github.io/jan-ken/new_logo.png",
+    "splashImageUrl": "https://jan-ken.vercel.app/new_logo.png",
     "splashBackgroundColor": "#000000"
   }
 }
