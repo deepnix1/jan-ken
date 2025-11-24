@@ -605,42 +605,7 @@ export default function Home() {
                   </p>
                 </div>
                 
-                {/* How to Play Section - Compact Grid */}
-                <div className="w-full max-w-xl bg-black/60 backdrop-blur-sm border border-red-500/30 rounded-lg p-4 sm:p-6">
-                  <h3 className="text-lg font-black text-red-400 mb-3 text-center">HOW TO PLAY</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
-                    <div className="flex items-start gap-2">
-                      <span className="text-lg">1️⃣</span>
-                      <div>
-                        <p className="text-white font-bold text-sm mb-0.5">Select Bet</p>
-                        <p className="text-gray-400 text-xs">Choose bet level (0.0015-0.3 ETH)</p>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <span className="text-lg">2️⃣</span>
-                      <div>
-                        <p className="text-white font-bold text-sm mb-0.5">Find Opponent</p>
-                        <p className="text-gray-400 text-xs">Auto-match with same bet level</p>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <span className="text-lg">3️⃣</span>
-                      <div>
-                        <p className="text-white font-bold text-sm mb-0.5">Make Choice</p>
-                        <p className="text-gray-400 text-xs">Rock 🪨 Paper 📄 Scissors ✂️ (20s)</p>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <span className="text-lg">4️⃣</span>
-                      <div>
-                        <p className="text-white font-bold text-sm mb-0.5">Win or Lose</p>
-                        <p className="text-gray-400 text-xs">Winner takes the pot!</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Let's Play Button - Smaller */}
+                {/* Let's Play Button - Moved Up */}
                 <button
                   onClick={() => {
                     setIsTransitioning(true);
@@ -649,17 +614,73 @@ export default function Home() {
                       setIsTransitioning(false);
                     }, 400);
                   }}
-                  className="group relative px-8 py-4 text-xl font-black text-yellow-400 bg-gradient-to-br from-red-600 via-red-700 to-black rounded-lg overflow-hidden transition-all duration-300 hover:scale-105 hover:shadow-[0_0_40px_rgba(220,20,60,0.8)] active:scale-95 border-2 border-red-500"
+                  className="group relative px-10 py-5 text-2xl font-black text-yellow-400 bg-gradient-to-br from-red-600 via-red-700 to-black rounded-lg overflow-hidden transition-all duration-300 hover:scale-105 hover:shadow-[0_0_50px_rgba(220,20,60,0.9)] active:scale-95 border-2 border-red-500"
                 >
                   <div className="absolute inset-0 bg-gradient-to-br from-red-700 via-red-800 to-black opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                  <div className="relative flex items-center gap-3">
-                    <span className="text-3xl">🎮</span>
+                  <div className="relative flex items-center gap-4">
+                    {/* Custom RPS Icon */}
+                    <div className="relative w-10 h-10 flex items-center justify-center">
+                      <div className="absolute inset-0 bg-red-500/20 rounded-full blur-md"></div>
+                      <div className="relative flex items-center gap-0.5 text-xl">
+                        <span className="transform rotate-12">🪨</span>
+                        <span className="transform -rotate-12">📄</span>
+                        <span className="transform rotate-12">✂️</span>
+                      </div>
+                    </div>
                     <span>LET&apos;S PLAY!</span>
                   </div>
+                  {/* Corner accents */}
+                  <div className="absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-yellow-400"></div>
+                  <div className="absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-yellow-400"></div>
+                  <div className="absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 border-yellow-400"></div>
+                  <div className="absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-yellow-400"></div>
                 </button>
                 
+                {/* How to Play Section - Compact Grid with Professional Numbers */}
+                <div className="w-full max-w-xl bg-black/60 backdrop-blur-sm border border-red-500/30 rounded-lg p-4 sm:p-6">
+                  <h3 className="text-lg font-black text-red-400 mb-4 text-center">HOW TO PLAY</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left">
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-red-600 to-red-800 border-2 border-red-400 flex items-center justify-center shadow-[0_0_10px_rgba(220,20,60,0.5)]">
+                        <span className="text-white font-black text-sm">1</span>
+                      </div>
+                      <div>
+                        <p className="text-white font-bold text-sm mb-0.5">Select Bet</p>
+                        <p className="text-gray-400 text-xs">Choose bet level (0.0015-0.3 ETH)</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-red-600 to-red-800 border-2 border-red-400 flex items-center justify-center shadow-[0_0_10px_rgba(220,20,60,0.5)]">
+                        <span className="text-white font-black text-sm">2</span>
+                      </div>
+                      <div>
+                        <p className="text-white font-bold text-sm mb-0.5">Find Opponent</p>
+                        <p className="text-gray-400 text-xs">Auto-match with same bet level</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-red-600 to-red-800 border-2 border-red-400 flex items-center justify-center shadow-[0_0_10px_rgba(220,20,60,0.5)]">
+                        <span className="text-white font-black text-sm">3</span>
+                      </div>
+                      <div>
+                        <p className="text-white font-bold text-sm mb-0.5">Make Choice</p>
+                        <p className="text-gray-400 text-xs">Rock 🪨 Paper 📄 Scissors ✂️ (20s)</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-red-600 to-red-800 border-2 border-red-400 flex items-center justify-center shadow-[0_0_10px_rgba(220,20,60,0.5)]">
+                        <span className="text-white font-black text-sm">4</span>
+                      </div>
+                      <div>
+                        <p className="text-white font-bold text-sm mb-0.5">Win or Lose</p>
+                        <p className="text-gray-400 text-xs">Winner takes the pot!</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
                 {/* Stats - Compact */}
-                <div className="flex flex-wrap justify-center gap-3 mt-4">
+                <div className="flex flex-wrap justify-center gap-3 mt-2">
                   <div className="bg-red-900/20 backdrop-blur-sm px-4 py-2 rounded border border-red-500/30">
                     <p className="text-red-400 text-xs font-bold">⚡ INSTANT</p>
                   </div>
