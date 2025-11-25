@@ -232,40 +232,92 @@ async function tryMatch(betLevel: number): Promise<MatchResult | null> {
  * Check for matches (polling function)
  */
 export async function checkForMatch(playerAddress: Address): Promise<MatchResult | null> {
-  // Check if player has been matched
-  const { data: queueEntry } = await supabase
-    .from('matchmaking_queue')
-    .select('*')
-    .eq('player_address', playerAddress.toLowerCase())
-    .eq('status', 'matched')
-    .single()
+  try {
+    // Check if player has been matched with retry
+    let retries = 2
+    let queueEntry: any = null
+    
+    while (retries > 0) {
+      try {
+        const { data, error } = await supabase
+          .from('matchmaking_queue')
+          .select('*')
+          .eq('player_address', playerAddress.toLowerCase())
+          .eq('status', 'matched')
+          .maybeSingle()
+        
+        if (error && error.code !== 'PGRST116') {
+          throw error
+        }
+        
+        queueEntry = data
+        break
+      } catch (err: any) {
+        if (err.message?.includes('fetch') || err.message?.includes('Load failed')) {
+          retries--
+          if (retries > 0) {
+            await new Promise(resolve => setTimeout(resolve, 1000))
+            continue
+          }
+        }
+        throw err
+      }
+    }
 
-  if (!queueEntry || !queueEntry.matched_with) {
+    if (!queueEntry || !queueEntry.matched_with) {
+      return null
+    }
+
+    // Find the game with retry
+    retries = 2
+    let game: any = null
+    
+    while (retries > 0) {
+      try {
+        const { data, error } = await supabase
+          .from('games')
+          .select('*')
+          .or(`player1_address.eq.${playerAddress.toLowerCase()},player2_address.eq.${playerAddress.toLowerCase()}`)
+          .eq('status', 'commit_phase')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        
+        if (error && error.code !== 'PGRST116') {
+          throw error
+        }
+        
+        game = data
+        break
+      } catch (err: any) {
+        if (err.message?.includes('fetch') || err.message?.includes('Load failed')) {
+          retries--
+          if (retries > 0) {
+            await new Promise(resolve => setTimeout(resolve, 1000))
+            continue
+          }
+        }
+        throw err
+      }
+    }
+
+    if (!game) {
+      return null
+    }
+
+    return {
+      gameId: game.game_id,
+      player1Address: game.player1_address as Address,
+      player1Fid: game.player1_fid,
+      player2Address: game.player2_address as Address,
+      player2Fid: game.player2_fid,
+      betLevel: game.bet_level,
+      betAmount: BigInt(game.bet_amount),
+    }
+  } catch (error: any) {
+    console.error('[checkForMatch] Error:', error)
+    // Don't throw, just return null to allow polling to continue
     return null
-  }
-
-  // Find the game
-  const { data: game } = await supabase
-    .from('games')
-    .select('*')
-    .or(`player1_address.eq.${playerAddress.toLowerCase()},player2_address.eq.${playerAddress.toLowerCase()}`)
-    .eq('status', 'commit_phase')
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single()
-
-  if (!game) {
-    return null
-  }
-
-  return {
-    gameId: game.game_id,
-    player1Address: game.player1_address as Address,
-    player1Fid: game.player1_fid,
-    player2Address: game.player2_address as Address,
-    player2Fid: game.player2_fid,
-    betLevel: game.bet_level,
-    betAmount: BigInt(game.bet_amount),
   }
 }
 
@@ -284,17 +336,48 @@ export async function leaveQueue(playerAddress: Address): Promise<void> {
  * Get queue status for a bet level
  */
 export async function getQueueCount(betLevel: number): Promise<number> {
-  const { count, error } = await supabase
-    .from('matchmaking_queue')
-    .select('*', { count: 'exact', head: true })
-    .eq('bet_level', betLevel)
-    .eq('status', 'waiting')
+  try {
+    let retries = 2
+    
+    while (retries > 0) {
+      try {
+        const { count, error } = await supabase
+          .from('matchmaking_queue')
+          .select('*', { count: 'exact', head: true })
+          .eq('bet_level', betLevel)
+          .eq('status', 'waiting')
 
-  if (error) {
+        if (error) {
+          // Retry on network errors
+          if (error.message?.includes('fetch') || error.message?.includes('Load failed')) {
+            retries--
+            if (retries > 0) {
+              await new Promise(resolve => setTimeout(resolve, 1000))
+              continue
+            }
+          }
+          console.error('Error getting queue count:', error)
+          return 0
+        }
+
+        return count || 0
+      } catch (err: any) {
+        if (err.message?.includes('fetch') || err.message?.includes('Load failed')) {
+          retries--
+          if (retries > 0) {
+            await new Promise(resolve => setTimeout(resolve, 1000))
+            continue
+          }
+        }
+        console.error('Error getting queue count:', err)
+        return 0
+      }
+    }
+    
+    return 0
+  } catch (error: any) {
     console.error('Error getting queue count:', error)
     return 0
   }
-
-  return count || 0
 }
 
