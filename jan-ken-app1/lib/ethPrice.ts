@@ -62,3 +62,4 @@ export function ethToUsd(ethAmount: number, ethPrice: number): number {
   return ethAmount * ethPrice;
 }
 
+

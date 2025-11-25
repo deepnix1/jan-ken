@@ -101,3 +101,4 @@ NEXT_PUBLIC_CONTRACT_ADDRESS=0x721aa7FBBf2924a8C63Dd2282a37CB3a1eF1B434
 4. Test wallet connection and game functionality
 
 
+

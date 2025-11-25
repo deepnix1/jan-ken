@@ -96,3 +96,4 @@ If Motion Studio MCP doesn't appear:
 
 **Note**: Motion+ users have access to additional MCP server with Motion+ APIs.
 
+

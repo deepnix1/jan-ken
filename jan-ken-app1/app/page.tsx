@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { useAccount, useConnect, useDisconnect, useConnectorClient } from 'wagmi';
 import { sdk } from '@farcaster/miniapp-sdk';
 import { BetSelector } from '@/components/BetSelector';
-import { Matchmaking } from '@/components/Matchmaking';
+import { MatchmakingOffChain } from '@/components/MatchmakingOffChain';
 import { GameBoard } from '@/components/GameBoard';
 import { Result } from '@/components/Result';
 import { MatchFoundAnimation } from '@/components/MatchFoundAnimation';
@@ -702,7 +702,7 @@ export default function Home() {
                     
                     {gameState === 'matching' && selectedBet && (
                       <div className="w-full animate-scale-in -mt-8 sm:-mt-12 md:-mt-16">
-                        <Matchmaking 
+                        <MatchmakingOffChain 
                           betAmount={selectedBet} 
                           onMatchFound={handleMatchFound}
                           onCancel={handleCancelMatchmaking}

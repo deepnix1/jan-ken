@@ -382,3 +382,4 @@ Transaction göndermeden önce kontrol edin:
 **Son Güncelleme**: 2025-11-23
 **Versiyon**: 1.0.0
 
+

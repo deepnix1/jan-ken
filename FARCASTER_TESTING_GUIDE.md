@@ -214,3 +214,4 @@ Production'a geçmeden önce:
 - **Mobile vs Desktop**: Hem mobile hem desktop'ta test edin
 
 
+

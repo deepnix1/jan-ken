@@ -86,3 +86,4 @@ Eğer force send çalışmazsa:
 
 
 
+
