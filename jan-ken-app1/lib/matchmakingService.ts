@@ -457,6 +457,7 @@ export async function checkForMatch(playerAddress: Address): Promise<MatchResult
     }
 
     // Find the game with retry
+    // CRITICAL: Verify game exists and both players match queue entry
     retries = 2
     let game: any = null
     
@@ -490,6 +491,22 @@ export async function checkForMatch(playerAddress: Address): Promise<MatchResult
     }
 
     if (!game) {
+      return null
+    }
+    
+    // CRITICAL: Verify game players match queue entry
+    const isPlayer1 = game.player1_address.toLowerCase() === playerAddress.toLowerCase()
+    const isPlayer2 = game.player2_address.toLowerCase() === playerAddress.toLowerCase()
+    
+    if (!isPlayer1 && !isPlayer2) {
+      console.warn('[checkForMatch] ⚠️ Game found but player address does not match')
+      return null
+    }
+    
+    // CRITICAL: Verify the other player matches matched_with
+    const otherPlayerAddress = isPlayer1 ? game.player2_address : game.player1_address
+    if (otherPlayerAddress.toLowerCase() !== queueEntry.matched_with.toLowerCase()) {
+      console.warn('[checkForMatch] ⚠️ Game player mismatch with queue matched_with')
       return null
     }
 
