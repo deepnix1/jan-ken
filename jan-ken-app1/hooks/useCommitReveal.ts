@@ -4,7 +4,7 @@
  */
 
 import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { Address, toBytes } from 'viem';
+import { Address, toBytes, toHex, pad } from 'viem';
 import { 
   CONTRACT_ADDRESS_COMMIT_REVEAL, 
   CONTRACT_ABI_COMMIT_REVEAL 
@@ -102,10 +102,8 @@ export function useCommitReveal() {
 
     // Convert secret string to bytes32
     const secretBytes = toBytes(secret);
-    const secretBytes32 = new Uint8Array(32);
-    secretBytes.slice(0, 32).forEach((byte, i) => {
-      secretBytes32[i] = byte;
-    });
+    // Pad to 32 bytes and convert to hex
+    const secretBytes32 = pad(secretBytes.slice(0, 32), { size: 32 });
 
     console.log('[useCommitReveal] 📝 Revealing move...');
     console.log('[useCommitReveal] 🎮 Match ID:', matchId.toString());
@@ -115,7 +113,7 @@ export function useCommitReveal() {
       address: CONTRACT_ADDRESS_COMMIT_REVEAL as Address,
       abi: CONTRACT_ABI_COMMIT_REVEAL,
       functionName: 'revealMove',
-      args: [matchId, move, secretBytes32 as `0x${string}`],
+      args: [matchId, move, secretBytes32],
     });
   };
 
