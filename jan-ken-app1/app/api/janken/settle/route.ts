@@ -12,19 +12,6 @@ if (!supabaseKey) {
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Contract configuration
-const CONTRACT_ADDRESS = process.env.CONTRACT_ADDRESS_V3 || process.env.NEXT_PUBLIC_CONTRACT_ADDRESS_V3 || '';
-const RPC_URL = process.env.RPC_URL || process.env.NEXT_PUBLIC_BASE_SEPOLIA_RPC_URL || 'https://sepolia.base.org';
-const RELAYER_PRIVATE_KEY = process.env.RELAYER_PRIVATE_KEY || '';
-
-if (!CONTRACT_ADDRESS) {
-  throw new Error('Missing CONTRACT_ADDRESS_V3');
-}
-
-if (!RELAYER_PRIVATE_KEY) {
-  throw new Error('Missing RELAYER_PRIVATE_KEY');
-}
-
 /**
  * Determine winner based on moves
  * @param a Move A (1=Rock, 2=Paper, 3=Scissors)
@@ -44,6 +31,25 @@ function determineWinner(a: number, b: number): 'A' | 'B' | null {
 
 export async function POST(request: NextRequest) {
   try {
+    // Contract configuration (checked at runtime, not build time)
+    const CONTRACT_ADDRESS = process.env.CONTRACT_ADDRESS_V3 || process.env.NEXT_PUBLIC_CONTRACT_ADDRESS_V3 || '';
+    const RPC_URL = process.env.RPC_URL || process.env.NEXT_PUBLIC_BASE_SEPOLIA_RPC_URL || 'https://sepolia.base.org';
+    const RELAYER_PRIVATE_KEY = process.env.RELAYER_PRIVATE_KEY || '';
+
+    if (!CONTRACT_ADDRESS) {
+      return NextResponse.json(
+        { error: 'Missing CONTRACT_ADDRESS_V3 environment variable' },
+        { status: 500 }
+      );
+    }
+
+    if (!RELAYER_PRIVATE_KEY) {
+      return NextResponse.json(
+        { error: 'Missing RELAYER_PRIVATE_KEY environment variable' },
+        { status: 500 }
+      );
+    }
+
     const body = await request.json();
     const {
       gameId,
