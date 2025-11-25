@@ -285,80 +285,134 @@ export async function joinQueue(params: JoinQueueParams): Promise<string> {
 
 /**
  * Try to match players in the queue
+ * CRITICAL: Uses atomic operations to prevent fake matches
  */
 async function tryMatch(betLevel: number): Promise<MatchResult | null> {
-  // Find two waiting players with same bet level
-  const { data: players, error } = await supabase
-    .from('matchmaking_queue')
-    .select('*')
-    .eq('bet_level', betLevel)
-    .eq('status', 'waiting')
-    .order('created_at', { ascending: true })
-    .limit(2)
+  try {
+    // Step 1: Find two waiting players with same bet level
+    // CRITICAL: Use FOR UPDATE lock equivalent by checking status again after selection
+    const { data: players, error } = await supabase
+      .from('matchmaking_queue')
+      .select('*')
+      .eq('bet_level', betLevel)
+      .eq('status', 'waiting')
+      .order('created_at', { ascending: true })
+      .limit(2)
 
-  if (error) {
-    console.error('Error finding players:', error)
-    return null
-  }
+    if (error) {
+      console.error('[tryMatch] Error finding players:', error)
+      return null
+    }
 
-  if (!players || players.length < 2) {
-    return null // Not enough players
-  }
+    if (!players || players.length < 2) {
+      return null // Not enough players
+    }
 
-  const player1 = players[0]
-  const player2 = players[1]
+    const player1 = players[0]
+    const player2 = players[1]
 
-  // Create game
-  const gameId = `game-${player1.player_address}-${player2.player_address}-${Date.now()}`
+    // CRITICAL: Verify both players are still waiting (prevent race conditions)
+    const { data: verifyPlayers, error: verifyError } = await supabase
+      .from('matchmaking_queue')
+      .select('id, status')
+      .in('id', [player1.id, player2.id])
+      .eq('status', 'waiting')
 
-  const { data: game, error: gameError } = await supabase
-    .from('games')
-    .insert({
-      game_id: gameId,
-      player1_address: player1.player_address,
-      player1_fid: player1.player_fid,
-      player2_address: player2.player_address,
-      player2_fid: player2.player_fid,
-      bet_level: betLevel,
-      bet_amount: player1.bet_amount,
-      status: 'commit_phase',
+    if (verifyError) {
+      console.error('[tryMatch] Error verifying players:', verifyError)
+      return null
+    }
+
+    // CRITICAL: If either player is no longer waiting, abort match
+    if (!verifyPlayers || verifyPlayers.length !== 2) {
+      console.log('[tryMatch] ⚠️ One or both players no longer waiting, aborting match')
+      return null
+    }
+
+    // CRITICAL: Double-check player addresses match
+    const verifiedPlayer1 = verifyPlayers.find(p => p.id === player1.id)
+    const verifiedPlayer2 = verifyPlayers.find(p => p.id === player2.id)
+    
+    if (!verifiedPlayer1 || !verifiedPlayer2) {
+      console.log('[tryMatch] ⚠️ Could not verify both players, aborting match')
+      return null
+    }
+
+    // Step 2: Atomically update both players to 'matched' status FIRST
+    // This prevents them from being matched again
+    const { error: updateError } = await supabase
+      .from('matchmaking_queue')
+      .update({
+        status: 'matched',
+        matched_at: new Date().toISOString(),
+        matched_with: player1.id === verifiedPlayer1.id ? player2.player_address : player1.player_address,
+      })
+      .in('id', [player1.id, player2.id])
+      .eq('status', 'waiting') // CRITICAL: Only update if still waiting
+
+    if (updateError) {
+      console.error('[tryMatch] Error updating queue status:', updateError)
+      return null
+    }
+
+    // Step 3: Verify the update succeeded
+    const { data: verifyUpdate, error: verifyUpdateError } = await supabase
+      .from('matchmaking_queue')
+      .select('id, status')
+      .in('id', [player1.id, player2.id])
+      .eq('status', 'matched')
+
+    if (verifyUpdateError || !verifyUpdate || verifyUpdate.length !== 2) {
+      console.error('[tryMatch] ⚠️ Queue update verification failed, match may have been aborted')
+      return null
+    }
+
+    // Step 4: Create game only after queue update is confirmed
+    const gameId = `game-${player1.player_address}-${player2.player_address}-${Date.now()}`
+
+    const { data: game, error: gameError } = await supabase
+      .from('games')
+      .insert({
+        game_id: gameId,
+        player1_address: player1.player_address,
+        player1_fid: player1.player_fid,
+        player2_address: player2.player_address,
+        player2_fid: player2.player_fid,
+        bet_level: betLevel,
+        bet_amount: player1.bet_amount,
+        status: 'commit_phase',
+      })
+      .select()
+      .single()
+
+    if (gameError) {
+      console.error('[tryMatch] Error creating game:', gameError)
+      // CRITICAL: Rollback queue status if game creation fails
+      await supabase
+        .from('matchmaking_queue')
+        .update({ status: 'waiting', matched_at: null, matched_with: null })
+        .in('id', [player1.id, player2.id])
+      return null
+    }
+
+    console.log('[tryMatch] ✅ Match created successfully:', {
+      gameId,
+      player1: player1.player_address.slice(0, 10) + '...',
+      player2: player2.player_address.slice(0, 10) + '...',
     })
-    .select()
-    .single()
 
-  if (gameError) {
-    console.error('Error creating game:', gameError)
+    return {
+      gameId,
+      player1Address: player1.player_address as Address,
+      player1Fid: player1.player_fid,
+      player2Address: player2.player_address as Address,
+      player2Fid: player2.player_fid,
+      betLevel,
+      betAmount: BigInt(player1.bet_amount),
+    }
+  } catch (error: any) {
+    console.error('[tryMatch] Unexpected error:', error)
     return null
-  }
-
-  // Update queue entries to matched
-  await supabase
-    .from('matchmaking_queue')
-    .update({
-      status: 'matched',
-      matched_at: new Date().toISOString(),
-    })
-    .in('id', [player1.id, player2.id])
-  
-  // Set matched_with for each player
-  await supabase
-    .from('matchmaking_queue')
-    .update({ matched_with: player2.player_address })
-    .eq('id', player1.id)
-  
-  await supabase
-    .from('matchmaking_queue')
-    .update({ matched_with: player1.player_address })
-    .eq('id', player2.id)
-
-  return {
-    gameId,
-    player1Address: player1.player_address as Address,
-    player1Fid: player1.player_fid,
-    player2Address: player2.player_address as Address,
-    player2Fid: player2.player_fid,
-    betLevel,
-    betAmount: BigInt(player1.bet_amount),
   }
 }
 

@@ -232,17 +232,67 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
     };
   }, [isConnected, hasJoinedQueue, betLevel]);
   
-  // Cleanup on unmount
+  // Cleanup on unmount - CRITICAL: Leave queue when component unmounts or app closes
   useEffect(() => {
-    return () => {
+    // Function to leave queue
+    const cleanup = async () => {
+      if (address && hasJoinedQueue) {
+        try {
+          console.log('[Matchmaking] 🧹 Cleanup: Leaving queue on unmount/app close')
+          await leaveQueue(address)
+          setHasJoinedQueue(false)
+        } catch (err) {
+          console.error('[Matchmaking] Error leaving queue on cleanup:', err)
+        }
+      }
+      
+      // Clear intervals
       if (matchCheckIntervalRef.current) {
-        clearInterval(matchCheckIntervalRef.current);
+        clearInterval(matchCheckIntervalRef.current)
+        matchCheckIntervalRef.current = null
       }
       if (queueCountIntervalRef.current) {
-        clearInterval(queueCountIntervalRef.current);
+        clearInterval(queueCountIntervalRef.current)
+        queueCountIntervalRef.current = null
       }
-    };
-  }, []);
+    }
+
+    // Handle page visibility change (app closed/minimized)
+    const handleVisibilityChange = () => {
+      if (document.hidden && hasJoinedQueue) {
+        console.log('[Matchmaking] 👁️ Page hidden, leaving queue')
+        cleanup()
+      }
+    }
+
+    // Handle beforeunload (browser/tab close)
+    const handleBeforeUnload = () => {
+      if (hasJoinedQueue) {
+        console.log('[Matchmaking] 🚪 Before unload, leaving queue')
+        // Use sendBeacon for reliable cleanup on page close
+        if (navigator.sendBeacon && address) {
+          // Note: sendBeacon doesn't support async, so we'll use sync fetch as fallback
+          fetch('/api/match/leave', {
+            method: 'POST',
+            body: JSON.stringify({ playerAddress: address }),
+            headers: { 'Content-Type': 'application/json' },
+            keepalive: true,
+          }).catch(() => {})
+        }
+      }
+    }
+
+    // Add event listeners
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('beforeunload', handleBeforeUnload)
+
+    // Cleanup on unmount
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+      cleanup()
+    }
+  }, [address, hasJoinedQueue])
   
   // Handle cancel
   const handleCancel = useCallback(async () => {
