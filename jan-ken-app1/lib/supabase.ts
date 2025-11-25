@@ -72,7 +72,9 @@ const customFetch = async (url: RequestInfo | URL, options?: RequestInit): Promi
     
     // Check if response is ok
     if (!response.ok) {
-      const errorText = await response.text().catch(() => 'Unknown error')
+      // Clone response before reading body to avoid "Body is disturbed" error
+      const clonedResponse = response.clone()
+      const errorText = await clonedResponse.text().catch(() => 'Unknown error')
       const errorInfo = {
         status: response.status,
         statusText: response.statusText,
@@ -84,6 +86,7 @@ const customFetch = async (url: RequestInfo | URL, options?: RequestInit): Promi
       console.log('[Supabase Fetch] ✅ Response OK:', response.status)
     }
     
+    // Return original response (not cloned) so Supabase can read it
     return response
   } catch (error: any) {
     // Log detailed fetch error with proper serialization
