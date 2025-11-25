@@ -6,6 +6,27 @@ import { Address } from 'viem'
  * This provides fast matching without waiting for blockchain confirmations
  */
 
+// Lock mechanism to prevent concurrent tryMatch calls for same betLevel
+const matchLocks = new Map<number, boolean>()
+
+/**
+ * Acquire lock for matching at a specific bet level
+ */
+function acquireLock(betLevel: number): boolean {
+  if (matchLocks.get(betLevel)) {
+    return false // Lock already held
+  }
+  matchLocks.set(betLevel, true)
+  return true
+}
+
+/**
+ * Release lock for matching at a specific bet level
+ */
+function releaseLock(betLevel: number): void {
+  matchLocks.delete(betLevel)
+}
+
 export interface JoinQueueParams {
   playerAddress: Address
   playerFid: number | null
@@ -285,9 +306,15 @@ export async function joinQueue(params: JoinQueueParams): Promise<string> {
 
 /**
  * Try to match players in the queue
- * CRITICAL: Uses atomic operations to prevent fake matches
+ * CRITICAL: Uses atomic operations and locking to prevent fake matches
  */
 async function tryMatch(betLevel: number): Promise<MatchResult | null> {
+  // CRITICAL: Acquire lock to prevent concurrent matching attempts
+  if (!acquireLock(betLevel)) {
+    console.log('[tryMatch] ⚠️ Lock already held for betLevel', betLevel, '- skipping match attempt')
+    return null
+  }
+
   try {
     // Step 1: Find two waiting players with same bet level
     // CRITICAL: Use FOR UPDATE lock equivalent by checking status again after selection
@@ -301,69 +328,159 @@ async function tryMatch(betLevel: number): Promise<MatchResult | null> {
 
     if (error) {
       console.error('[tryMatch] Error finding players:', error)
+      releaseLock(betLevel)
       return null
     }
 
     if (!players || players.length < 2) {
+      releaseLock(betLevel)
       return null // Not enough players
     }
 
     const player1 = players[0]
     const player2 = players[1]
+    
+    // CRITICAL: Verify player addresses are valid and not the same
+    if (!player1.player_address || !player2.player_address) {
+      console.error('[tryMatch] ⚠️ Invalid player addresses')
+      releaseLock(betLevel)
+      return null
+    }
+    
+    if (player1.player_address.toLowerCase() === player2.player_address.toLowerCase()) {
+      console.error('[tryMatch] ⚠️ Cannot match player with themselves')
+      releaseLock(betLevel)
+      return null
+    }
 
     // CRITICAL: Verify both players are still waiting (prevent race conditions)
+    // Get full player data to verify addresses match
     const { data: verifyPlayers, error: verifyError } = await supabase
       .from('matchmaking_queue')
-      .select('id, status')
+      .select('id, status, player_address, bet_level')
       .in('id', [player1.id, player2.id])
       .eq('status', 'waiting')
 
     if (verifyError) {
       console.error('[tryMatch] Error verifying players:', verifyError)
+      releaseLock(betLevel)
       return null
     }
 
     // CRITICAL: If either player is no longer waiting, abort match
     if (!verifyPlayers || verifyPlayers.length !== 2) {
       console.log('[tryMatch] ⚠️ One or both players no longer waiting, aborting match')
+      releaseLock(betLevel)
       return null
     }
 
-    // CRITICAL: Double-check player addresses match
+    // CRITICAL: Verify player addresses and bet levels match
     const verifiedPlayer1 = verifyPlayers.find(p => p.id === player1.id)
     const verifiedPlayer2 = verifyPlayers.find(p => p.id === player2.id)
     
     if (!verifiedPlayer1 || !verifiedPlayer2) {
       console.log('[tryMatch] ⚠️ Could not verify both players, aborting match')
+      releaseLock(betLevel)
+      return null
+    }
+    
+    // CRITICAL: Verify addresses match exactly
+    if (
+      verifiedPlayer1.player_address.toLowerCase() !== player1.player_address.toLowerCase() ||
+      verifiedPlayer2.player_address.toLowerCase() !== player2.player_address.toLowerCase()
+    ) {
+      console.error('[tryMatch] ⚠️ Player address mismatch during verification')
+      releaseLock(betLevel)
+      return null
+    }
+    
+    // CRITICAL: Verify bet levels match
+    if (verifiedPlayer1.bet_level !== betLevel || verifiedPlayer2.bet_level !== betLevel) {
+      console.error('[tryMatch] ⚠️ Bet level mismatch during verification')
+      releaseLock(betLevel)
       return null
     }
 
     // Step 2: Atomically update both players to 'matched' status FIRST
+    // CRITICAL: Update each player separately with their matched_with address
     // This prevents them from being matched again
-    const { error: updateError } = await supabase
+    
+    // Update player1
+    const { error: updateError1, data: updateData1 } = await supabase
       .from('matchmaking_queue')
       .update({
         status: 'matched',
         matched_at: new Date().toISOString(),
-        matched_with: player1.id === verifiedPlayer1.id ? player2.player_address : player1.player_address,
+        matched_with: player2.player_address.toLowerCase(),
       })
-      .in('id', [player1.id, player2.id])
+      .eq('id', player1.id)
       .eq('status', 'waiting') // CRITICAL: Only update if still waiting
+      .select()
 
-    if (updateError) {
-      console.error('[tryMatch] Error updating queue status:', updateError)
+    if (updateError1 || !updateData1 || updateData1.length === 0) {
+      console.error('[tryMatch] Error updating player1 queue status:', updateError1)
+      releaseLock(betLevel)
       return null
     }
 
-    // Step 3: Verify the update succeeded
+    // Update player2
+    const { error: updateError2, data: updateData2 } = await supabase
+      .from('matchmaking_queue')
+      .update({
+        status: 'matched',
+        matched_at: new Date().toISOString(),
+        matched_with: player1.player_address.toLowerCase(),
+      })
+      .eq('id', player2.id)
+      .eq('status', 'waiting') // CRITICAL: Only update if still waiting
+      .select()
+
+    if (updateError2 || !updateData2 || updateData2.length === 0) {
+      console.error('[tryMatch] Error updating player2 queue status:', updateError2)
+      // CRITICAL: Rollback player1 if player2 update fails
+      await supabase
+        .from('matchmaking_queue')
+        .update({ status: 'waiting', matched_at: null, matched_with: null })
+        .eq('id', player1.id)
+      releaseLock(betLevel)
+      return null
+    }
+
+    // Step 3: Verify the update succeeded for both players
     const { data: verifyUpdate, error: verifyUpdateError } = await supabase
       .from('matchmaking_queue')
-      .select('id, status')
+      .select('id, status, player_address, matched_with')
       .in('id', [player1.id, player2.id])
       .eq('status', 'matched')
 
     if (verifyUpdateError || !verifyUpdate || verifyUpdate.length !== 2) {
       console.error('[tryMatch] ⚠️ Queue update verification failed, match may have been aborted')
+      // Rollback both players
+      await supabase
+        .from('matchmaking_queue')
+        .update({ status: 'waiting', matched_at: null, matched_with: null })
+        .in('id', [player1.id, player2.id])
+      releaseLock(betLevel)
+      return null
+    }
+    
+    // CRITICAL: Verify matched_with addresses are correct
+    const verifyPlayer1 = verifyUpdate.find(p => p.id === player1.id)
+    const verifyPlayer2 = verifyUpdate.find(p => p.id === player2.id)
+    
+    if (
+      !verifyPlayer1 || 
+      !verifyPlayer2 ||
+      verifyPlayer1.matched_with?.toLowerCase() !== player2.player_address.toLowerCase() ||
+      verifyPlayer2.matched_with?.toLowerCase() !== player1.player_address.toLowerCase()
+    ) {
+      console.error('[tryMatch] ⚠️ matched_with verification failed')
+      // Rollback both players
+      await supabase
+        .from('matchmaking_queue')
+        .update({ status: 'waiting', matched_at: null, matched_with: null })
+        .in('id', [player1.id, player2.id])
+      releaseLock(betLevel)
       return null
     }
 
@@ -392,6 +509,42 @@ async function tryMatch(betLevel: number): Promise<MatchResult | null> {
         .from('matchmaking_queue')
         .update({ status: 'waiting', matched_at: null, matched_with: null })
         .in('id', [player1.id, player2.id])
+      releaseLock(betLevel)
+      return null
+    }
+    
+    // CRITICAL: Final verification - check game was created with correct players
+    const { data: verifyGame, error: verifyGameError } = await supabase
+      .from('games')
+      .select('player1_address, player2_address')
+      .eq('game_id', gameId)
+      .single()
+    
+    if (verifyGameError || !verifyGame) {
+      console.error('[tryMatch] ⚠️ Game verification failed after creation')
+      // Rollback everything
+      await supabase.from('games').delete().eq('game_id', gameId)
+      await supabase
+        .from('matchmaking_queue')
+        .update({ status: 'waiting', matched_at: null, matched_with: null })
+        .in('id', [player1.id, player2.id])
+      releaseLock(betLevel)
+      return null
+    }
+    
+    // CRITICAL: Verify game players match queue players
+    if (
+      verifyGame.player1_address.toLowerCase() !== player1.player_address.toLowerCase() ||
+      verifyGame.player2_address.toLowerCase() !== player2.player_address.toLowerCase()
+    ) {
+      console.error('[tryMatch] ⚠️ Game player mismatch after creation')
+      // Rollback everything
+      await supabase.from('games').delete().eq('game_id', gameId)
+      await supabase
+        .from('matchmaking_queue')
+        .update({ status: 'waiting', matched_at: null, matched_with: null })
+        .in('id', [player1.id, player2.id])
+      releaseLock(betLevel)
       return null
     }
 
@@ -401,6 +554,7 @@ async function tryMatch(betLevel: number): Promise<MatchResult | null> {
       player2: player2.player_address.slice(0, 10) + '...',
     })
 
+    releaseLock(betLevel)
     return {
       gameId,
       player1Address: player1.player_address as Address,
@@ -412,6 +566,7 @@ async function tryMatch(betLevel: number): Promise<MatchResult | null> {
     }
   } catch (error: any) {
     console.error('[tryMatch] Unexpected error:', error)
+    releaseLock(betLevel)
     return null
   }
 }
