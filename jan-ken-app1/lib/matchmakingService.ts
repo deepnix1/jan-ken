@@ -576,6 +576,23 @@ async function tryMatch(betLevel: number): Promise<MatchResult | null> {
  */
 export async function checkForMatch(playerAddress: Address): Promise<MatchResult | null> {
   try {
+    // CRITICAL: First verify player is still in queue
+    const { data: queueStatus, error: statusError } = await supabase
+      .from('matchmaking_queue')
+      .select('id, status')
+      .eq('player_address', playerAddress.toLowerCase())
+      .maybeSingle()
+    
+    // If player is not in queue at all, return null
+    if (statusError && statusError.code === 'PGRST116') {
+      return null // Not in queue
+    }
+    
+    // If player is not waiting or matched, they're cancelled or other status
+    if (!queueStatus || (queueStatus.status !== 'waiting' && queueStatus.status !== 'matched')) {
+      return null // Cancelled or other status
+    }
+    
     // Check if player has been matched with retry
     let retries = 2
     let queueEntry: any = null
@@ -608,6 +625,31 @@ export async function checkForMatch(playerAddress: Address): Promise<MatchResult
     }
 
     if (!queueEntry || !queueEntry.matched_with) {
+      return null
+    }
+    
+    // CRITICAL: Verify matched_with address is valid
+    if (!queueEntry.matched_with || queueEntry.matched_with === '0x0000000000000000000000000000000000000000') {
+      console.warn('[checkForMatch] ⚠️ Invalid matched_with address')
+      return null
+    }
+    
+    // CRITICAL: Verify the matched_with player is also in queue and matched
+    const { data: matchedPlayer, error: matchedPlayerError } = await supabase
+      .from('matchmaking_queue')
+      .select('id, status, player_address, matched_with')
+      .eq('player_address', queueEntry.matched_with.toLowerCase())
+      .eq('status', 'matched')
+      .maybeSingle()
+    
+    if (matchedPlayerError || !matchedPlayer) {
+      console.warn('[checkForMatch] ⚠️ Matched player not found in queue or not matched')
+      return null
+    }
+    
+    // CRITICAL: Verify matched player's matched_with points back to us
+    if (matchedPlayer.matched_with?.toLowerCase() !== playerAddress.toLowerCase()) {
+      console.warn('[checkForMatch] ⚠️ Matched player does not point back to us')
       return null
     }
 
