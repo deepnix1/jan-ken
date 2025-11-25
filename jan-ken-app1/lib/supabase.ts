@@ -49,7 +49,11 @@ if (!supabaseKey) {
 
 // Create a custom fetch wrapper with better error handling
 const customFetch = async (url: RequestInfo | URL, options?: RequestInit): Promise<Response> => {
+  const urlStr = String(url)
+  
   try {
+    console.log('[Supabase Fetch] Attempting fetch:', urlStr.slice(0, 100))
+    
     const response = await fetch(url, {
       ...options,
       headers: {
@@ -61,24 +65,28 @@ const customFetch = async (url: RequestInfo | URL, options?: RequestInit): Promi
     // Check if response is ok
     if (!response.ok) {
       const errorText = await response.text().catch(() => 'Unknown error')
-      console.error('[Supabase Fetch] Response not OK:', {
+      const errorInfo = {
         status: response.status,
         statusText: response.statusText,
-        url: String(url),
+        url: urlStr.slice(0, 200),
         errorText: errorText.slice(0, 200),
-      })
+      }
+      console.error('[Supabase Fetch] Response not OK:', JSON.stringify(errorInfo, null, 2))
+    } else {
+      console.log('[Supabase Fetch] ✅ Response OK:', response.status)
     }
     
     return response
   } catch (error: any) {
-    // Log detailed fetch error
-    console.error('[Supabase Fetch] Fetch error:', {
-      name: error?.name,
-      message: error?.message,
-      type: error?.constructor?.name,
-      url: String(url),
-      stack: error?.stack?.split('\n').slice(0, 3),
-    })
+    // Log detailed fetch error with proper serialization
+    const errorInfo = {
+      name: error?.name || 'Unknown',
+      message: error?.message || 'No message',
+      type: error?.constructor?.name || 'Unknown',
+      url: urlStr.slice(0, 200),
+      stack: error?.stack ? error.stack.split('\n').slice(0, 3) : null,
+    }
+    console.error('[Supabase Fetch] Fetch error:', JSON.stringify(errorInfo, null, 2))
     
     // Re-throw with more context
     if (error?.name === 'TypeError' && error?.message?.includes('fetch')) {
