@@ -101,12 +101,37 @@ export function DebugPanel() {
       originalError(...args);
       const errorStr = args.join(' ');
       
+      // Serialize error objects properly
+      const serializedError = args.map(arg => {
+        if (arg instanceof Error) {
+          return {
+            name: arg.name,
+            message: arg.message,
+            stack: arg.stack,
+          }
+        }
+        if (typeof arg === 'object' && arg !== null) {
+          try {
+            return JSON.parse(JSON.stringify(arg, (key, value) => {
+              // Handle BigInt and other non-serializable values
+              if (typeof value === 'bigint') {
+                return value.toString()
+              }
+              return value
+            }))
+          } catch {
+            return String(arg)
+          }
+        }
+        return arg
+      })
+      
       const log: TransactionLog = {
         id: `error-${Date.now()}-${Math.random()}`,
         type: 'error',
         message: errorStr,
         timestamp: new Date().toISOString(),
-        error: args,
+        error: serializedError,
       };
       logsRef.current.push(log);
       if (logsRef.current.length > 100) logsRef.current.shift();

@@ -45,8 +45,21 @@ export async function joinQueue(params: JoinQueueParams): Promise<string> {
       .maybeSingle() // Use maybeSingle instead of single to avoid error if not found
 
     if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = not found, which is OK
-      console.error('[joinQueue] Error checking existing queue:', checkError)
-      throw new Error(`Failed to check queue: ${checkError.message || 'Network error'}`)
+      // Log detailed error information
+      const errorDetails = {
+        code: checkError.code,
+        message: checkError.message,
+        details: checkError.details,
+        hint: checkError.hint,
+      }
+      console.error('[joinQueue] Error checking existing queue:', JSON.stringify(errorDetails, null, 2))
+      
+      // Check for specific error types
+      if (checkError.message?.includes('fetch') || checkError.message?.includes('Load failed') || checkError.message?.includes('Failed to fetch')) {
+        throw new Error('Network error: Unable to connect to Supabase. Please check your internet connection.')
+      }
+      
+      throw new Error(`Failed to check queue: ${checkError.message || checkError.code || 'Unknown error'}`)
     }
 
     if (existing) {
@@ -134,18 +147,32 @@ export async function joinQueue(params: JoinQueueParams): Promise<string> {
     // If we exhausted retries
     throw new Error(`Failed to join queue after 3 retries: ${lastError?.message || 'Network error'}`)
   } catch (error: any) {
-    console.error('[joinQueue] Final error:', error)
+    // Log detailed error information
+    const errorDetails = {
+      name: error?.name,
+      message: error?.message,
+      stack: error?.stack,
+      cause: error?.cause,
+      code: error?.code,
+    }
+    console.error('[joinQueue] Final error:', JSON.stringify(errorDetails, null, 2))
+    console.error('[joinQueue] Raw error object:', error)
     
     // Provide user-friendly error messages
-    if (error.message?.includes('Load failed') || error.message?.includes('fetch')) {
+    if (error?.message?.includes('Load failed') || error?.message?.includes('fetch') || error?.message?.includes('Failed to fetch') || error?.name === 'TypeError') {
       throw new Error('Network error: Unable to connect to matchmaking service. Please check your internet connection and try again.')
     }
     
-    if (error.message?.includes('PGRST') || error.message?.includes('PostgREST')) {
+    if (error?.message?.includes('PGRST') || error?.message?.includes('PostgREST')) {
       throw new Error('Database connection error. Please try again in a moment.')
     }
     
-    throw error
+    // Re-throw with better message if available
+    if (error?.message) {
+      throw new Error(error.message)
+    }
+    
+    throw new Error('Failed to join queue. Please try again.')
   }
 }
 

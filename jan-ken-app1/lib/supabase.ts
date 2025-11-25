@@ -11,10 +11,11 @@ if (!supabaseKey) {
   }
 }
 
-// Create Supabase client with better error handling and retry configuration
+// Create Supabase client with minimal configuration for reliability
+// Using default fetch to avoid wrapper issues
 export const supabase = createClient(supabaseUrl, supabaseKey || '', {
   auth: {
-    persistSession: false, // Don't persist auth sessions in this app
+    persistSession: false,
     autoRefreshToken: false,
   },
   db: {
@@ -24,28 +25,24 @@ export const supabase = createClient(supabaseUrl, supabaseKey || '', {
     headers: {
       'x-client-info': 'jan-ken-app',
     },
-    fetch: (url, options = {}) => {
-      // Enhanced fetch with timeout and retry
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
-      
-      return fetch(url, {
-        ...options,
-        signal: controller.signal,
-      }).finally(() => {
-        clearTimeout(timeoutId)
-      }).catch((error) => {
-        if (error.name === 'AbortError') {
-          throw new Error('Request timeout: Supabase connection took too long')
-        }
-        if (error.message?.includes('Load failed') || error.message?.includes('Failed to fetch')) {
-          throw new Error('Network error: Unable to connect to Supabase. Please check your internet connection.')
-        }
-        throw error
-      })
-    },
   },
 })
+
+// Test Supabase connection on client-side
+if (typeof window !== 'undefined') {
+  // Verify connection is working
+  supabase.from('matchmaking_queue').select('count', { count: 'exact', head: true })
+    .then(({ error }) => {
+      if (error) {
+        console.warn('[Supabase] Connection test failed:', error)
+      } else {
+        console.log('[Supabase] ✅ Connection verified')
+      }
+    })
+    .catch((err) => {
+      console.error('[Supabase] ❌ Connection test error:', err)
+    })
+}
 
 // Database Types
 export interface MatchmakingQueue {
