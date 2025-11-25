@@ -136,27 +136,26 @@ export const supabase = createClient(
 // Test Supabase connection on client-side
 if (typeof window !== 'undefined') {
   // Verify connection is working (with delay to ensure client is ready)
-  setTimeout(() => {
-    supabase.from('matchmaking_queue').select('count', { count: 'exact', head: true })
-      .then(({ error }) => {
-        if (error) {
-          console.warn('[Supabase] Connection test failed:', {
-            code: error.code,
-            message: error.message,
-            details: error.details,
-            hint: error.hint,
-          })
-        } else {
-          console.log('[Supabase] ✅ Connection verified')
-        }
-      })
-      .catch((err) => {
-        console.error('[Supabase] ❌ Connection test error:', {
-          name: err?.name,
-          message: err?.message,
-          stack: err?.stack?.split('\n').slice(0, 3),
+  setTimeout(async () => {
+    try {
+      const { error } = await supabase.from('matchmaking_queue').select('count', { count: 'exact', head: true })
+      if (error) {
+        console.warn('[Supabase] Connection test failed:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
         })
+      } else {
+        console.log('[Supabase] ✅ Connection verified')
+      }
+    } catch (err: any) {
+      console.error('[Supabase] ❌ Connection test error:', {
+        name: err?.name,
+        message: err?.message,
+        stack: err?.stack?.split('\n').slice(0, 3),
       })
+    }
   }, 1000)
 }
 
