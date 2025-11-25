@@ -1,7 +1,28 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://iophfhfnctqufqsmunyz.supabase.co'
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_KEY
+// Hardcoded fallback values for testing (remove in production if needed)
+const DEFAULT_SUPABASE_URL = 'https://iophfhfnctqufqsmunyz.supabase.co'
+const DEFAULT_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlvcGhmaGZuY3RxdWZxc211bnl6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQwMTQyNzQsImV4cCI6MjA3OTU5MDI3NH0.VRRauQBI6dIj3q2PhZzyXjzlKlzPF2s3N7RKctfKlD0'
+
+// Get environment variables with fallback
+function getSupabaseConfig() {
+  const url = typeof window !== 'undefined' 
+    ? (window as any).__NEXT_DATA__?.env?.NEXT_PUBLIC_SUPABASE_URL 
+      || process.env.NEXT_PUBLIC_SUPABASE_URL 
+      || DEFAULT_SUPABASE_URL
+    : process.env.NEXT_PUBLIC_SUPABASE_URL || DEFAULT_SUPABASE_URL
+
+  const key = typeof window !== 'undefined'
+    ? (window as any).__NEXT_DATA__?.env?.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      || process.env.SUPABASE_KEY
+      || DEFAULT_SUPABASE_KEY
+    : process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_KEY || DEFAULT_SUPABASE_KEY
+
+  return { url, key }
+}
+
+const { url: supabaseUrl, key: supabaseKey } = getSupabaseConfig()
 
 // Log environment variable status (for debugging)
 if (typeof window !== 'undefined') {
@@ -10,11 +31,16 @@ if (typeof window !== 'undefined') {
     keyExists: !!supabaseKey,
     keyLength: supabaseKey?.length || 0,
     keyPrefix: supabaseKey?.slice(0, 20) || 'none',
+    usingFallback: supabaseKey === DEFAULT_SUPABASE_KEY,
+    envVars: {
+      NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || 'NOT_SET',
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 'SET' : 'NOT_SET',
+    }
   })
 }
 
 if (!supabaseKey) {
-  console.error('Missing Supabase key. Please set NEXT_PUBLIC_SUPABASE_ANON_KEY or SUPABASE_KEY environment variable.')
+  console.error('❌ CRITICAL: Missing Supabase key. Please set NEXT_PUBLIC_SUPABASE_ANON_KEY or SUPABASE_KEY environment variable.')
   // Don't throw in client-side, just log error
   if (typeof window === 'undefined') {
     throw new Error('Missing Supabase key. Please set NEXT_PUBLIC_SUPABASE_ANON_KEY or SUPABASE_KEY environment variable.')

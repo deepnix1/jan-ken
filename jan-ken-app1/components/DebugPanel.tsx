@@ -34,10 +34,14 @@ export function DebugPanel() {
   const writeContractCallsRef = useRef<Array<{ timestamp: string; params: any; result?: any; error?: any }>>([]);
 
   // Intercept console.log for transaction monitoring
+  // CRITICAL: This must run FIRST, before any other code
   useEffect(() => {
+    // Store original functions
     const originalLog = console.log;
     const originalError = console.error;
     const originalWarn = console.warn;
+    
+    // Override immediately to catch all errors
 
     console.log = (...args: any[]) => {
       originalLog(...args);

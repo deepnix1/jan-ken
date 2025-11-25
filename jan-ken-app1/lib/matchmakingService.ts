@@ -46,6 +46,7 @@ export async function joinQueue(params: JoinQueueParams): Promise<string> {
 
     if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = not found, which is OK
       // Log detailed error information with proper serialization
+      // CRITICAL: Serialize immediately to avoid [object Object]
       const errorInfo = {
         code: checkError.code || 'NO_CODE',
         message: checkError.message || 'NO_MESSAGE',
@@ -55,11 +56,18 @@ export async function joinQueue(params: JoinQueueParams): Promise<string> {
         statusText: (checkError as any)?.statusText || null,
       }
       
-      console.error('[joinQueue] Error checking existing queue:', JSON.stringify(errorInfo, null, 2))
-      console.error('[joinQueue] Error code:', errorInfo.code)
-      console.error('[joinQueue] Error message:', errorInfo.message)
-      console.error('[joinQueue] Error details:', errorInfo.details)
-      console.error('[joinQueue] Error hint:', errorInfo.hint)
+      // Serialize to string immediately
+      const errorInfoStr = JSON.stringify(errorInfo, null, 2)
+      const errorCodeStr = String(errorInfo.code)
+      const errorMsgStr = String(errorInfo.message)
+      const errorDetailsStr = errorInfo.details ? JSON.stringify(errorInfo.details) : 'null'
+      const errorHintStr = errorInfo.hint ? String(errorInfo.hint) : 'null'
+      
+      console.error('[joinQueue] Error checking existing queue:', errorInfoStr)
+      console.error('[joinQueue] Error code:', errorCodeStr)
+      console.error('[joinQueue] Error message:', errorMsgStr)
+      console.error('[joinQueue] Error details:', errorDetailsStr)
+      console.error('[joinQueue] Error hint:', errorHintStr)
       
       // Check for specific error types
       const errorMsg = errorInfo.message || String(checkError) || ''

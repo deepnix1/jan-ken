@@ -93,6 +93,7 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
         setError(null);
       } catch (err: any) {
         // Log detailed error information with proper serialization
+        // CRITICAL: Serialize immediately to avoid [object Object]
         const errorDetails = {
           name: err?.name || 'Unknown',
           message: err?.message || 'No message',
@@ -100,13 +101,18 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
           stack: err?.stack ? err.stack.split('\n').slice(0, 5) : null,
         }
         
-        console.error('[Matchmaking] ❌ Error joining queue:', JSON.stringify(errorDetails, null, 2))
-        console.error('[Matchmaking] ❌ Error name:', errorDetails.name)
-        console.error('[Matchmaking] ❌ Error message:', errorDetails.message)
-        console.error('[Matchmaking] ❌ Error code:', errorDetails.code)
-        if (errorDetails.stack) {
-          console.error('[Matchmaking] ❌ Error stack:', errorDetails.stack.join('\n'))
-        }
+        // Serialize to strings immediately
+        const errorDetailsStr = JSON.stringify(errorDetails, null, 2)
+        const errorNameStr = String(errorDetails.name)
+        const errorMsgStr = String(errorDetails.message)
+        const errorCodeStr = errorDetails.code ? String(errorDetails.code) : 'null'
+        const errorStackStr = errorDetails.stack ? errorDetails.stack.join('\n') : 'null'
+        
+        console.error('[Matchmaking] ❌ Error joining queue:', errorDetailsStr)
+        console.error('[Matchmaking] ❌ Error name:', errorNameStr)
+        console.error('[Matchmaking] ❌ Error message:', errorMsgStr)
+        console.error('[Matchmaking] ❌ Error code:', errorCodeStr)
+        console.error('[Matchmaking] ❌ Error stack:', errorStackStr)
         
         // Provide user-friendly error message
         let errorMessage = 'Failed to join queue. Please try again.';
