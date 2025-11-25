@@ -144,29 +144,59 @@ export async function joinQueue(params: JoinQueueParams): Promise<string> {
         if (error) {
           lastError = error
           
-          // Handle specific Supabase errors
-          if (error.code === '23505') { // Unique constraint violation
-            // Player already in queue, try to get existing entry
-            const { data: existingAfter } = await supabase
+          // Handle duplicate key error (409 or 23505) - player already in queue
+          const isDuplicateError = 
+            error.code === '23505' || 
+            error.code === 'PGRST301' ||
+            error.message?.includes('duplicate key') || 
+            error.message?.includes('unique constraint') ||
+            error.message?.includes('Body is disturbed') // Sometimes duplicate errors show as body disturbed
+          
+          if (isDuplicateError) {
+            console.log('[joinQueue] Duplicate key detected, fetching existing queue entry...')
+            
+            // Fetch existing queue entry
+            const { data: existingAfter, error: fetchError } = await supabase
               .from('matchmaking_queue')
               .select('id')
               .eq('player_address', playerAddress.toLowerCase())
               .eq('status', 'waiting')
               .maybeSingle()
-            
-            if (existingAfter) {
+              
+            if (fetchError) {
+              console.error('[joinQueue] Error fetching existing entry after duplicate:', fetchError)
+              // Continue to retry or throw
+            } else if (existingAfter) {
+              console.log('[joinQueue] ✅ Found existing queue entry:', existingAfter.id)
               return existingAfter.id
             }
           }
           
-          // Retry on network errors
-          if (error.message?.includes('fetch') || error.message?.includes('Load failed') || error.code === 'PGRST301') {
+          // Retry on network errors (but not duplicate errors)
+          if (!isDuplicateError && (error.message?.includes('fetch') || error.message?.includes('Load failed') || error.code === 'PGRST301')) {
             retries--
             if (retries > 0) {
               console.warn(`[joinQueue] Retry ${3 - retries}/3 after error:`, error.message)
               await new Promise(resolve => setTimeout(resolve, 1000 * (4 - retries))) // Exponential backoff
               continue
             }
+          }
+          
+          // For duplicate errors, if we couldn't fetch existing entry, it's still a success (we're in queue)
+          if (isDuplicateError) {
+            console.log('[joinQueue] Duplicate error but couldn't fetch entry - assuming success')
+            // Try one final fetch
+            const { data: finalCheck } = await supabase
+              .from('matchmaking_queue')
+              .select('id')
+              .eq('player_address', playerAddress.toLowerCase())
+              .eq('status', 'waiting')
+              .maybeSingle()
+            if (finalCheck) {
+              return finalCheck.id
+            }
+            // If still can't find, return a success message (user is likely in queue)
+            throw new Error('Already in queue, but could not verify. Please refresh the page.')
           }
           
           throw new Error(`Failed to join queue: ${error.message || error.code || 'Unknown error'}`)
