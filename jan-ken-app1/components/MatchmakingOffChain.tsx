@@ -92,16 +92,12 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
         setHasJoinedQueue(true);
         setError(null);
       } catch (err: any) {
-        // Log detailed error information
-        const errorDetails = {
-          name: err?.name,
-          message: err?.message,
-          stack: err?.stack?.split('\n').slice(0, 5), // First 5 lines of stack
-          cause: err?.cause,
-          code: err?.code,
-        }
-        console.error('[Matchmaking] ❌ Error joining queue:', JSON.stringify(errorDetails, null, 2))
-        console.error('[Matchmaking] Raw error:', err)
+        // Log detailed error information (avoid JSON.stringify for better compatibility)
+        console.error('[Matchmaking] ❌ Error joining queue - Name:', err?.name)
+        console.error('[Matchmaking] ❌ Error joining queue - Message:', err?.message)
+        console.error('[Matchmaking] ❌ Error joining queue - Code:', err?.code)
+        console.error('[Matchmaking] ❌ Error joining queue - Stack:', err?.stack?.split('\n').slice(0, 5).join('\n'))
+        console.error('[Matchmaking] ❌ Error joining queue - Full object:', err)
         
         // Provide user-friendly error message
         let errorMessage = 'Failed to join queue. Please try again.';

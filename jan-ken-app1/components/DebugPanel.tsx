@@ -692,6 +692,54 @@ ${transactionLogs.slice(-20).map(log => `[${log.type.toUpperCase()}] ${log.messa
                     </div>
                   </div>
                 </div>
+                
+                <div className="border-2 border-purple-500 rounded-lg p-4">
+                  <h4 className="font-bold text-sm mb-3 text-purple-300">Supabase Configuration</h4>
+                  <div className="space-y-2 text-xs">
+                    <div className="flex justify-between">
+                      <span className="opacity-60">URL:</span>
+                      <span className="font-mono text-[10px] break-all">
+                        {process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://iophfhfnctqufqsmunyz.supabase.co'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="opacity-60">Key Exists:</span>
+                      <span className={process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 'text-green-400' : 'text-red-400'}>
+                        {process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 'Yes' : 'No'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="opacity-60">Key Length:</span>
+                      <span>{process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.length || 0}</span>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        const { testSupabaseConnection } = await import('@/lib/supabaseTest')
+                        const result = await testSupabaseConnection()
+                        if (result.success) {
+                          addIssue({
+                            id: 'supabase-test-ok',
+                            title: 'Supabase Connection Test',
+                            status: 'ok',
+                            message: 'Connection test successful!',
+                            details: result.details,
+                          })
+                        } else {
+                          addIssue({
+                            id: 'supabase-test-fail',
+                            title: 'Supabase Connection Test Failed',
+                            status: 'error',
+                            message: result.error || 'Connection test failed',
+                            details: result.details,
+                          })
+                        }
+                      }}
+                      className="mt-2 w-full px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded"
+                    >
+                      Test Supabase Connection
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
           </div>

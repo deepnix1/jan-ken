@@ -52,10 +52,14 @@ export async function joinQueue(params: JoinQueueParams): Promise<string> {
         details: checkError.details,
         hint: checkError.hint,
       }
-      console.error('[joinQueue] Error checking existing queue:', JSON.stringify(errorDetails, null, 2))
+      console.error('[joinQueue] Error checking existing queue:', errorDetails)
+      console.error('[joinQueue] Error code:', checkError.code)
+      console.error('[joinQueue] Error message:', checkError.message)
+      console.error('[joinQueue] Full error object:', checkError)
       
       // Check for specific error types
-      if (checkError.message?.includes('fetch') || checkError.message?.includes('Load failed') || checkError.message?.includes('Failed to fetch')) {
+      const errorMsg = checkError.message || String(checkError) || ''
+      if (errorMsg.includes('fetch') || errorMsg.includes('Load failed') || errorMsg.includes('Failed to fetch') || errorMsg.includes('TypeError')) {
         throw new Error('Network error: Unable to connect to Supabase. Please check your internet connection.')
       }
       
@@ -147,29 +151,29 @@ export async function joinQueue(params: JoinQueueParams): Promise<string> {
     // If we exhausted retries
     throw new Error(`Failed to join queue after 3 retries: ${lastError?.message || 'Network error'}`)
   } catch (error: any) {
-    // Log detailed error information
-    const errorDetails = {
-      name: error?.name,
-      message: error?.message,
-      stack: error?.stack,
-      cause: error?.cause,
-      code: error?.code,
-    }
-    console.error('[joinQueue] Final error:', JSON.stringify(errorDetails, null, 2))
-    console.error('[joinQueue] Raw error object:', error)
+    // Log detailed error information (avoid JSON.stringify for better compatibility)
+    console.error('[joinQueue] Final error - Name:', error?.name)
+    console.error('[joinQueue] Final error - Message:', error?.message)
+    console.error('[joinQueue] Final error - Code:', error?.code)
+    console.error('[joinQueue] Final error - Stack:', error?.stack?.split('\n').slice(0, 3).join('\n'))
+    console.error('[joinQueue] Final error - Full object:', error)
+    
+    // Extract error message safely
+    const errorMessage = error?.message || String(error) || 'Unknown error'
+    const errorName = error?.name || ''
     
     // Provide user-friendly error messages
-    if (error?.message?.includes('Load failed') || error?.message?.includes('fetch') || error?.message?.includes('Failed to fetch') || error?.name === 'TypeError') {
+    if (errorMessage.includes('Load failed') || errorMessage.includes('fetch') || errorMessage.includes('Failed to fetch') || errorName === 'TypeError') {
       throw new Error('Network error: Unable to connect to matchmaking service. Please check your internet connection and try again.')
     }
     
-    if (error?.message?.includes('PGRST') || error?.message?.includes('PostgREST')) {
+    if (errorMessage.includes('PGRST') || errorMessage.includes('PostgREST')) {
       throw new Error('Database connection error. Please try again in a moment.')
     }
     
     // Re-throw with better message if available
-    if (error?.message) {
-      throw new Error(error.message)
+    if (errorMessage && errorMessage !== 'Unknown error') {
+      throw new Error(errorMessage)
     }
     
     throw new Error('Failed to join queue. Please try again.')
