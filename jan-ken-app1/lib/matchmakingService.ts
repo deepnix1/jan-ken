@@ -46,16 +46,18 @@ export async function joinQueue(params: JoinQueueParams): Promise<string> {
 
     if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = not found, which is OK
       // Log detailed error information
-      const errorDetails = {
+      console.error('[joinQueue] Error checking existing queue - Code:', checkError.code)
+      console.error('[joinQueue] Error checking existing queue - Message:', checkError.message)
+      console.error('[joinQueue] Error checking existing queue - Details:', checkError.details)
+      console.error('[joinQueue] Error checking existing queue - Hint:', checkError.hint)
+      console.error('[joinQueue] Full error object:', {
         code: checkError.code,
         message: checkError.message,
         details: checkError.details,
         hint: checkError.hint,
-      }
-      console.error('[joinQueue] Error checking existing queue:', errorDetails)
-      console.error('[joinQueue] Error code:', checkError.code)
-      console.error('[joinQueue] Error message:', checkError.message)
-      console.error('[joinQueue] Full error object:', checkError)
+        status: (checkError as any)?.status,
+        statusText: (checkError as any)?.statusText,
+      })
       
       // Check for specific error types
       const errorMsg = checkError.message || String(checkError) || ''

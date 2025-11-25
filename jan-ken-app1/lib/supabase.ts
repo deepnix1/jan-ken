@@ -3,6 +3,16 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://iophfhfnctqufqsmunyz.supabase.co'
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_KEY
 
+// Log environment variable status (for debugging)
+if (typeof window !== 'undefined') {
+  console.log('[Supabase] Environment check:', {
+    url: supabaseUrl,
+    keyExists: !!supabaseKey,
+    keyLength: supabaseKey?.length || 0,
+    keyPrefix: supabaseKey?.slice(0, 20) || 'none',
+  })
+}
+
 if (!supabaseKey) {
   console.error('Missing Supabase key. Please set NEXT_PUBLIC_SUPABASE_ANON_KEY or SUPABASE_KEY environment variable.')
   // Don't throw in client-side, just log error

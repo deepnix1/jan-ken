@@ -99,31 +99,82 @@ export function DebugPanel() {
 
     console.error = (...args: any[]) => {
       originalError(...args);
-      const errorStr = args.join(' ');
       
-      // Serialize error objects properly
-      const serializedError = args.map(arg => {
+      // Serialize error objects properly BEFORE joining
+      const serializedArgs = args.map(arg => {
         if (arg instanceof Error) {
-          return {
-            name: arg.name,
-            message: arg.message,
-            stack: arg.stack,
-          }
+          return `Error(${arg.name}): ${arg.message}${arg.stack ? '\n' + arg.stack.split('\n').slice(0, 3).join('\n') : ''}`
         }
         if (typeof arg === 'object' && arg !== null) {
           try {
-            return JSON.parse(JSON.stringify(arg, (key, value) => {
-              // Handle BigInt and other non-serializable values
-              if (typeof value === 'bigint') {
-                return value.toString()
-              }
-              return value
-            }))
+            // Try to extract meaningful properties
+            const keys = Object.keys(arg)
+            if (keys.length > 0) {
+              const props = keys.slice(0, 10).map(key => {
+                try {
+                  const val = arg[key]
+                  if (val instanceof Error) {
+                    return `${key}: Error(${val.name}): ${val.message}`
+                  }
+                  if (typeof val === 'object' && val !== null) {
+                    return `${key}: [Object]`
+                  }
+                  if (typeof val === 'bigint') {
+                    return `${key}: ${val.toString()}`
+                  }
+                  return `${key}: ${String(val).slice(0, 100)}`
+                } catch {
+                  return `${key}: [unserializable]`
+                }
+              }).join(', ')
+              return `{${props}}`
+            }
+            return '[Object]'
           } catch {
             return String(arg)
           }
         }
-        return arg
+        return String(arg)
+      })
+      
+      const errorStr = serializedArgs.join(' ');
+      
+      // Also create a structured error object for details
+      const structuredError = args.map(arg => {
+        if (arg instanceof Error) {
+          return {
+            type: 'Error',
+            name: arg.name,
+            message: arg.message,
+            stack: arg.stack?.split('\n').slice(0, 5),
+          }
+        }
+        if (typeof arg === 'object' && arg !== null) {
+          try {
+            const result: any = { type: 'Object' }
+            const keys = Object.keys(arg).slice(0, 10)
+            for (const key of keys) {
+              try {
+                const val = arg[key]
+                if (val instanceof Error) {
+                  result[key] = { type: 'Error', name: val.name, message: val.message }
+                } else if (typeof val === 'bigint') {
+                  result[key] = val.toString()
+                } else if (typeof val === 'object' && val !== null) {
+                  result[key] = '[Object]'
+                } else {
+                  result[key] = String(val).slice(0, 200)
+                }
+              } catch {
+                result[key] = '[unserializable]'
+              }
+            }
+            return result
+          } catch {
+            return { type: 'Object', value: '[unserializable]' }
+          }
+        }
+        return { type: typeof arg, value: String(arg) }
       })
       
       const log: TransactionLog = {
@@ -131,7 +182,7 @@ export function DebugPanel() {
         type: 'error',
         message: errorStr,
         timestamp: new Date().toISOString(),
-        error: serializedError,
+        error: structuredError,
       };
       logsRef.current.push(log);
       if (logsRef.current.length > 100) logsRef.current.shift();
