@@ -57,11 +57,26 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
   
   // Join queue when component mounts
   useEffect(() => {
+    // CRITICAL: Don't join queue if bet is not selected
+    if (!betAmount || betAmount === BigInt(0)) {
+      console.log('[Matchmaking] ⚠️ Bet amount not selected, skipping queue join')
+      setError('Please select a bet amount before joining the queue.')
+      return
+    }
+    
     if (!isConnected || !address || hasJoinedQueue) return;
+    
+    // Validate bet level (must be valid)
+    if (!betLevel || betLevel === 0) {
+      console.log('[Matchmaking] ⚠️ Invalid bet level, skipping queue join')
+      setError('Invalid bet amount. Please select a valid bet level.')
+      return
+    }
     
     // Validate inputs
     if (!isValidBetAmount(betAmount)) {
-      setError('Invalid bet amount.');
+      console.log('[Matchmaking] ⚠️ Bet amount validation failed, skipping queue join')
+      setError('Invalid bet amount. Please select a valid bet amount.')
       return;
     }
     
