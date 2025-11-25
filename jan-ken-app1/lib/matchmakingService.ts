@@ -31,10 +31,31 @@ export async function joinQueue(params: JoinQueueParams): Promise<string> {
   const { playerAddress, playerFid, betLevel, betAmount } = params
 
   try {
+    // CRITICAL: Validate bet amount before proceeding
+    if (!betAmount || betAmount === BigInt(0)) {
+      throw new Error('Bet amount is required. Please select a bet amount before joining the queue.')
+    }
+    
+    // CRITICAL: Validate bet level
+    if (!betLevel || betLevel === 0 || betLevel < 1 || betLevel > 6) {
+      throw new Error('Invalid bet level. Please select a valid bet level (1-6).')
+    }
+    
+    // Validate player address
+    if (!playerAddress || playerAddress === '0x0000000000000000000000000000000000000000') {
+      throw new Error('Invalid player address.')
+    }
+    
     // Validate Supabase client
     if (!supabase) {
       throw new Error('Supabase client not initialized')
     }
+    
+    console.log('[joinQueue] ✅ Validation passed:', {
+      playerAddress: playerAddress.slice(0, 10) + '...',
+      betLevel,
+      betAmount: betAmount.toString(),
+    })
 
     // Check if player is already in queue
     // CRITICAL: Use explicit error handling and retry logic
