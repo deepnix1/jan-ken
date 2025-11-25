@@ -588,7 +588,7 @@ export async function checkForMatch(playerAddress: Address): Promise<MatchResult
     // CRITICAL: First verify player is still in queue
     const { data: queueStatus, error: statusError } = await supabase
       .from('matchmaking_queue')
-      .select('id, status')
+      .select('id, status, bet_level')
       .eq('player_address', playerAddress.toLowerCase())
       .maybeSingle()
     
@@ -600,6 +600,24 @@ export async function checkForMatch(playerAddress: Address): Promise<MatchResult
     // If player is not waiting or matched, they're cancelled or other status
     if (!queueStatus || (queueStatus.status !== 'waiting' && queueStatus.status !== 'matched')) {
       return null // Cancelled or other status
+    }
+    
+    // CRITICAL: If player is still waiting, try to match them
+    // This ensures matches happen even if tryMatch wasn't called during joinQueue
+    // or if two players join at the same time
+    if (queueStatus.status === 'waiting' && queueStatus.bet_level) {
+      console.log('[checkForMatch] Player still waiting, attempting match for betLevel', queueStatus.bet_level)
+      try {
+        const matchResult = await tryMatch(queueStatus.bet_level)
+        if (matchResult) {
+          // Match was created, now check if we're the matched player
+          // The match will be picked up in the next check
+          console.log('[checkForMatch] Match created, will be picked up in next check')
+        }
+      } catch (err) {
+        console.warn('[checkForMatch] Error attempting match:', err)
+        // Continue to check if we're already matched
+      }
     }
     
     // Check if player has been matched with retry
