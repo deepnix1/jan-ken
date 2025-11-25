@@ -73,24 +73,44 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
     const joinQueueAsync = async () => {
       try {
         console.log('[Matchmaking] 🎯 Joining queue (off-chain)...');
-        console.log('Address:', address);
-        console.log('FID:', playerFid);
-        console.log('Bet Level:', betLevel);
-        console.log('Bet Amount:', betAmount.toString());
+        console.log('[Matchmaking] Address:', address);
+        console.log('[Matchmaking] FID:', playerFid);
+        console.log('[Matchmaking] Bet Level:', betLevel);
+        console.log('[Matchmaking] Bet Amount:', betAmount.toString());
         
-        await joinQueue({
+        // Add a small delay to ensure Supabase client is ready
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        const queueId = await joinQueue({
           playerAddress: address,
           playerFid: playerFid,
           betLevel: betLevel,
           betAmount: betAmount,
         });
         
+        console.log('[Matchmaking] ✅ Joined queue successfully. Queue ID:', queueId);
         setHasJoinedQueue(true);
         setError(null);
-        console.log('[Matchmaking] ✅ Joined queue successfully');
       } catch (err: any) {
         console.error('[Matchmaking] ❌ Error joining queue:', err);
-        setError(err?.message || 'Failed to join queue. Please try again.');
+        console.error('[Matchmaking] Error details:', {
+          message: err?.message,
+          name: err?.name,
+          stack: err?.stack,
+          cause: err?.cause,
+        });
+        
+        // Provide user-friendly error message
+        let errorMessage = 'Failed to join queue. Please try again.';
+        if (err?.message?.includes('Network error')) {
+          errorMessage = 'Network error: Unable to connect. Please check your internet connection.';
+        } else if (err?.message?.includes('Database connection')) {
+          errorMessage = 'Service temporarily unavailable. Please try again in a moment.';
+        } else if (err?.message) {
+          errorMessage = err.message;
+        }
+        
+        setError(errorMessage);
         setHasJoinedQueue(false);
       }
     };
