@@ -7,16 +7,25 @@ import { Address } from 'viem'
  */
 
 // Lock mechanism to prevent concurrent tryMatch calls for same betLevel
-const matchLocks = new Map<number, boolean>()
+// Use timestamp to auto-release locks after timeout
+const matchLocks = new Map<number, number>() // betLevel -> timestamp
+
+const LOCK_TIMEOUT_MS = 5000 // 5 seconds
 
 /**
  * Acquire lock for matching at a specific bet level
  */
 function acquireLock(betLevel: number): boolean {
-  if (matchLocks.get(betLevel)) {
+  const now = Date.now()
+  const lockTime = matchLocks.get(betLevel)
+  
+  // If lock exists and is still valid, deny
+  if (lockTime && (now - lockTime) < LOCK_TIMEOUT_MS) {
     return false // Lock already held
   }
-  matchLocks.set(betLevel, true)
+  
+  // Acquire lock (or override expired lock)
+  matchLocks.set(betLevel, now)
   return true
 }
 
