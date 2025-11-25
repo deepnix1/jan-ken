@@ -37,12 +37,36 @@ export async function joinQueue(params: JoinQueueParams): Promise<string> {
     }
 
     // Check if player is already in queue
-    const { data: existing, error: checkError } = await supabase
-      .from('matchmaking_queue')
-      .select('id')
-      .eq('player_address', playerAddress.toLowerCase())
-      .eq('status', 'waiting')
-      .maybeSingle() // Use maybeSingle instead of single to avoid error if not found
+    // CRITICAL: Use explicit error handling and retry logic
+    let existing = null
+    let checkError = null
+    
+    try {
+      const result = await supabase
+        .from('matchmaking_queue')
+        .select('id')
+        .eq('player_address', playerAddress.toLowerCase())
+        .eq('status', 'waiting')
+        .maybeSingle() // Use maybeSingle instead of single to avoid error if not found
+      
+      existing = result.data
+      checkError = result.error
+      
+      // Log the result for debugging
+      console.log('[joinQueue] Check existing result:', {
+        hasData: !!existing,
+        hasError: !!checkError,
+        errorCode: checkError?.code,
+        errorMessage: checkError?.message,
+      })
+    } catch (err: any) {
+      console.error('[joinQueue] Exception during check:', {
+        name: err?.name,
+        message: err?.message,
+        stack: err?.stack?.split('\n').slice(0, 3),
+      })
+      checkError = err
+    }
 
     if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = not found, which is OK
       // Log detailed error information with proper serialization

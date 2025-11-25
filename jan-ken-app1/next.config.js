@@ -71,7 +71,7 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: https:",
               "font-src 'self' data:",
-              "connect-src 'self' https://api.coingecko.com https://sepolia.base.org https://mainnet.base.org wss://sepolia.base.org wss://mainnet.base.org",
+              "connect-src 'self' https://api.coingecko.com https://sepolia.base.org https://mainnet.base.org wss://sepolia.base.org wss://mainnet.base.org https://*.supabase.co https://iophfhfnctqufqsmunyz.supabase.co",
               "frame-src 'self'",
               "object-src 'none'",
               "base-uri 'self'",

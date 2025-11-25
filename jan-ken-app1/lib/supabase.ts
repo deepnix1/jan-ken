@@ -54,12 +54,20 @@ const customFetch = async (url: RequestInfo | URL, options?: RequestInit): Promi
   try {
     console.log('[Supabase Fetch] Attempting fetch:', urlStr.slice(0, 100))
     
+    // Ensure apikey is in headers for Supabase REST API
+    const headers = new Headers(options?.headers)
+    if (!headers.has('apikey')) {
+      headers.set('apikey', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlvcGhmaGZuY3RxdWZxc211bnl6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQwMTQyNzQsImV4cCI6MjA3OTU5MDI3NH0.VRRauQBI6dIj3q2PhZzyXjzlKlzPF2s3N7RKctfKlD0')
+    }
+    if (!headers.has('Content-Type')) {
+      headers.set('Content-Type', 'application/json')
+    }
+    
     const response = await fetch(url, {
       ...options,
-      headers: {
-        ...options?.headers,
-        'Content-Type': 'application/json',
-      },
+      headers: headers,
+      mode: 'cors',
+      credentials: 'omit',
     })
     
     // Check if response is ok
@@ -97,21 +105,33 @@ const customFetch = async (url: RequestInfo | URL, options?: RequestInit): Promi
 }
 
 // Create Supabase client with custom fetch for better error handling
-export const supabase = createClient(supabaseUrl, supabaseKey || '', {
-  auth: {
-    persistSession: false,
-    autoRefreshToken: false,
-  },
-  db: {
-    schema: 'public',
-  },
-  global: {
-    headers: {
-      'x-client-info': 'jan-ken-app',
+// CRITICAL: Use the exact URL and key from MCP verification
+export const supabase = createClient(
+  'https://iophfhfnctqufqsmunyz.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlvcGhmaGZuY3RxdWZxc211bnl6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQwMTQyNzQsImV4cCI6MjA3OTU5MDI3NH0.VRRauQBI6dIj3q2PhZzyXjzlKlzPF2s3N7RKctfKlD0',
+  {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
     },
-    fetch: customFetch,
-  },
-})
+    db: {
+      schema: 'public',
+    },
+    global: {
+      headers: {
+        'x-client-info': 'jan-ken-app',
+        'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlvcGhmaGZuY3RxdWZxc211bnl6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQwMTQyNzQsImV4cCI6MjA3OTU5MDI3NH0.VRRauQBI6dIj3q2PhZzyXjzlKlzPF2s3N7RKctfKlD0',
+      },
+      fetch: customFetch,
+    },
+    realtime: {
+      params: {
+        eventsPerSecond: 10,
+      },
+    },
+  }
+)
 
 // Test Supabase connection on client-side
 if (typeof window !== 'undefined') {
