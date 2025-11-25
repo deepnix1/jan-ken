@@ -203,9 +203,9 @@ export async function joinQueue(params: JoinQueueParams): Promise<string> {
             }
           }
           
-          // For duplicate errors, if we couldn't fetch existing entry, it's still a success (we're in queue)
+          // For duplicate errors, if we could not fetch existing entry, it is still a success (we are in queue)
           if (isDuplicateError) {
-            console.log('[joinQueue] Duplicate error but couldn't fetch entry - assuming success')
+            console.log('[joinQueue] Duplicate error but could not fetch entry - assuming success')
             // Try one final fetch
             const { data: finalCheck } = await supabase
               .from('matchmaking_queue')
