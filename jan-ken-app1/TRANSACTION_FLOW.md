@@ -384,3 +384,4 @@ http('https://sepolia.base.org', {
 **Tüm bunlar RPC Provider (Base Sepolia) üzerinden gerçekleşir!**
 
 
+

@@ -3,15 +3,26 @@
  * Client-side utilities for commit-reveal Rock-Paper-Scissors game
  */
 
-import { Address, keccak256, toBytes, type WalletClient } from 'viem';
-import { writeContract, waitForTransactionReceipt, readContract, getConnectorClient } from '@wagmi/core';
-import { config } from '@/app/rootProvider';
+import { Address, keccak256, toBytes, bytesToHex, pad, type WalletClient } from 'viem';
+import { writeContract, waitForTransactionReceipt, readContract, getConnectorClient, type Config } from '@wagmi/core';
 import { 
   CONTRACT_ADDRESS_COMMIT_REVEAL, 
   CONTRACT_ABI_COMMIT_REVEAL,
   MOVE,
   MATCH_STATUS 
 } from './contractCommitReveal';
+
+// Get config from global (set by rootProvider)
+function getConfig(): Config {
+  if (typeof window === 'undefined') {
+    throw new Error('Config is only available on client-side');
+  }
+  const config = (globalThis as any).__wagmiConfig;
+  if (!config) {
+    throw new Error('Wagmi config not initialized. Make sure RootProvider is mounted.');
+  }
+  return config;
+}
 
 // ============================================
 // TYPES
@@ -110,6 +121,7 @@ export async function createMatch(betAmount: bigint): Promise<string> {
   }
 
   // Ensure connector client is ready
+  const config = getConfig();
   const connectorClient = await getConnectorClient(config);
   if (!connectorClient) {
     throw new Error('Wallet not connected. Please connect your wallet first.');
@@ -125,7 +137,7 @@ export async function createMatch(betAmount: bigint): Promise<string> {
     functionName: 'createMatch',
     args: [betAmount],
     value: betAmount,
-    connector: connectorClient,
+    account: connectorClient.account,
   });
 
   console.log('[createMatch] ✅ Transaction hash:', hash);
@@ -147,6 +159,7 @@ export async function joinMatch(matchId: bigint, betAmount: bigint): Promise<str
   }
 
   // Ensure connector client is ready
+  const config = getConfig();
   const connectorClient = await getConnectorClient(config);
   if (!connectorClient) {
     throw new Error('Wallet not connected. Please connect your wallet first.');
@@ -162,7 +175,7 @@ export async function joinMatch(matchId: bigint, betAmount: bigint): Promise<str
     functionName: 'joinMatch',
     args: [matchId],
     value: betAmount,
-    connector: connectorClient,
+    account: connectorClient.account,
   });
 
   console.log('[joinMatch] ✅ Transaction hash:', hash);
@@ -184,6 +197,7 @@ export async function sendCommitTx(matchId: bigint, commitHash: string): Promise
   }
 
   // Ensure connector client is ready
+  const config = getConfig();
   const connectorClient = await getConnectorClient(config);
   if (!connectorClient) {
     throw new Error('Wallet not connected. Please connect your wallet first.');
@@ -198,7 +212,7 @@ export async function sendCommitTx(matchId: bigint, commitHash: string): Promise
     abi: CONTRACT_ABI_COMMIT_REVEAL,
     functionName: 'commitMove',
     args: [matchId, commitHash as `0x${string}`],
-    connector: connectorClient,
+    account: connectorClient.account,
   });
 
   console.log('[sendCommitTx] ✅ Transaction hash:', hash);
@@ -225,6 +239,7 @@ export async function sendRevealTx(
   }
 
   // Ensure connector client is ready
+  const config = getConfig();
   const connectorClient = await getConnectorClient(config);
   if (!connectorClient) {
     throw new Error('Wallet not connected. Please connect your wallet first.');
@@ -232,10 +247,8 @@ export async function sendRevealTx(
 
   // Convert secret string to bytes32
   const secretBytes = toBytes(secret);
-  const secretBytes32 = new Uint8Array(32);
-  secretBytes.slice(0, 32).forEach((byte, i) => {
-    secretBytes32[i] = byte;
-  });
+  // Pad to 32 bytes and convert to hex string
+  const secretBytes32 = bytesToHex(pad(secretBytes.slice(0, 32), { size: 32 })) as `0x${string}`;
 
   console.log('[sendRevealTx] 📝 Preparing reveal transaction...');
   console.log('[sendRevealTx] 🎮 Match ID:', matchId.toString());
@@ -245,8 +258,8 @@ export async function sendRevealTx(
     address: CONTRACT_ADDRESS_COMMIT_REVEAL as Address,
     abi: CONTRACT_ABI_COMMIT_REVEAL,
     functionName: 'revealMove',
-    args: [matchId, move, secretBytes32 as `0x${string}`],
-    connector: connectorClient,
+    args: [matchId, move, secretBytes32],
+    account: connectorClient.account,
   });
 
   console.log('[sendRevealTx] ✅ Transaction hash:', hash);
@@ -268,6 +281,7 @@ export async function readMatchStatus(matchId: bigint): Promise<MatchData | null
   }
 
   try {
+    const config = getConfig();
     const match = await readContract(config, {
       address: CONTRACT_ADDRESS_COMMIT_REVEAL as Address,
       abi: CONTRACT_ABI_COMMIT_REVEAL,
@@ -293,6 +307,7 @@ export async function getPlayerMatches(playerAddress: Address): Promise<bigint[]
   }
 
   try {
+    const config = getConfig();
     const matches = await readContract(config, {
       address: CONTRACT_ADDRESS_COMMIT_REVEAL as Address,
       abi: CONTRACT_ABI_COMMIT_REVEAL,
@@ -321,6 +336,7 @@ export async function waitForTx(
   hash: string,
   timeout: number = 120000
 ): Promise<`0x${string}`> {
+  const config = getConfig();
   const receipt = await waitForTransactionReceipt(config, {
     hash: hash as `0x${string}`,
     timeout,

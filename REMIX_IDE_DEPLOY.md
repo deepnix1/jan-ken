@@ -182,3 +182,4 @@ Contract deploy edildikten sonra:
 
 
 
+

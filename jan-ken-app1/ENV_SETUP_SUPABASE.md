@@ -57,3 +57,4 @@ if (error) {
 - This is the anon key (public key) - safe to expose in frontend
 - Never commit `.env.local` to git (it's in `.gitignore`)
 
+

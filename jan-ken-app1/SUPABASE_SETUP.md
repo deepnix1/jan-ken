@@ -74,3 +74,4 @@ await joinQueue({
 - FID (Farcaster ID) is optional but recommended
 - Games are automatically created when 2 players match
 
+

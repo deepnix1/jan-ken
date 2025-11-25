@@ -141,3 +141,4 @@ const match = await checkForMatch('0x...')
 - Check the RLS policies in Supabase Dashboard
 - Policies should allow public read/write for development
 
+

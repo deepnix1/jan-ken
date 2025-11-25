@@ -134,3 +134,4 @@ After deployment, test:
 - No choice handling in contract (handled by Supabase)
 - Only results are written on-chain
 
+

@@ -5,20 +5,18 @@
  */
 
 import { Address, keccak256, toHex, type WalletClient, stringToBytes, bytesToHex } from 'viem';
-import { signMessage as wagmiSignMessage } from '@wagmi/core';
-import { config } from '@/app/rootProvider';
+import { signMessage as wagmiSignMessage, type Config } from '@wagmi/core';
 
-/**
- * Convert string salt to bytes32 (keccak256 hash)
- * Contract expects bytes32, so we hash the salt string
- */
-function saltToBytes32(salt: string): string {
-  // If already a hex string with 66 chars (0x + 64 hex), return as is
-  if (salt.startsWith('0x') && salt.length === 66) {
-    return salt;
+// Get config from global (set by rootProvider)
+function getConfig(): Config {
+  if (typeof window === 'undefined') {
+    throw new Error('Config is only available on client-side');
   }
-  // Hash the string to get bytes32
-  return keccak256(stringToBytes(salt));
+  const config = (globalThis as any).__wagmiConfig;
+  if (!config) {
+    throw new Error('Wagmi config not initialized. Make sure RootProvider is mounted.');
+  }
+  return config;
 }
 
 /**
@@ -69,9 +67,7 @@ export async function createMoveSignature(
       });
     } else {
       // Use wagmi signMessage utility
-      if (!config) {
-        throw new Error('Wagmi config not available. Please provide walletClient or ensure config is initialized.');
-      }
+      const config = getConfig();
       signature = await wagmiSignMessage(config, {
         message: msg,
       });

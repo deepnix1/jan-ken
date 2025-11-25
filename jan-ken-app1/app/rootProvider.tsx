@@ -92,6 +92,12 @@ export function RootProvider({ children }: { children: ReactNode }) {
     });
   }, [mounted, metaMaskConnector]);
 
+  // Export config for use in utility functions (client-side only)
+  // This is safe because config is only used in client-side code
+  if (typeof window !== 'undefined' && config) {
+    (globalThis as any).__wagmiConfig = config;
+  }
+
   const [queryClient] = useState(() => new QueryClient({
     defaultOptions: {
       queries: {

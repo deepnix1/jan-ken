@@ -179,3 +179,4 @@ The app includes a built-in debug panel (🔧 button):
 **Built with ❤️ using Neynar SDK**
 
 
+

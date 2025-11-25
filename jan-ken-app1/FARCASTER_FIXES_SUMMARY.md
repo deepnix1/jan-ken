@@ -105,3 +105,4 @@ Bu dokümantasyon, [Farcaster Mini Apps AI Agent Checklist](https://miniapps.far
    - Splash screen'i gizlemek için kritik
 
 
+

@@ -304,3 +304,4 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
 // Memoize component to prevent unnecessary re-renders
 export const MatchmakingOffChain = React.memo(MatchmakingOffChainComponent);
 
+

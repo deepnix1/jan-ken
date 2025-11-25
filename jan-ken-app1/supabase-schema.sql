@@ -108,3 +108,4 @@ CREATE POLICY "Anyone can update commits"
   ON commits FOR UPDATE
   USING (true);
 
+
