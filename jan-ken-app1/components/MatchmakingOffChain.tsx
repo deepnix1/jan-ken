@@ -266,15 +266,20 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
     }
 
     // Handle beforeunload (browser/tab close)
-    const handleBeforeUnload = () => {
-      if (hasJoinedQueue) {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasJoinedQueue && address) {
         console.log('[Matchmaking] 🚪 Before unload, leaving queue')
         // Use sendBeacon for reliable cleanup on page close
-        if (navigator.sendBeacon && address) {
-          // Note: sendBeacon doesn't support async, so we'll use sync fetch as fallback
+        const data = JSON.stringify({ playerAddress: address })
+        const blob = new Blob([data], { type: 'application/json' })
+        
+        if (navigator.sendBeacon) {
+          navigator.sendBeacon('/api/match/leave', blob)
+        } else {
+          // Fallback: sync fetch with keepalive
           fetch('/api/match/leave', {
             method: 'POST',
-            body: JSON.stringify({ playerAddress: address }),
+            body: data,
             headers: { 'Content-Type': 'application/json' },
             keepalive: true,
           }).catch(() => {})
