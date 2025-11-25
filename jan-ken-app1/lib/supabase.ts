@@ -1,13 +1,51 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = 'https://iophfhfnctqufqsmunyz.supabase.co'
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://iophfhfnctqufqsmunyz.supabase.co'
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_KEY
 
 if (!supabaseKey) {
-  throw new Error('Missing Supabase key. Please set NEXT_PUBLIC_SUPABASE_ANON_KEY or SUPABASE_KEY environment variable.')
+  console.error('Missing Supabase key. Please set NEXT_PUBLIC_SUPABASE_ANON_KEY or SUPABASE_KEY environment variable.')
+  // Don't throw in client-side, just log error
+  if (typeof window === 'undefined') {
+    throw new Error('Missing Supabase key. Please set NEXT_PUBLIC_SUPABASE_ANON_KEY or SUPABASE_KEY environment variable.')
+  }
 }
 
-export const supabase = createClient(supabaseUrl, supabaseKey)
+// Create Supabase client with better error handling and retry configuration
+export const supabase = createClient(supabaseUrl, supabaseKey || '', {
+  auth: {
+    persistSession: false, // Don't persist auth sessions in this app
+    autoRefreshToken: false,
+  },
+  db: {
+    schema: 'public',
+  },
+  global: {
+    headers: {
+      'x-client-info': 'jan-ken-app',
+    },
+    fetch: (url, options = {}) => {
+      // Enhanced fetch with timeout and retry
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+      
+      return fetch(url, {
+        ...options,
+        signal: controller.signal,
+      }).finally(() => {
+        clearTimeout(timeoutId)
+      }).catch((error) => {
+        if (error.name === 'AbortError') {
+          throw new Error('Request timeout: Supabase connection took too long')
+        }
+        if (error.message?.includes('Load failed') || error.message?.includes('Failed to fetch')) {
+          throw new Error('Network error: Unable to connect to Supabase. Please check your internet connection.')
+        }
+        throw error
+      })
+    },
+  },
+})
 
 // Database Types
 export interface MatchmakingQueue {

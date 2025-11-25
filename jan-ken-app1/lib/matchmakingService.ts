@@ -30,40 +30,123 @@ export interface MatchResult {
 export async function joinQueue(params: JoinQueueParams): Promise<string> {
   const { playerAddress, playerFid, betLevel, betAmount } = params
 
-  // Check if player is already in queue
-  const { data: existing } = await supabase
-    .from('matchmaking_queue')
-    .select('id')
-    .eq('player_address', playerAddress.toLowerCase())
-    .eq('status', 'waiting')
-    .single()
+  try {
+    // Validate Supabase client
+    if (!supabase) {
+      throw new Error('Supabase client not initialized')
+    }
 
-  if (existing) {
-    return existing.id // Already in queue
+    // Check if player is already in queue
+    const { data: existing, error: checkError } = await supabase
+      .from('matchmaking_queue')
+      .select('id')
+      .eq('player_address', playerAddress.toLowerCase())
+      .eq('status', 'waiting')
+      .maybeSingle() // Use maybeSingle instead of single to avoid error if not found
+
+    if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = not found, which is OK
+      console.error('[joinQueue] Error checking existing queue:', checkError)
+      throw new Error(`Failed to check queue: ${checkError.message || 'Network error'}`)
+    }
+
+    if (existing) {
+      console.log('[joinQueue] Already in queue:', existing.id)
+      return existing.id // Already in queue
+    }
+
+    // Insert into queue with retry logic
+    let retries = 3
+    let lastError: any = null
+
+    while (retries > 0) {
+      try {
+        const { data, error } = await supabase
+          .from('matchmaking_queue')
+          .insert({
+            player_address: playerAddress.toLowerCase(),
+            player_fid: playerFid,
+            bet_level: betLevel,
+            bet_amount: betAmount.toString(),
+            status: 'waiting',
+          })
+          .select()
+          .single()
+
+        if (error) {
+          lastError = error
+          
+          // Handle specific Supabase errors
+          if (error.code === '23505') { // Unique constraint violation
+            // Player already in queue, try to get existing entry
+            const { data: existingAfter } = await supabase
+              .from('matchmaking_queue')
+              .select('id')
+              .eq('player_address', playerAddress.toLowerCase())
+              .eq('status', 'waiting')
+              .maybeSingle()
+            
+            if (existingAfter) {
+              return existingAfter.id
+            }
+          }
+          
+          // Retry on network errors
+          if (error.message?.includes('fetch') || error.message?.includes('Load failed') || error.code === 'PGRST301') {
+            retries--
+            if (retries > 0) {
+              console.warn(`[joinQueue] Retry ${3 - retries}/3 after error:`, error.message)
+              await new Promise(resolve => setTimeout(resolve, 1000 * (4 - retries))) // Exponential backoff
+              continue
+            }
+          }
+          
+          throw new Error(`Failed to join queue: ${error.message || error.code || 'Unknown error'}`)
+        }
+
+        if (!data) {
+          throw new Error('No data returned from Supabase')
+        }
+
+        // Try to find a match immediately (don't fail if this fails)
+        tryMatch(betLevel).catch(err => {
+          console.warn('[joinQueue] Failed to try match immediately:', err)
+          // Non-critical, continue
+        })
+
+        return data.id
+      } catch (err: any) {
+        lastError = err
+        
+        // Check if it's a network error that we should retry
+        if (err.message?.includes('fetch') || err.message?.includes('Load failed') || err.message?.includes('network')) {
+          retries--
+          if (retries > 0) {
+            console.warn(`[joinQueue] Retry ${3 - retries}/3 after error:`, err.message)
+            await new Promise(resolve => setTimeout(resolve, 1000 * (4 - retries)))
+            continue
+          }
+        }
+        
+        throw err
+      }
+    }
+
+    // If we exhausted retries
+    throw new Error(`Failed to join queue after 3 retries: ${lastError?.message || 'Network error'}`)
+  } catch (error: any) {
+    console.error('[joinQueue] Final error:', error)
+    
+    // Provide user-friendly error messages
+    if (error.message?.includes('Load failed') || error.message?.includes('fetch')) {
+      throw new Error('Network error: Unable to connect to matchmaking service. Please check your internet connection and try again.')
+    }
+    
+    if (error.message?.includes('PGRST') || error.message?.includes('PostgREST')) {
+      throw new Error('Database connection error. Please try again in a moment.')
+    }
+    
+    throw error
   }
-
-  // Insert into queue
-  const { data, error } = await supabase
-    .from('matchmaking_queue')
-    .insert({
-      player_address: playerAddress.toLowerCase(),
-      player_fid: playerFid,
-      bet_level: betLevel,
-      bet_amount: betAmount.toString(),
-      status: 'waiting',
-    })
-    .select()
-    .single()
-
-  if (error) {
-    console.error('Error joining queue:', error)
-    throw new Error(`Failed to join queue: ${error.message}`)
-  }
-
-  // Try to find a match immediately
-  await tryMatch(betLevel)
-
-  return data.id
 }
 
 /**
