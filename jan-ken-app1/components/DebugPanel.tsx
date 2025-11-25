@@ -216,7 +216,7 @@ export function DebugPanel() {
           title: 'Transaction Error',
           status: 'error',
           message: errorStr,
-          details: { error: args },
+          details: structuredError.length > 0 ? structuredError[0] : undefined,
         });
       }
     };

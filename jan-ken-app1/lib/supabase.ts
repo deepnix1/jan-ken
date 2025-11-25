@@ -21,8 +21,48 @@ if (!supabaseKey) {
   }
 }
 
-// Create Supabase client with minimal configuration for reliability
-// Using default fetch to avoid wrapper issues
+// Create a custom fetch wrapper with better error handling
+const customFetch = async (url: RequestInfo | URL, options?: RequestInit): Promise<Response> => {
+  try {
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        ...options?.headers,
+        'Content-Type': 'application/json',
+      },
+    })
+    
+    // Check if response is ok
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => 'Unknown error')
+      console.error('[Supabase Fetch] Response not OK:', {
+        status: response.status,
+        statusText: response.statusText,
+        url: String(url),
+        errorText: errorText.slice(0, 200),
+      })
+    }
+    
+    return response
+  } catch (error: any) {
+    // Log detailed fetch error
+    console.error('[Supabase Fetch] Fetch error:', {
+      name: error?.name,
+      message: error?.message,
+      type: error?.constructor?.name,
+      url: String(url),
+      stack: error?.stack?.split('\n').slice(0, 3),
+    })
+    
+    // Re-throw with more context
+    if (error?.name === 'TypeError' && error?.message?.includes('fetch')) {
+      throw new Error(`Network error: Failed to connect to Supabase. ${error.message}`)
+    }
+    throw error
+  }
+}
+
+// Create Supabase client with custom fetch for better error handling
 export const supabase = createClient(supabaseUrl, supabaseKey || '', {
   auth: {
     persistSession: false,
@@ -35,6 +75,7 @@ export const supabase = createClient(supabaseUrl, supabaseKey || '', {
     headers: {
       'x-client-info': 'jan-ken-app',
     },
+    fetch: customFetch,
   },
 })
 

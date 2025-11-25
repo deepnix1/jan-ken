@@ -92,21 +92,32 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
         setHasJoinedQueue(true);
         setError(null);
       } catch (err: any) {
-        // Log detailed error information (avoid JSON.stringify for better compatibility)
-        console.error('[Matchmaking] ❌ Error joining queue - Name:', err?.name)
-        console.error('[Matchmaking] ❌ Error joining queue - Message:', err?.message)
-        console.error('[Matchmaking] ❌ Error joining queue - Code:', err?.code)
-        console.error('[Matchmaking] ❌ Error joining queue - Stack:', err?.stack?.split('\n').slice(0, 5).join('\n'))
-        console.error('[Matchmaking] ❌ Error joining queue - Full object:', err)
+        // Log detailed error information with proper serialization
+        const errorDetails = {
+          name: err?.name || 'Unknown',
+          message: err?.message || 'No message',
+          code: err?.code || null,
+          stack: err?.stack ? err.stack.split('\n').slice(0, 5) : null,
+        }
+        
+        console.error('[Matchmaking] ❌ Error joining queue:', JSON.stringify(errorDetails, null, 2))
+        console.error('[Matchmaking] ❌ Error name:', errorDetails.name)
+        console.error('[Matchmaking] ❌ Error message:', errorDetails.message)
+        console.error('[Matchmaking] ❌ Error code:', errorDetails.code)
+        if (errorDetails.stack) {
+          console.error('[Matchmaking] ❌ Error stack:', errorDetails.stack.join('\n'))
+        }
         
         // Provide user-friendly error message
         let errorMessage = 'Failed to join queue. Please try again.';
-        if (err?.message?.includes('Network error')) {
-          errorMessage = 'Network error: Unable to connect. Please check your internet connection.';
-        } else if (err?.message?.includes('Database connection')) {
+        const errMsg = errorDetails.message.toLowerCase()
+        
+        if (errMsg.includes('network error') || errMsg.includes('unable to connect')) {
+          errorMessage = 'Network error: Unable to connect to matchmaking service. Please check your internet connection.';
+        } else if (errMsg.includes('database') || errMsg.includes('postgrest') || errMsg.includes('pgrst')) {
           errorMessage = 'Service temporarily unavailable. Please try again in a moment.';
-        } else if (err?.message) {
-          errorMessage = err.message;
+        } else if (errorDetails.message && errorDetails.message !== 'No message') {
+          errorMessage = errorDetails.message;
         }
         
         setError(errorMessage);

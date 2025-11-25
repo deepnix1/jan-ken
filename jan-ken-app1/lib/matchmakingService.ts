@@ -45,27 +45,45 @@ export async function joinQueue(params: JoinQueueParams): Promise<string> {
       .maybeSingle() // Use maybeSingle instead of single to avoid error if not found
 
     if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = not found, which is OK
-      // Log detailed error information
-      console.error('[joinQueue] Error checking existing queue - Code:', checkError.code)
-      console.error('[joinQueue] Error checking existing queue - Message:', checkError.message)
-      console.error('[joinQueue] Error checking existing queue - Details:', checkError.details)
-      console.error('[joinQueue] Error checking existing queue - Hint:', checkError.hint)
-      console.error('[joinQueue] Full error object:', {
-        code: checkError.code,
-        message: checkError.message,
-        details: checkError.details,
-        hint: checkError.hint,
-        status: (checkError as any)?.status,
-        statusText: (checkError as any)?.statusText,
-      })
+      // Log detailed error information with proper serialization
+      const errorInfo = {
+        code: checkError.code || 'NO_CODE',
+        message: checkError.message || 'NO_MESSAGE',
+        details: checkError.details || null,
+        hint: checkError.hint || null,
+        status: (checkError as any)?.status || null,
+        statusText: (checkError as any)?.statusText || null,
+      }
+      
+      console.error('[joinQueue] Error checking existing queue:', JSON.stringify(errorInfo, null, 2))
+      console.error('[joinQueue] Error code:', errorInfo.code)
+      console.error('[joinQueue] Error message:', errorInfo.message)
+      console.error('[joinQueue] Error details:', errorInfo.details)
+      console.error('[joinQueue] Error hint:', errorInfo.hint)
       
       // Check for specific error types
-      const errorMsg = checkError.message || String(checkError) || ''
-      if (errorMsg.includes('fetch') || errorMsg.includes('Load failed') || errorMsg.includes('Failed to fetch') || errorMsg.includes('TypeError')) {
+      const errorMsg = errorInfo.message || String(checkError) || ''
+      const errorCode = errorInfo.code || ''
+      
+      // Network-related errors
+      if (
+        errorMsg.includes('fetch') || 
+        errorMsg.includes('Load failed') || 
+        errorMsg.includes('Failed to fetch') || 
+        errorMsg.includes('TypeError') ||
+        errorMsg.includes('NetworkError') ||
+        errorCode === 'PGRST301' || // PostgREST connection error
+        errorCode === 'PGRST204' // PostgREST timeout
+      ) {
         throw new Error('Network error: Unable to connect to Supabase. Please check your internet connection.')
       }
       
-      throw new Error(`Failed to check queue: ${checkError.message || checkError.code || 'Unknown error'}`)
+      // Database/API errors
+      if (errorCode.startsWith('PGRST') || errorMsg.includes('PostgREST')) {
+        throw new Error(`Database error: ${errorInfo.message || errorCode}. Please try again in a moment.`)
+      }
+      
+      throw new Error(`Failed to check queue: ${errorInfo.message || errorCode || 'Unknown error'}`)
     }
 
     if (existing) {

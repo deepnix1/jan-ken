@@ -232,11 +232,16 @@ export default function Home() {
       });
       
       // If connected but no connector client, wait a bit then reconnect
+      // This is normal during initial connection, so we'll wait up to 3 seconds
       if (!connectorClient) {
-        console.warn('⚠️ Connected but connector client not available - waiting 2 seconds...');
-        const timeout = setTimeout(() => {
+        // Only log warning after 1 second to avoid noise
+        const warningTimeout = setTimeout(() => {
+          console.warn('⚠️ Connector client not yet available - this is normal during connection initialization');
+        }, 1000);
+        
+        const reconnectTimeout = setTimeout(() => {
           if (!connectorClient) {
-            console.error('❌ Connector client still not available after 2 seconds');
+            console.error('❌ Connector client still not available after 3 seconds');
             console.error('Attempting to reconnect...');
             
             // Get active connector
@@ -254,8 +259,12 @@ export default function Home() {
           } else {
             console.log('✅ Connector client created after wait');
           }
-        }, 2000);
-        return () => clearTimeout(timeout);
+        }, 3000);
+        
+        return () => {
+          clearTimeout(warningTimeout);
+          clearTimeout(reconnectTimeout);
+        };
       } else {
         console.log('✅ Connector client is available:', {
           account: connectorClient.account?.address,
