@@ -318,6 +318,8 @@ export async function joinQueue(params: JoinQueueParams): Promise<string> {
  * CRITICAL: Uses atomic operations and locking to prevent fake matches
  */
 async function tryMatch(betLevel: number): Promise<MatchResult | null> {
+  console.log('[tryMatch] 🔍 Starting match attempt for betLevel', betLevel)
+  
   // CRITICAL: Acquire lock to prevent concurrent matching attempts
   if (!acquireLock(betLevel)) {
     console.log('[tryMatch] ⚠️ Lock already held for betLevel', betLevel, '- skipping match attempt')
@@ -327,6 +329,7 @@ async function tryMatch(betLevel: number): Promise<MatchResult | null> {
   try {
     // Step 1: Find two waiting players with same bet level
     // CRITICAL: Use FOR UPDATE lock equivalent by checking status again after selection
+    console.log('[tryMatch] 🔍 Step 1: Finding waiting players for betLevel', betLevel)
     const { data: players, error } = await supabase
       .from('matchmaking_queue')
       .select('*')
@@ -336,12 +339,31 @@ async function tryMatch(betLevel: number): Promise<MatchResult | null> {
       .limit(2)
 
     if (error) {
-      console.error('[tryMatch] Error finding players:', error)
+      console.error('[tryMatch] ❌ Error finding players:', {
+        error: error.message || error.code || error,
+        betLevel,
+      })
       releaseLock(betLevel)
       return null
     }
 
+    console.log('[tryMatch] 📊 Found players:', {
+      count: players?.length || 0,
+      betLevel,
+      players: players?.map(p => ({
+        id: p.id,
+        address: p.player_address?.slice(0, 10) + '...',
+        status: p.status,
+        created_at: p.created_at,
+      })) || [],
+    })
+
     if (!players || players.length < 2) {
+      console.log('[tryMatch] ⚠️ Not enough players:', {
+        found: players?.length || 0,
+        required: 2,
+        betLevel,
+      })
       releaseLock(betLevel)
       return null // Not enough players
     }
@@ -364,6 +386,10 @@ async function tryMatch(betLevel: number): Promise<MatchResult | null> {
 
     // CRITICAL: Verify both players are still waiting (prevent race conditions)
     // Get full player data to verify addresses match
+    console.log('[tryMatch] 🔍 Step 2: Verifying players are still waiting:', {
+      player1_id: player1.id,
+      player2_id: player2.id,
+    })
     const { data: verifyPlayers, error: verifyError } = await supabase
       .from('matchmaking_queue')
       .select('id, status, player_address, bet_level')
@@ -371,14 +397,36 @@ async function tryMatch(betLevel: number): Promise<MatchResult | null> {
       .eq('status', 'waiting')
 
     if (verifyError) {
-      console.error('[tryMatch] Error verifying players:', verifyError)
+      console.error('[tryMatch] ❌ Error verifying players:', {
+        error: verifyError.message || verifyError.code || verifyError,
+        player1_id: player1.id,
+        player2_id: player2.id,
+      })
       releaseLock(betLevel)
       return null
     }
 
+    console.log('[tryMatch] 📊 Verification result:', {
+      found: verifyPlayers?.length || 0,
+      required: 2,
+      players: verifyPlayers?.map(p => ({
+        id: p.id,
+        status: p.status,
+        address: p.player_address?.slice(0, 10) + '...',
+        bet_level: p.bet_level,
+      })) || [],
+    })
+
     // CRITICAL: If either player is no longer waiting, abort match
     if (!verifyPlayers || verifyPlayers.length !== 2) {
-      console.log('[tryMatch] ⚠️ One or both players no longer waiting, aborting match')
+      console.log('[tryMatch] ⚠️ One or both players no longer waiting, aborting match:', {
+        found: verifyPlayers?.length || 0,
+        required: 2,
+        player1_id: player1.id,
+        player2_id: player2.id,
+        player1_status: verifyPlayers?.find(p => p.id === player1.id)?.status || 'not found',
+        player2_status: verifyPlayers?.find(p => p.id === player2.id)?.status || 'not found',
+      })
       releaseLock(betLevel)
       return null
     }
@@ -443,6 +491,12 @@ async function tryMatch(betLevel: number): Promise<MatchResult | null> {
       .eq('id', player2.id)
       .eq('status', 'waiting') // CRITICAL: Only update if still waiting
       .select()
+
+    console.log('[tryMatch] 📊 Player2 update result:', {
+      error: updateError2?.message || updateError2?.code || null,
+      updated: updateData2?.length || 0,
+      player2_id: player2.id,
+    })
 
     if (updateError2 || !updateData2 || updateData2.length === 0) {
       console.error('[tryMatch] Error updating player2 queue status:', updateError2)
@@ -606,16 +660,29 @@ export async function checkForMatch(playerAddress: Address): Promise<MatchResult
     // This ensures matches happen even if tryMatch wasn't called during joinQueue
     // or if two players join at the same time
     if (queueStatus.status === 'waiting' && queueStatus.bet_level) {
-      console.log('[checkForMatch] Player still waiting, attempting match for betLevel', queueStatus.bet_level)
+      console.log('[checkForMatch] 🔍 Player still waiting, attempting match for betLevel', queueStatus.bet_level, {
+        playerAddress: playerAddress.slice(0, 10) + '...',
+        queueId: queueStatus.id,
+      })
       try {
         const matchResult = await tryMatch(queueStatus.bet_level)
         if (matchResult) {
           // Match was created, now check if we're the matched player
           // The match will be picked up in the next check
-          console.log('[checkForMatch] Match created, will be picked up in next check')
+          console.log('[checkForMatch] ✅ Match created, will be picked up in next check:', {
+            gameId: matchResult.gameId,
+            player1: matchResult.player1Address.slice(0, 10) + '...',
+            player2: matchResult.player2Address.slice(0, 10) + '...',
+          })
+        } else {
+          console.log('[checkForMatch] ⚠️ tryMatch returned null (no match found or error occurred)')
         }
-      } catch (err) {
-        console.warn('[checkForMatch] Error attempting match:', err)
+      } catch (err: any) {
+        console.error('[checkForMatch] ❌ Error attempting match:', {
+          error: err?.message || err,
+          stack: err?.stack?.split('\n').slice(0, 3).join('\n'),
+          betLevel: queueStatus.bet_level,
+        })
         // Continue to check if we're already matched
       }
     }
