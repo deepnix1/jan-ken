@@ -160,10 +160,16 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
     }
     
     const checkMatch = async () => {
+      console.log('[Matchmaking] 🔄 Polling checkForMatch - address:', address?.slice(0, 10) + '...')
       try {
         const match = await checkForMatch(address);
         if (match) {
-          console.log('[Matchmaking] ✅ MATCH FOUND!', match);
+          console.log('[Matchmaking] ✅ MATCH FOUND!', JSON.stringify({
+            gameId: match.gameId,
+            player1: match.player1Address.slice(0, 10) + '...',
+            player2: match.player2Address.slice(0, 10) + '...',
+            betLevel: match.betLevel,
+          }))
           setIsMatching(false);
           setHasJoinedQueue(false);
           
@@ -179,9 +185,15 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
           
           // Call onMatchFound
           onMatchFound(match.gameId, match.player1Address, match.player2Address);
+        } else {
+          console.log('[Matchmaking] ⚠️ No match found in this polling cycle')
         }
-      } catch (err) {
-        console.error('[Matchmaking] Error checking for match:', err);
+      } catch (err: any) {
+        console.error('[Matchmaking] ❌ Error checking for match:', JSON.stringify({
+          error: err?.message || String(err),
+          name: err?.name,
+          stack: err?.stack?.split('\n').slice(0, 3).join('\n'),
+        }))
       }
     };
     

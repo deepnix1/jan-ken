@@ -259,10 +259,27 @@ export async function joinQueue(params: JoinQueueParams): Promise<string> {
         }
 
         // Try to find a match immediately (don't fail if this fails)
-        tryMatch(betLevel).catch(err => {
-          console.warn('[joinQueue] Failed to try match immediately:', err)
-          // Non-critical, continue
-        })
+        console.log('[joinQueue] 🚀 Attempting immediate match for betLevel', betLevel)
+        tryMatch(betLevel)
+          .then(result => {
+            if (result) {
+              console.log('[joinQueue] ✅ Immediate match successful:', JSON.stringify({
+                gameId: result.gameId,
+                player1: result.player1Address.slice(0, 10) + '...',
+                player2: result.player2Address.slice(0, 10) + '...',
+              }))
+            } else {
+              console.log('[joinQueue] ⚠️ Immediate match returned null (no match found)')
+            }
+          })
+          .catch(err => {
+            console.error('[joinQueue] ❌ Failed to try match immediately:', JSON.stringify({
+              error: err?.message || String(err),
+              name: err?.name,
+              stack: err?.stack?.split('\n').slice(0, 3).join('\n'),
+            }))
+            // Non-critical, continue
+          })
 
         return data.id
       } catch (err: any) {
@@ -639,21 +656,39 @@ async function tryMatch(betLevel: number): Promise<MatchResult | null> {
  * Check for matches (polling function)
  */
 export async function checkForMatch(playerAddress: Address): Promise<MatchResult | null> {
+  console.log('[checkForMatch] 🔍 Starting checkForMatch for player:', playerAddress.slice(0, 10) + '...')
   try {
     // CRITICAL: First verify player is still in queue
+    console.log('[checkForMatch] 📊 Fetching queue status from Supabase...')
     const { data: queueStatus, error: statusError } = await supabase
       .from('matchmaking_queue')
       .select('id, status, bet_level')
       .eq('player_address', playerAddress.toLowerCase())
       .maybeSingle()
     
+    console.log('[checkForMatch] 📊 Queue status result:', JSON.stringify({
+      found: !!queueStatus,
+      status: queueStatus?.status,
+      betLevel: queueStatus?.bet_level,
+      queueId: queueStatus?.id,
+      error: statusError ? {
+        message: statusError.message,
+        code: statusError.code,
+      } : null,
+    }))
+    
     // If player is not in queue at all, return null
     if (statusError && statusError.code === 'PGRST116') {
+      console.log('[checkForMatch] ⚠️ Player not in queue (PGRST116)')
       return null // Not in queue
     }
     
     // If player is not waiting or matched, they're cancelled or other status
     if (!queueStatus || (queueStatus.status !== 'waiting' && queueStatus.status !== 'matched')) {
+      console.log('[checkForMatch] ⚠️ Player not waiting or matched:', {
+        status: queueStatus?.status,
+        hasQueueStatus: !!queueStatus,
+      })
       return null // Cancelled or other status
     }
     
