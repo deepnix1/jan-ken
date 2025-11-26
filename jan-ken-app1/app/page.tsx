@@ -50,22 +50,44 @@ export default function Home() {
       try {
         // Try imported SDK first
         if (sdk && sdk.actions && typeof sdk.actions.ready === 'function') {
-          await sdk.actions.ready();
-          if (mounted) {
-            setAppReady(true);
-            console.log('✅ Farcaster SDK ready() called (imported SDK) - splash screen hidden');
+          console.log('🔍 Calling sdk.actions.ready() (imported SDK)...');
+          try {
+            await sdk.actions.ready();
+            if (mounted) {
+              setAppReady(true);
+              console.log('✅ Farcaster SDK ready() called (imported SDK) - splash screen hidden');
+            }
+            return true;
+          } catch (readyError: any) {
+            console.error('❌ Error calling sdk.actions.ready():', readyError);
+            // Even if ready() fails, show the app
+            if (mounted) {
+              setAppReady(true);
+              console.log('⚠️ ready() failed but enabling app anyway');
+            }
+            return false;
           }
-          return true;
         }
         
         // Try window SDK (PC Debug Tool or web environment)
         if ((window as any).farcaster?.sdk?.actions?.ready) {
-          await (window as any).farcaster.sdk.actions.ready();
-          if (mounted) {
-            setAppReady(true);
-            console.log('✅ Farcaster SDK ready() called (window SDK) - splash screen hidden');
+          console.log('🔍 Calling window.farcaster.sdk.actions.ready()...');
+          try {
+            await (window as any).farcaster.sdk.actions.ready();
+            if (mounted) {
+              setAppReady(true);
+              console.log('✅ Farcaster SDK ready() called (window SDK) - splash screen hidden');
+            }
+            return true;
+          } catch (readyError: any) {
+            console.error('❌ Error calling window.farcaster.sdk.actions.ready():', readyError);
+            // Even if ready() fails, show the app
+            if (mounted) {
+              setAppReady(true);
+              console.log('⚠️ ready() failed but enabling app anyway');
+            }
+            return false;
           }
-          return true;
         }
         
         return false;
@@ -408,13 +430,15 @@ export default function Home() {
   // Don't block app rendering if SDK is not available (PC browser case)
   // https://miniapps.farcaster.xyz/docs/guides/loading
   useEffect(() => {
-    // If SDK check takes too long (5 seconds), assume we're not in Farcaster environment
+    // If SDK check takes too long (2 seconds), assume we're not in Farcaster environment
+    // OR if we're in Farcaster but ready() failed, still show the app
     const timeout = setTimeout(() => {
       if (!appReady) {
-        console.log('ℹ️ Farcaster SDK check timeout - assuming PC browser, enabling app');
+        console.log('ℹ️ Farcaster SDK check timeout - enabling app anyway');
+        console.log('ℹ️ This is normal if running in PC browser or if ready() failed');
         setAppReady(true);
       }
-    }, 5000);
+    }, 2000); // Reduced to 2 seconds for faster loading
     
     return () => clearTimeout(timeout);
   }, [appReady]);
