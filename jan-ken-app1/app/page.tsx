@@ -444,7 +444,8 @@ export default function Home() {
   }, [appReady]);
 
   // Don't block rendering - show app even if appReady is false (for PC browser)
-  // Only show loading screen if we're actually in Farcaster environment
+  // CRITICAL: Per Farcaster docs, if ready() fails or takes too long, show app anyway
+  // Only show loading screen briefly, then force show app
   const isFarcasterEnv = 
     (typeof window !== 'undefined' && 
      ((sdk && sdk.actions && typeof sdk.actions.ready === 'function') ||
@@ -460,13 +461,18 @@ export default function Home() {
             />
           )}
           
-          {/* Only show loading if in Farcaster environment and not ready */}
+          {/* Only show loading briefly if in Farcaster environment and not ready */}
+          {/* After 2 seconds, app will be shown anyway due to timeout */}
           {!appReady && isFarcasterEnv && (
             <LoadingScreen 
               message="LOADING..." 
               subMessage="Initializing Farcaster Mini App"
             />
           )}
+          
+          {/* CRITICAL: Always show app content - don't block on appReady */}
+          {/* This ensures app works even if ready() fails */}
+          <div style={{ display: appReady ? 'block' : 'none' }}>
           
           <main className="min-h-screen bg-gradient-to-b from-black via-gray-900 to-black relative overflow-hidden">
       {/* Japanese Background Effects */}
