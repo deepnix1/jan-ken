@@ -81,11 +81,12 @@ export async function joinQueue(params: JoinQueueParams): Promise<string> {
       throw new Error('Supabase client not initialized')
     }
     
-    console.log('[joinQueue] ✅ Validation passed:', {
+    console.log('[joinQueue] ✅ Validation passed')
+    console.log('[joinQueue] 📊 Validation details:', JSON.stringify({
       playerAddress: playerAddress.slice(0, 10) + '...',
       betLevel,
       betAmount: betAmount.toString(),
-    })
+    }))
 
     // Check if player is already in queue
     // CRITICAL: Use explicit error handling and retry logic
@@ -660,31 +661,44 @@ export async function checkForMatch(playerAddress: Address): Promise<MatchResult
     // This ensures matches happen even if tryMatch wasn't called during joinQueue
     // or if two players join at the same time
     if (queueStatus.status === 'waiting' && queueStatus.bet_level) {
-      console.log('[checkForMatch] 🔍 Player still waiting, attempting match for betLevel', queueStatus.bet_level, {
+      console.log('[checkForMatch] 🔍 Player still waiting, attempting match for betLevel', queueStatus.bet_level)
+      console.log('[checkForMatch] 📊 Queue status:', JSON.stringify({
         playerAddress: playerAddress.slice(0, 10) + '...',
         queueId: queueStatus.id,
-      })
+        status: queueStatus.status,
+        betLevel: queueStatus.bet_level,
+      }))
       try {
+        console.log('[checkForMatch] 🚀 Calling tryMatch for betLevel', queueStatus.bet_level)
         const matchResult = await tryMatch(queueStatus.bet_level)
         if (matchResult) {
           // Match was created, now check if we're the matched player
           // The match will be picked up in the next check
-          console.log('[checkForMatch] ✅ Match created, will be picked up in next check:', {
+          console.log('[checkForMatch] ✅ Match created, will be picked up in next check')
+          console.log('[checkForMatch] 📊 Match details:', JSON.stringify({
             gameId: matchResult.gameId,
             player1: matchResult.player1Address.slice(0, 10) + '...',
             player2: matchResult.player2Address.slice(0, 10) + '...',
-          })
+            betLevel: matchResult.betLevel,
+          }))
         } else {
           console.log('[checkForMatch] ⚠️ tryMatch returned null (no match found or error occurred)')
         }
       } catch (err: any) {
-        console.error('[checkForMatch] ❌ Error attempting match:', {
-          error: err?.message || err,
+        console.error('[checkForMatch] ❌ Error attempting match')
+        console.error('[checkForMatch] ❌ Error details:', JSON.stringify({
+          error: err?.message || String(err),
+          name: err?.name,
           stack: err?.stack?.split('\n').slice(0, 3).join('\n'),
           betLevel: queueStatus.bet_level,
-        })
+        }))
         // Continue to check if we're already matched
       }
+    } else {
+      console.log('[checkForMatch] ⚠️ Player not waiting or betLevel missing:', {
+        status: queueStatus.status,
+        betLevel: queueStatus.bet_level,
+      })
     }
     
     // Check if player has been matched with retry
