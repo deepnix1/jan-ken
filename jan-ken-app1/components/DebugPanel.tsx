@@ -584,9 +584,14 @@ ${transactionLogs.slice(-20).map(log => `[${log.type.toUpperCase()}] ${log.messa
     <>
       {/* Floating Debug Button */}
       <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-4 right-4 z-[9998] w-14 h-14 rounded-full bg-purple-600 hover:bg-purple-700 text-white font-black shadow-lg flex items-center justify-center transition-all"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setIsOpen(!isOpen);
+        }}
+        className="fixed bottom-4 right-4 z-[9998] w-14 h-14 rounded-full bg-purple-600 hover:bg-purple-700 text-white font-black shadow-lg flex items-center justify-center transition-all cursor-pointer"
         title="Debug Panel"
+        type="button"
       >
         {issues.filter(i => i.status === 'error').length > 0 ? (
           <span className="text-2xl animate-pulse">🐛</span>

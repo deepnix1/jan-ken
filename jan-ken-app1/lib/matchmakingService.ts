@@ -335,7 +335,7 @@ export async function joinQueue(params: JoinQueueParams): Promise<string> {
  * Try to match players in the queue
  * CRITICAL: Uses atomic operations and locking to prevent fake matches
  */
-async function tryMatch(betLevel: number): Promise<MatchResult | null> {
+export async function tryMatch(betLevel: number): Promise<MatchResult | null> {
   console.log('[tryMatch] 🔍 Starting match attempt for betLevel', betLevel)
   
   // CRITICAL: Acquire lock to prevent concurrent matching attempts

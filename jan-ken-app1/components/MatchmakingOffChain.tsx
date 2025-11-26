@@ -224,7 +224,33 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
     const updateQueueCount = async () => {
       try {
         const count = await getQueueCount(betLevel);
+        console.log('[Matchmaking] 📊 Queue count updated:', count, 'for betLevel', betLevel)
         setQueueCount(count);
+        
+        // CRITICAL: If 2+ players waiting, force tryMatch
+        if (count >= 2) {
+          console.log('[Matchmaking] 🚀 2+ players waiting, forcing tryMatch for betLevel', betLevel)
+          // Import tryMatch and call it directly
+          const { tryMatch: tryMatchFn } = await import('@/lib/matchmakingService')
+          tryMatchFn(betLevel)
+            .then(result => {
+              if (result) {
+                console.log('[Matchmaking] ✅ Force tryMatch successful!', JSON.stringify({
+                  gameId: result.gameId,
+                  player1: result.player1Address.slice(0, 10) + '...',
+                  player2: result.player2Address.slice(0, 10) + '...',
+                }))
+              } else {
+                console.log('[Matchmaking] ⚠️ Force tryMatch returned null')
+              }
+            })
+            .catch(err => {
+              console.error('[Matchmaking] ❌ Force tryMatch error:', JSON.stringify({
+                error: err?.message || String(err),
+                name: err?.name,
+              }))
+            })
+        }
       } catch (err) {
         console.error('[Matchmaking] Error getting queue count:', err);
       }
@@ -347,7 +373,11 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
               Pool: {formatEther(betAmount)} ETH
             </p>
             <p className="text-gray-400 font-mono text-xs sm:text-sm text-center mt-2">
-              {queueCount > 0 ? `${queueCount} player${queueCount > 1 ? 's' : ''} waiting...` : 'Waiting for another player...'}
+              {queueCount >= 2 
+                ? `🔍 ${queueCount} players waiting - matching...` 
+                : queueCount === 1 
+                  ? '1 player waiting - need 1 more...' 
+                  : 'Waiting for another player...'}
             </p>
           </div>
         )}
