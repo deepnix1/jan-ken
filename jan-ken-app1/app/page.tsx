@@ -112,7 +112,9 @@ export default function Home() {
         if (attempts >= maxAttempts) {
           clearInterval(checkSDK);
           // SDK not available - might be normal web browser (not Farcaster Mini App)
-          console.log('ℹ️ Farcaster SDK not available - this is normal if running in a regular web browser');
+          // Per Farcaster docs: "If you're not in a Farcaster environment, continue anyway"
+          console.log('ℹ️ Farcaster SDK not available - this is normal if running in a regular web browser or PC');
+          console.log('ℹ️ App will continue to work normally without Farcaster SDK');
           if (mounted) {
             setAppReady(true);
           }
@@ -402,6 +404,28 @@ export default function Home() {
     // For now, we just reset the UI state
   };
 
+  // CRITICAL: Per Farcaster docs, if not in Farcaster environment, app should work normally
+  // Don't block app rendering if SDK is not available (PC browser case)
+  // https://miniapps.farcaster.xyz/docs/guides/loading
+  useEffect(() => {
+    // If SDK check takes too long (5 seconds), assume we're not in Farcaster environment
+    const timeout = setTimeout(() => {
+      if (!appReady) {
+        console.log('ℹ️ Farcaster SDK check timeout - assuming PC browser, enabling app');
+        setAppReady(true);
+      }
+    }, 5000);
+    
+    return () => clearTimeout(timeout);
+  }, [appReady]);
+
+  // Don't block rendering - show app even if appReady is false (for PC browser)
+  // Only show loading screen if we're actually in Farcaster environment
+  const isFarcasterEnv = 
+    (typeof window !== 'undefined' && 
+     ((sdk && sdk.actions && typeof sdk.actions.ready === 'function') ||
+      (window as any).farcaster?.sdk?.actions?.ready));
+
   return (
           <>
           {/* Loading Screens */}
@@ -409,6 +433,14 @@ export default function Home() {
             <LoadingScreen 
               message="CONNECTING WALLET" 
               subMessage="Please approve in your wallet"
+            />
+          )}
+          
+          {/* Only show loading if in Farcaster environment and not ready */}
+          {!appReady && isFarcasterEnv && (
+            <LoadingScreen 
+              message="LOADING..." 
+              subMessage="Initializing Farcaster Mini App"
             />
           )}
           
