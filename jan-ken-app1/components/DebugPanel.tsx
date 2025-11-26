@@ -15,7 +15,17 @@ interface DebugIssue {
 
 interface TransactionLog {
   id: string;
-  type: 'writeContract' | 'readContract' | 'wallet' | 'error' | 'info';
+  type: 'writeContract' | 'readContract' | 'wallet' | 'error' | 'info' | 'matchmaking';
+  message: string;
+  timestamp: string;
+  data?: any;
+  error?: any;
+}
+
+interface MatchmakingLog {
+  id: string;
+  type: 'tryMatch' | 'checkForMatch' | 'joinQueue' | 'leaveQueue' | 'matchFound' | 'error';
+  step?: string;
   message: string;
   timestamp: string;
   data?: any;
@@ -26,11 +36,13 @@ export function DebugPanel() {
   const [isOpen, setIsOpen] = useState(false);
   const [issues, setIssues] = useState<DebugIssue[]>([]);
   const [transactionLogs, setTransactionLogs] = useState<TransactionLog[]>([]);
-  const [activeTab, setActiveTab] = useState<'issues' | 'transactions' | 'wallet' | 'contract'>('issues');
+  const [matchmakingLogs, setMatchmakingLogs] = useState<MatchmakingLog[]>([]);
+  const [activeTab, setActiveTab] = useState<'issues' | 'transactions' | 'wallet' | 'contract' | 'matchmaking'>('matchmaking');
   const { address, isConnected, connector } = useAccount();
   const { data: connectorClient } = useConnectorClient();
   const chainId = useChainId();
   const logsRef = useRef<TransactionLog[]>([]);
+  const matchmakingLogsRef = useRef<MatchmakingLog[]>([]);
   const writeContractCallsRef = useRef<Array<{ timestamp: string; params: any; result?: any; error?: any }>>([]);
 
   // Intercept console.log for transaction monitoring
@@ -46,6 +58,70 @@ export function DebugPanel() {
     console.log = (...args: any[]) => {
       originalLog(...args);
       const logStr = args.join(' ');
+      
+      // Track matchmaking logs
+      if (logStr.includes('[tryMatch]') || logStr.includes('[checkForMatch]') || logStr.includes('[joinQueue]') || logStr.includes('[leaveQueue]') || logStr.includes('[Matchmaking]')) {
+        let logType: MatchmakingLog['type'] = 'error';
+        let step: string | undefined;
+        
+        if (logStr.includes('[tryMatch]')) {
+          logType = 'tryMatch';
+          if (logStr.includes('Step 1')) step = 'Finding Players';
+          else if (logStr.includes('Step 2')) step = 'Verifying Players';
+          else if (logStr.includes('Step 3')) step = 'Updating Status';
+          else if (logStr.includes('✅')) logType = 'matchFound';
+        } else if (logStr.includes('[checkForMatch]')) {
+          logType = 'checkForMatch';
+        } else if (logStr.includes('[joinQueue]')) {
+          logType = 'joinQueue';
+        } else if (logStr.includes('[leaveQueue]')) {
+          logType = 'leaveQueue';
+        }
+        
+        const matchmakingLog: MatchmakingLog = {
+          id: `match-${Date.now()}-${Math.random()}`,
+          type: logType,
+          step,
+          message: logStr,
+          timestamp: new Date().toISOString(),
+          data: args.length > 1 ? args.slice(1) : undefined,
+        };
+        
+        matchmakingLogsRef.current.push(matchmakingLog);
+        if (matchmakingLogsRef.current.length > 200) matchmakingLogsRef.current.shift();
+        setMatchmakingLogs([...matchmakingLogsRef.current]);
+        
+        // Also add to transaction logs for visibility
+        const log: TransactionLog = {
+          id: `log-${Date.now()}-${Math.random()}`,
+          type: 'matchmaking',
+          message: logStr,
+          timestamp: new Date().toISOString(),
+          data: args.length > 1 ? args.slice(1) : undefined,
+        };
+        logsRef.current.push(log);
+        if (logsRef.current.length > 100) logsRef.current.shift();
+        setTransactionLogs([...logsRef.current]);
+        
+        // Create issues for important matchmaking events
+        if (logStr.includes('[tryMatch] ⚠️') || logStr.includes('[tryMatch] ❌')) {
+          addIssue({
+            id: `matchmaking-${Date.now()}`,
+            title: 'Matchmaking Issue',
+            status: logStr.includes('❌') ? 'error' : 'warning',
+            message: logStr,
+            details: { step, data: args.length > 1 ? args.slice(1) : undefined },
+          });
+        } else if (logStr.includes('[tryMatch] ✅')) {
+          addIssue({
+            id: 'match-found',
+            title: 'Match Found!',
+            status: 'ok',
+            message: logStr,
+            details: { step, data: args.length > 1 ? args.slice(1) : undefined },
+          });
+        }
+      }
       
       // Track writeContract calls
       if (logStr.includes('writeContract') || logStr.includes('[useCommitReveal]') || logStr.includes('[createMatch]') || logStr.includes('[joinMatch]') || logStr.includes('[sendCommitTx]') || logStr.includes('[sendRevealTx]')) {
@@ -192,6 +268,27 @@ export function DebugPanel() {
       if (logsRef.current.length > 100) logsRef.current.shift();
       setTransactionLogs([...logsRef.current]);
 
+      // Track matchmaking errors
+      if (errorStr.includes('[tryMatch]') || errorStr.includes('[checkForMatch]') || errorStr.includes('[joinQueue]') || errorStr.includes('[leaveQueue]')) {
+        let logType: MatchmakingLog['type'] = 'error';
+        if (errorStr.includes('[tryMatch]')) logType = 'tryMatch';
+        else if (errorStr.includes('[checkForMatch]')) logType = 'checkForMatch';
+        else if (errorStr.includes('[joinQueue]')) logType = 'joinQueue';
+        else if (errorStr.includes('[leaveQueue]')) logType = 'leaveQueue';
+        
+        const matchmakingLog: MatchmakingLog = {
+          id: `match-error-${Date.now()}-${Math.random()}`,
+          type: logType,
+          message: errorStr,
+          timestamp: new Date().toISOString(),
+          error: structuredError,
+        };
+        
+        matchmakingLogsRef.current.push(matchmakingLog);
+        if (matchmakingLogsRef.current.length > 200) matchmakingLogsRef.current.shift();
+        setMatchmakingLogs([...matchmakingLogsRef.current]);
+      }
+      
       // Parse common errors
       if (errorStr.includes('User rejected') || errorStr.includes('user rejected') || errorStr.includes('User denied')) {
         addIssue({
@@ -398,7 +495,9 @@ export function DebugPanel() {
 
   const clearLogs = () => {
     logsRef.current = [];
+    matchmakingLogsRef.current = [];
     setTransactionLogs([]);
+    setMatchmakingLogs([]);
   };
 
   const copyToClipboard = async (text: string) => {
@@ -466,6 +565,18 @@ ${transactionLogs.slice(-20).map(log => `[${log.type.toUpperCase()}] ${log.messa
       case 'wallet': return 'text-cyan-400 border-cyan-500 bg-cyan-500/10';
       case 'error': return 'text-red-400 border-red-500 bg-red-500/10';
       case 'info': return 'text-gray-400 border-gray-500 bg-gray-500/10';
+      case 'matchmaking': return 'text-green-400 border-green-500 bg-green-500/10';
+    }
+  };
+  
+  const getMatchmakingLogColor = (type: MatchmakingLog['type']) => {
+    switch (type) {
+      case 'tryMatch': return 'text-blue-400 border-blue-500 bg-blue-500/10';
+      case 'checkForMatch': return 'text-cyan-400 border-cyan-500 bg-cyan-500/10';
+      case 'joinQueue': return 'text-yellow-400 border-yellow-500 bg-yellow-500/10';
+      case 'leaveQueue': return 'text-orange-400 border-orange-500 bg-orange-500/10';
+      case 'matchFound': return 'text-green-400 border-green-500 bg-green-500/20';
+      case 'error': return 'text-red-400 border-red-500 bg-red-500/10';
     }
   };
 
@@ -574,6 +685,16 @@ ${transactionLogs.slice(-20).map(log => `[${log.type.toUpperCase()}] ${log.messa
               }`}
             >
               Contract
+            </button>
+            <button
+              onClick={() => setActiveTab('matchmaking')}
+              className={`px-4 py-2 text-sm font-bold transition-colors ${
+                activeTab === 'matchmaking' 
+                  ? 'bg-purple-600 text-white border-b-2 border-white' 
+                  : 'text-purple-300 hover:text-white'
+              }`}
+            >
+              Matchmaking ({matchmakingLogs.length})
             </button>
           </div>
 
@@ -795,6 +916,75 @@ ${transactionLogs.slice(-20).map(log => `[${log.type.toUpperCase()}] ${log.messa
                     </button>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {activeTab === 'matchmaking' && (
+              <div className="space-y-2">
+                {matchmakingLogs.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-gray-400 text-sm">No matchmaking logs yet</p>
+                    <p className="text-gray-500 text-xs mt-2">Waiting for matchmaking activity...</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="mb-4 p-3 bg-purple-900/30 rounded-lg border border-purple-700">
+                      <div className="grid grid-cols-3 gap-4 text-xs">
+                        <div>
+                          <div className="opacity-60">Total Logs:</div>
+                          <div className="text-lg font-bold text-purple-300">{matchmakingLogs.length}</div>
+                        </div>
+                        <div>
+                          <div className="opacity-60">tryMatch Calls:</div>
+                          <div className="text-lg font-bold text-blue-400">
+                            {matchmakingLogs.filter(l => l.type === 'tryMatch').length}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="opacity-60">Matches Found:</div>
+                          <div className="text-lg font-bold text-green-400">
+                            {matchmakingLogs.filter(l => l.type === 'matchFound').length}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    {matchmakingLogs.slice().reverse().map((log) => (
+                      <div
+                        key={log.id}
+                        className={`border-2 rounded-lg p-3 ${getMatchmakingLogColor(log.type)}`}
+                      >
+                        <div className="flex items-start gap-2">
+                          <span className="text-xs font-bold flex-shrink-0">[{log.type}]</span>
+                          {log.step && (
+                            <span className="text-xs opacity-60 flex-shrink-0">Step: {log.step}</span>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs break-words font-mono">{log.message}</p>
+                            {log.data && (
+                              <details className="mt-1">
+                                <summary className="text-xs opacity-60 cursor-pointer">Data</summary>
+                                <pre className="text-xs mt-1 opacity-80 overflow-auto max-h-32">
+                                  {JSON.stringify(log.data, null, 2)}
+                                </pre>
+                              </details>
+                            )}
+                            {log.error && (
+                              <details className="mt-1">
+                                <summary className="text-xs opacity-60 cursor-pointer text-red-400">Error</summary>
+                                <pre className="text-xs mt-1 opacity-80 overflow-auto max-h-32 text-red-300">
+                                  {JSON.stringify(log.error, null, 2)}
+                                </pre>
+                              </details>
+                            )}
+                            <p className="text-xs mt-1 opacity-60">
+                              {new Date(log.timestamp).toLocaleTimeString()}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </>
+                )}
               </div>
             )}
           </div>
