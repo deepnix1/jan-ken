@@ -737,25 +737,95 @@ export async function checkForMatch(playerAddress: Address): Promise<MatchResult
     }
     
     // Check if player has been matched with retry
+    // CRITICAL: After tryMatch creates a match, players are set to 'matched' status
+    // We need to find the game using the matched_with field or by searching games table
+    console.log('[checkForMatch] 🔍 Checking if player has been matched...')
     let retries = 2
     let queueEntry: any = null
     
     while (retries > 0) {
       try {
-        const { data, error } = await supabase
+        // First, try to find queue entry with matched status
+        const { data: matchedQueueEntry, error: queueError } = await supabase
           .from('matchmaking_queue')
           .select('*')
           .eq('player_address', playerAddress.toLowerCase())
           .eq('status', 'matched')
           .maybeSingle()
         
-        if (error && error.code !== 'PGRST116') {
-          throw error
+        console.log('[checkForMatch] 📊 Matched queue entry check:', JSON.stringify({
+          found: !!matchedQueueEntry,
+          error: queueError ? {
+            message: queueError.message,
+            code: queueError.code,
+          } : null,
+        }))
+        
+        if (queueError && queueError.code !== 'PGRST116') {
+          throw queueError
         }
         
-        queueEntry = data
+        if (matchedQueueEntry) {
+          queueEntry = matchedQueueEntry
+          console.log('[checkForMatch] ✅ Found matched queue entry:', JSON.stringify({
+            id: queueEntry.id,
+            matched_with: queueEntry.matched_with,
+            matched_at: queueEntry.matched_at,
+          }))
+          break
+        }
+        
+        // If not found in queue, try to find game directly
+        console.log('[checkForMatch] 🔍 Queue entry not found, searching games table...')
+        const { data: games, error: gamesError } = await supabase
+          .from('games')
+          .select('*')
+          .or(`player1_address.eq.${playerAddress.toLowerCase()},player2_address.eq.${playerAddress.toLowerCase()}`)
+          .eq('status', 'commit_phase')
+          .order('created_at', { ascending: false })
+          .limit(1)
+        
+        console.log('[checkForMatch] 📊 Games search result:', JSON.stringify({
+          found: !!games && games.length > 0,
+          count: games?.length || 0,
+          error: gamesError ? {
+            message: gamesError.message,
+            code: gamesError.code,
+          } : null,
+        }))
+        
+        if (gamesError) {
+          throw gamesError
+        }
+        
+        if (games && games.length > 0) {
+          const game = games[0]
+          console.log('[checkForMatch] ✅ Found game directly:', JSON.stringify({
+            gameId: game.game_id,
+            player1: game.player1_address?.slice(0, 10) + '...',
+            player2: game.player2_address?.slice(0, 10) + '...',
+          }))
+          
+          // Return match result
+          return {
+            gameId: game.game_id,
+            player1Address: game.player1_address as Address,
+            player1Fid: game.player1_fid,
+            player2Address: game.player2_address as Address,
+            player2Fid: game.player2_fid,
+            betLevel: game.bet_level,
+            betAmount: BigInt(game.bet_amount || '0'),
+          }
+        }
+        
+        // No match found
         break
       } catch (err: any) {
+        console.error('[checkForMatch] ❌ Error checking matched status:', JSON.stringify({
+          error: err?.message || String(err),
+          name: err?.name,
+          code: err?.code,
+        }))
         if (err.message?.includes('fetch') || err.message?.includes('Load failed')) {
           retries--
           if (retries > 0) {
