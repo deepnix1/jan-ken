@@ -36,6 +36,12 @@ export default function Home() {
   const [isConnecting, setIsConnecting] = useState(false); // For loading screen
   const [isTransitioning, setIsTransitioning] = useState(false); // For page transitions
 
+  // CRITICAL: Set appReady immediately - app should ALWAYS be visible
+  // ready() only hides Farcaster splash screen, it doesn't control app visibility
+  useEffect(() => {
+    setAppReady(true);
+  }, []);
+
   // CRITICAL: Call sdk.actions.ready() IMMEDIATELY to hide Farcaster splash screen
   // Per Farcaster docs: https://miniapps.farcaster.xyz/docs/getting-started#making-your-app-display
   // "After your app loads, you must call sdk.actions.ready() to hide the splash screen and display your content"
