@@ -1728,11 +1728,6 @@ export async function checkForMatch(playerAddress: Address): Promise<MatchResult
         // No match found in games table - return null to stop polling for cancelled player
         console.log('[checkForMatch] 🛑 Player cancelled and no game found - returning null to stop polling')
         return null
-      }
-      
-      // CRITICAL: If cancelled but no games found, return null immediately to stop polling
-      console.log('[checkForMatch] 🛑 Player cancelled and no game found - returning null to stop polling')
-      return null
       } catch (err: any) {
         console.error('[checkForMatch] ❌ Error checking matched status:', JSON.stringify({
           error: err?.message || String(err),
