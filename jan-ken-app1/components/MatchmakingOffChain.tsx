@@ -56,43 +56,12 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
     );
   }
   
-  // CRITICAL: Cleanup function - leave queue when component unmounts or conditions change
-  useEffect(() => {
-    return () => {
-      // Cleanup: Leave queue when component unmounts
-      if (hasJoinedQueue && address) {
-        console.log('[Matchmaking] 🧹 Cleanup: Leaving queue on component unmount')
-        leaveQueue(address).catch(err => {
-          console.error('[Matchmaking] ❌ Error leaving queue on cleanup:', err)
-        })
-      }
-    }
-  }, [hasJoinedQueue, address])
-
   // Join queue when component mounts
-  // CRITICAL: Only join queue if:
-  // 1. Bet amount is selected (betAmount > 0)
-  // 2. Wallet is connected
-  // 3. Address is available
-  // 4. App is visible
-  // 5. Component is actually rendered (not just mounted)
   useEffect(() => {
     // CRITICAL: Don't join queue if bet is not selected
     if (!betAmount || betAmount === BigInt(0)) {
-      console.log('[Matchmaking] ⚠️ Bet amount not selected, skipping queue join', JSON.stringify({
-        betAmount: betAmount?.toString() || 'null',
-        hasBetAmount: !!betAmount,
-        betAmountIsZero: betAmount === BigInt(0),
-      }, null, 2))
+      console.log('[Matchmaking] ⚠️ Bet amount not selected, skipping queue join')
       setError('Please select a bet amount before joining the queue.')
-      // CRITICAL: Leave queue if already joined but bet is not selected
-      if (hasJoinedQueue && address) {
-        console.log('[Matchmaking] 🧹 Leaving queue - bet amount not selected')
-        leaveQueue(address).catch(err => {
-          console.error('[Matchmaking] ❌ Error leaving queue:', err)
-        })
-        setHasJoinedQueue(false)
-      }
       return
     }
     
@@ -100,14 +69,6 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
     if (!isConnected) {
       console.log('[Matchmaking] ⚠️ Wallet not connected, skipping queue join')
       setError('Please connect your wallet first.')
-      // CRITICAL: Leave queue if already joined but wallet disconnected
-      if (hasJoinedQueue && address) {
-        console.log('[Matchmaking] 🧹 Leaving queue - wallet disconnected')
-        leaveQueue(address).catch(err => {
-          console.error('[Matchmaking] ❌ Error leaving queue:', err)
-        })
-        setHasJoinedQueue(false)
-      }
       return
     }
     
@@ -122,22 +83,10 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
     if (typeof document !== 'undefined' && document.hidden) {
       console.log('[Matchmaking] ⚠️ App is hidden, skipping queue join')
       setError('App must be visible to join queue.')
-      // CRITICAL: Leave queue if already joined but app is hidden
-      if (hasJoinedQueue) {
-        console.log('[Matchmaking] 🧹 Leaving queue - app is hidden')
-        leaveQueue(address).catch(err => {
-          console.error('[Matchmaking] ❌ Error leaving queue:', err)
-        })
-        setHasJoinedQueue(false)
-      }
       return
     }
     
-    // CRITICAL: Don't join if already joined
-    if (hasJoinedQueue) {
-      console.log('[Matchmaking] ✅ Already joined queue, skipping')
-      return
-    }
+    if (hasJoinedQueue) return;
     
     // Validate bet level (must be valid)
     if (!betLevel || betLevel === 0) {
@@ -266,22 +215,11 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
         }
       }
       
-      // CRITICAL: useEffect cannot be async, so we need to wrap async logic
-      // Check queue status and start polling only if player is in queue
-      const initializePolling = async () => {
-        const shouldPoll = await checkQueueStatus()
-        if (!shouldPoll) {
-          return
-        }
-        
-        // Start polling only if shouldPoll is true
-        // The polling logic will be set up below
+      // Check queue status before starting polling
+      const shouldPoll = await checkQueueStatus()
+      if (!shouldPoll) {
+        return
       }
-      
-      // Call async function to check queue status
-      initializePolling()
-      
-      // Continue with polling setup (will be checked on first poll)
     
     // CRITICAL: Update last_seen timestamp to keep player active in queue
     // This ensures only players with open apps can be matched

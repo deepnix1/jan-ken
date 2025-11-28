@@ -73,3 +73,5 @@ Ekranda beyaz arka plan ve basit tasarım görünüyor. Modern gradient arka pla
 
 
 
+
+

@@ -67,3 +67,5 @@ COMMENT ON COLUMN matches.move1 IS 'Player1 move: 0=Rock, 1=Paper, 2=Scissors';
 COMMENT ON COLUMN matches.move2 IS 'Player2 move: 0=Rock, 1=Paper, 2=Scissors';
 
 
+
+

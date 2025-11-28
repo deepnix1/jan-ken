@@ -70,3 +70,5 @@ Private key'iniz environment dosyalarına eklendi. Şimdi:
 
 
 
+
+
