@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { getFarcasterProfileByAddress } from '@/lib/farcasterProfile';
 import Image from 'next/image';
@@ -38,10 +38,12 @@ export function MatchFoundAnimation({ player1Address, player2Address, currentUse
     setMounted(true);
   }, []);
 
-  // Determine opponent address
-  const opponentAddress = currentUserAddress 
-    ? (player1Address?.toLowerCase() === currentUserAddress.toLowerCase() ? player2Address : player1Address)
-    : (player1Address || player2Address);
+  // Determine opponent address - CRITICAL: Memoize to prevent infinite re-renders
+  const opponentAddress = useMemo(() => {
+    return currentUserAddress 
+      ? (player1Address?.toLowerCase() === currentUserAddress.toLowerCase() ? player2Address : player1Address)
+      : (player1Address || player2Address);
+  }, [player1Address, player2Address, currentUserAddress]);
 
   // Prevent multiple instances
   useEffect(() => {
