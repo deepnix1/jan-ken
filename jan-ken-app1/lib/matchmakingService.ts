@@ -381,22 +381,39 @@ export async function tryMatch(betLevel: number): Promise<MatchResult | null> {
     
     // CRITICAL: First get all unique waiting players for this bet level
     // Only include players who were active in the last 30 seconds (app is open)
+    const thirtySecondsAgo = new Date(Date.now() - 30000).toISOString()
+    console.log('[tryMatch] 🔍 Filtering players by last_seen >=', thirtySecondsAgo)
+    
     const { data: allPlayers, error: allPlayersError } = await supabase
       .from('matchmaking_queue')
       .select('id, player_address, status, bet_level, created_at, player_fid, bet_amount, last_seen')
       .eq('bet_level', betLevel)
       .eq('status', 'waiting')
-      .gte('last_seen', new Date(Date.now() - 30000).toISOString()) // Active in last 30 seconds
+      .not('last_seen', 'is', null) // CRITICAL: Exclude NULL last_seen (inactive players)
+      .gte('last_seen', thirtySecondsAgo) // Active in last 30 seconds
       .order('created_at', { ascending: true })
     
     if (allPlayersError) {
       console.error('[tryMatch] ❌ Error finding all players:', JSON.stringify({
         error: allPlayersError.message || allPlayersError.code || allPlayersError,
         betLevel,
+        thirtySecondsAgo,
       }, null, 2))
       releaseLock(betLevel)
       return null
     }
+    
+    // CRITICAL: Log all found players with their last_seen timestamps for debugging
+    console.log('[tryMatch] 📊 Found players with active last_seen:', JSON.stringify({
+      count: allPlayers?.length || 0,
+      betLevel,
+      players: (allPlayers || []).map(p => ({
+        address: p.player_address?.slice(0, 10) + '...',
+        last_seen: p.last_seen,
+        seconds_ago: p.last_seen ? Math.floor((Date.now() - new Date(p.last_seen).getTime()) / 1000) : null,
+        created_at: p.created_at,
+      })),
+    }, null, 2))
     
     // CRITICAL: Filter out duplicate addresses (case-insensitive)
     const uniquePlayers = new Map<string, any>()

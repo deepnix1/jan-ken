@@ -191,7 +191,14 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
     // CRITICAL: Update last_seen timestamp to keep player active in queue
     // This ensures only players with open apps can be matched
     const updateLastSeen = async () => {
-      if (!address || !hasJoinedQueue) return;
+      if (!address || !hasJoinedQueue) {
+        console.warn('[Matchmaking] ⚠️ Cannot update last_seen - missing address or not in queue:', JSON.stringify({
+          hasAddress: !!address,
+          hasJoinedQueue,
+          address: address?.slice(0, 10) + '...',
+        }, null, 2))
+        return;
+      }
       
       try {
         // Check if app is visible
@@ -200,20 +207,46 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
           return;
         }
         
+        const now = new Date().toISOString()
+        console.log('[Matchmaking] 🔄 Updating last_seen to:', now)
+        
         // Update last_seen timestamp in queue
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('matchmaking_queue')
-          .update({ last_seen: new Date().toISOString() })
+          .update({ last_seen: now })
           .eq('player_address', address.toLowerCase())
           .eq('status', 'waiting')
+          .select('id, last_seen')
         
         if (error) {
-          console.warn('[Matchmaking] ⚠️ Could not update last_seen:', error.message);
+          console.error('[Matchmaking] ❌❌❌ CRITICAL: Could not update last_seen:', JSON.stringify({
+            error: error.message || error.code || error,
+            code: error.code,
+            details: error.details,
+            hint: error.hint,
+            address: address.slice(0, 10) + '...',
+            now,
+          }, null, 2))
+          // CRITICAL: This is a serious error - player will be excluded from matching
+        } else if (data && data.length > 0) {
+          console.log('[Matchmaking] ✅✅✅ Updated last_seen successfully:', JSON.stringify({
+            updatedRows: data.length,
+            last_seen: data[0]?.last_seen,
+            queueId: data[0]?.id,
+          }, null, 2))
         } else {
-          console.log('[Matchmaking] ✅ Updated last_seen timestamp');
+          console.warn('[Matchmaking] ⚠️ Update last_seen returned no rows - player may not be in queue:', JSON.stringify({
+            address: address.slice(0, 10) + '...',
+            hasJoinedQueue,
+          }, null, 2))
         }
-      } catch (err) {
-        console.warn('[Matchmaking] ⚠️ Error updating last_seen:', err);
+      } catch (err: any) {
+        console.error('[Matchmaking] ❌❌❌ CRITICAL ERROR updating last_seen:', JSON.stringify({
+          error: err?.message || String(err),
+          name: err?.name,
+          stack: err?.stack?.split('\n').slice(0, 5).join('\n'),
+          address: address?.slice(0, 10) + '...',
+        }, null, 2))
       }
     };
     
