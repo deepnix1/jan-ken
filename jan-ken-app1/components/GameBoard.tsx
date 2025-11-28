@@ -628,12 +628,17 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
               <div className="flex flex-col">
                 <p className="text-red-400 font-black text-lg uppercase tracking-wider">
                   {isPending && !hash 
-                    ? (status === 'pending' ? '⏳ Waiting for wallet...' : '📤 Sending transaction...') 
+                    ? (status === 'pending' ? '⏳ Wallet popup opened' : '📤 Sending transaction...') 
                     : '✅ Confirming...'}
                 </p>
-                {isPending && !hash && (
+                {isPending && !hash && status === 'pending' && (
+                  <p className="text-green-400 font-mono text-sm mt-1">
+                    Check your wallet popup
+                  </p>
+                )}
+                {isPending && !hash && status !== 'pending' && (
                   <p className="text-yellow-400 font-mono text-sm mt-1">
-                    Please approve in your wallet
+                    Preparing transaction...
                   </p>
                 )}
                 {hash && (

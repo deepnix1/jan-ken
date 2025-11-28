@@ -16,17 +16,50 @@ export function Result({ onPlayAgain, onTieRematch }: ResultProps) {
   const [fireworks, setFireworks] = useState<Array<{ id: number; x: number; y: number; color: string; tx: number; ty: number }>>([]);
   const [sakura, setSakura] = useState<Array<{ id: number; x: number; delay: number; duration: number }>>([]);
 
-  const { data: gameData } = useReadContract({
+  const { data: gameData, isLoading: isLoadingGame, refetch: refetchGame } = useReadContract({
     address: CONTRACT_ADDRESS as `0x${string}`,
     abi: CONTRACT_ABI,
     functionName: 'getMyGame',
     args: address ? [address] : undefined,
+    query: {
+      enabled: !!address,
+      // CRITICAL: Poll every 2 seconds while loading to get results
+      refetchInterval: (data) => {
+        // If we have data and game is finished, stop polling
+        if (data && Array.isArray(data) && data.length > 0) {
+          const status = data[5];
+          if (status === 3 || status === 4) return false; // Finished or Cancelled
+        }
+        // If still loading, keep polling
+        if (result === 'loading') return 2000;
+        return false;
+      },
+    },
   });
 
   useEffect(() => {
+    console.log('[Result] 🔍 Checking game data:', {
+      hasAddress: !!address,
+      hasGameData: !!gameData,
+      isLoadingGame,
+      gameDataLength: Array.isArray(gameData) ? gameData.length : 0,
+    });
+
     // PRODUCTION MODE: Check contract data only
-    if (!address || !gameData) {
+    if (!address) {
+      console.log('[Result] ⚠️ No address, setting loading');
       setResult('loading');
+      return;
+    }
+
+    if (!gameData) {
+      console.log('[Result] ⚠️ No game data yet, setting loading');
+      setResult('loading');
+      // Try to refetch if we don't have data
+      if (!isLoadingGame) {
+        console.log('[Result] 🔄 Refetching game data...');
+        refetchGame();
+      }
       return;
     }
 
@@ -37,37 +70,48 @@ export function Result({ onPlayAgain, onTieRematch }: ResultProps) {
       const player1Choice = gameData[3]; // Choice enum
       const player2Choice = gameData[4]; // Choice enum
 
+      console.log('[Result] 📊 Game data:', {
+        status,
+        winner: winner ? winner.slice(0, 10) + '...' : 'null',
+        player1Choice,
+        player2Choice,
+        betAmount: betAmount?.toString(),
+        currentAddress: address?.slice(0, 10) + '...',
+      });
+
       // Status: 0=Waiting, 1=Matched, 2=InProgress, 3=Finished, 4=Cancelled
       if (status === 3) {
         // Game Finished
+        console.log('[Result] ✅ Game finished, determining result...');
         if (winner && winner !== '0x0000000000000000000000000000000000000000') {
           // There is a winner
           if (winner.toLowerCase() === address.toLowerCase()) {
             // Player won
+            console.log('[Result] 🎉 Player WON!');
             setResult('win');
             setPrize((Number(betAmount) * 2 / 1e18).toFixed(4));
             
-              // Create fireworks - spread from center
-              const newFireworks: Array<{ id: number; x: number; y: number; color: string; tx: number; ty: number }> = [];
-              const colors = ['#ff0066', '#00ffff', '#ffaa00', '#ff0066', '#00ffff', '#ff00ff', '#00ff00'];
-              const centerX = 50;
-              const centerY = 50;
-              for (let i = 0; i < 80; i++) {
-                const angle = (Math.PI * 2 * i) / 80;
-                const distance = 30 + Math.random() * 40;
-                const tx = Math.cos(angle) * distance;
-                const ty = Math.sin(angle) * distance;
-                newFireworks.push({
-                  id: i,
-                  x: centerX,
-                  y: centerY,
-                  color: colors[Math.floor(Math.random() * colors.length)],
-                  tx: tx,
-                  ty: ty,
-                });
-              }
-              setFireworks(newFireworks);
-            
+            // Create fireworks - spread from center
+            const newFireworks: Array<{ id: number; x: number; y: number; color: string; tx: number; ty: number }> = [];
+            const colors = ['#ff0066', '#00ffff', '#ffaa00', '#ff0066', '#00ffff', '#ff00ff', '#00ff00'];
+            const centerX = 50;
+            const centerY = 50;
+            for (let i = 0; i < 80; i++) {
+              const angle = (Math.PI * 2 * i) / 80;
+              const distance = 30 + Math.random() * 40;
+              const tx = Math.cos(angle) * distance;
+              const ty = Math.sin(angle) * distance;
+              newFireworks.push({
+                id: i,
+                x: centerX,
+                y: centerY,
+                color: colors[Math.floor(Math.random() * colors.length)],
+                tx: tx,
+                ty: ty,
+              });
+            }
+            setFireworks(newFireworks);
+          
             // Create sakura petals
             const newSakura: Array<{ id: number; x: number; delay: number; duration: number }> = [];
             for (let i = 0; i < 30; i++) {
@@ -81,10 +125,12 @@ export function Result({ onPlayAgain, onTieRematch }: ResultProps) {
             setSakura(newSakura);
           } else {
             // Player lost
+            console.log('[Result] 😢 Player LOST');
             setResult('lose');
           }
         } else {
           // Tie (winner is address(0))
+          console.log('[Result] 🤝 TIE');
           setResult('tie');
           // Auto rematch after 3 seconds
           if (onTieRematch) {
@@ -95,6 +141,7 @@ export function Result({ onPlayAgain, onTieRematch }: ResultProps) {
         }
       } else if (status === 4) {
         // Cancelled
+        console.log('[Result] ⚠️ Game cancelled');
         setResult('tie');
         if (onTieRematch) {
           setTimeout(() => {
@@ -102,19 +149,20 @@ export function Result({ onPlayAgain, onTieRematch }: ResultProps) {
           }, 3000);
         }
       } else if (status === 2 && player1Choice > 0 && player2Choice > 0) {
-        // InProgress with both choices - check for tie
-        if (player1Choice === player2Choice) {
-          // Tie - will be handled by contract, but we can prepare
-          setResult('loading');
-        } else {
-          // Not a tie, wait for contract to finish
-          setResult('loading');
-        }
+        // InProgress with both choices - wait for contract to finish
+        console.log('[Result] ⏳ Game in progress, both players made choices, waiting for contract to finish...');
+        setResult('loading');
+        // Keep polling - refetch will continue
+      } else {
+        // Still waiting for game to finish
+        console.log('[Result] ⏳ Still waiting for game to finish...', { status, player1Choice, player2Choice });
+        setResult('loading');
       }
     } else {
+      console.log('[Result] ⚠️ Game data is empty array');
       setResult('loading');
     }
-  }, [gameData, address, onTieRematch]);
+  }, [gameData, address, onTieRematch, isLoadingGame, refetchGame, result]);
 
   return (
     <div className="w-full text-center py-8 relative overflow-hidden">
