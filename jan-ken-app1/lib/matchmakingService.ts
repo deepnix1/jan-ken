@@ -471,27 +471,35 @@ export async function tryMatch(betLevel: number): Promise<MatchResult | null> {
       return null
     }
 
-    console.log('[tryMatch] 📊 Verification result:', {
+    console.log('[tryMatch] 📊 Verification result:', JSON.stringify({
       found: verifyPlayers?.length || 0,
       required: 2,
       players: verifyPlayers?.map(p => ({
         id: p.id,
         status: p.status,
         address: p.player_address?.slice(0, 10) + '...',
+        fullAddress: p.player_address, // Log full address
         bet_level: p.bet_level,
       })) || [],
-    })
+    }, null, 2))
 
     // CRITICAL: If either player is no longer waiting, abort match
     if (!verifyPlayers || verifyPlayers.length !== 2) {
-      console.log('[tryMatch] ⚠️ One or both players no longer waiting, aborting match:', {
+      console.log('[tryMatch] ⚠️ One or both players no longer waiting, aborting match:', JSON.stringify({
         found: verifyPlayers?.length || 0,
         required: 2,
         player1_id: player1.id,
+        player1_address: player1.player_address,
         player2_id: player2.id,
+        player2_address: player2.player_address,
         player1_status: verifyPlayers?.find(p => p.id === player1.id)?.status || 'not found',
         player2_status: verifyPlayers?.find(p => p.id === player2.id)?.status || 'not found',
-      })
+        allPlayers: verifyPlayers?.map(p => ({
+          id: p.id,
+          address: p.player_address,
+          status: p.status,
+        })) || [],
+      }, null, 2))
       releaseLock(betLevel)
       return null
     }
@@ -501,27 +509,74 @@ export async function tryMatch(betLevel: number): Promise<MatchResult | null> {
     const verifiedPlayer2 = verifyPlayers.find(p => p.id === player2.id)
     
     if (!verifiedPlayer1 || !verifiedPlayer2) {
-      console.log('[tryMatch] ⚠️ Could not verify both players, aborting match')
+      console.log('[tryMatch] ⚠️ Could not verify both players, aborting match:', JSON.stringify({
+        verifiedPlayer1: verifiedPlayer1 ? {
+          id: verifiedPlayer1.id,
+          address: verifiedPlayer1.player_address,
+        } : null,
+        verifiedPlayer2: verifiedPlayer2 ? {
+          id: verifiedPlayer2.id,
+          address: verifiedPlayer2.player_address,
+        } : null,
+        player1_id: player1.id,
+        player2_id: player2.id,
+      }, null, 2))
       releaseLock(betLevel)
       return null
     }
     
-    // CRITICAL: Verify addresses match exactly
+    // CRITICAL: Verify addresses match exactly and are different
+    const verifiedAddr1 = verifiedPlayer1.player_address.toLowerCase().trim()
+    const verifiedAddr2 = verifiedPlayer2.player_address.toLowerCase().trim()
+    const originalAddr1 = player1.player_address.toLowerCase().trim()
+    const originalAddr2 = player2.player_address.toLowerCase().trim()
+    
+    if (verifiedAddr1 === verifiedAddr2) {
+      console.error('[tryMatch] ⚠️ Verified players have same address (duplicate):', JSON.stringify({
+        verifiedPlayer1_address: verifiedPlayer1.player_address,
+        verifiedPlayer2_address: verifiedPlayer2.player_address,
+        normalized1: verifiedAddr1,
+        normalized2: verifiedAddr2,
+      }, null, 2))
+      releaseLock(betLevel)
+      return null
+    }
+    
     if (
-      verifiedPlayer1.player_address.toLowerCase() !== player1.player_address.toLowerCase() ||
-      verifiedPlayer2.player_address.toLowerCase() !== player2.player_address.toLowerCase()
+      verifiedAddr1 !== originalAddr1 ||
+      verifiedAddr2 !== originalAddr2
     ) {
-      console.error('[tryMatch] ⚠️ Player address mismatch during verification')
+      console.error('[tryMatch] ⚠️ Player address mismatch during verification:', JSON.stringify({
+        originalPlayer1: originalAddr1,
+        verifiedPlayer1: verifiedAddr1,
+        originalPlayer2: originalAddr2,
+        verifiedPlayer2: verifiedAddr2,
+        match1: verifiedAddr1 === originalAddr1,
+        match2: verifiedAddr2 === originalAddr2,
+      }, null, 2))
       releaseLock(betLevel)
       return null
     }
     
     // CRITICAL: Verify bet levels match
     if (verifiedPlayer1.bet_level !== betLevel || verifiedPlayer2.bet_level !== betLevel) {
-      console.error('[tryMatch] ⚠️ Bet level mismatch during verification')
+      console.error('[tryMatch] ⚠️ Bet level mismatch during verification:', JSON.stringify({
+        required: betLevel,
+        player1_bet_level: verifiedPlayer1.bet_level,
+        player2_bet_level: verifiedPlayer2.bet_level,
+        match1: verifiedPlayer1.bet_level === betLevel,
+        match2: verifiedPlayer2.bet_level === betLevel,
+      }, null, 2))
       releaseLock(betLevel)
       return null
     }
+    
+    console.log('[tryMatch] ✅ All verifications passed:', JSON.stringify({
+      player1: verifiedAddr1.slice(0, 10) + '...',
+      player2: verifiedAddr2.slice(0, 10) + '...',
+      betLevel,
+      addressesDifferent: verifiedAddr1 !== verifiedAddr2,
+    }, null, 2))
 
     // Step 2: Atomically update both players to 'matched' status FIRST
     // CRITICAL: Update each player separately with their matched_with address
