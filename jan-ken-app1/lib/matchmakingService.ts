@@ -430,9 +430,16 @@ export async function tryMatch(betLevel: number): Promise<MatchResult | null> {
     }, null, 2))
     
     // CRITICAL: Filter out duplicate addresses (case-insensitive)
+    // Use validPlayers instead of allPlayers to ensure we only process valid addresses
     const uniquePlayers = new Map<string, any>()
-    for (const player of (allPlayers || [])) {
-      if (!player.player_address) continue
+    for (const player of validPlayers) {
+      if (!player.player_address || player.player_address.trim() === '') {
+        console.warn('[tryMatch] ⚠️ Skipping player with invalid address:', JSON.stringify({
+          id: player.id,
+          hasAddress: !!player.player_address,
+        }, null, 2))
+        continue
+      }
       const normalizedAddr = player.player_address.toLowerCase().trim()
       if (!uniquePlayers.has(normalizedAddr)) {
         uniquePlayers.set(normalizedAddr, player)
@@ -1367,10 +1374,35 @@ export async function checkForMatch(playerAddress: Address): Promise<MatchResult
       
       if (games && games.length > 0) {
         const game = games[0]
+        
+        // CRITICAL: Verify game has both player addresses (not null/empty)
+        if (!game.player1_address || !game.player2_address) {
+          console.error('[checkForMatch] ❌❌❌ REJECTING GAME: Missing player addresses:', JSON.stringify({
+            gameId: game.game_id,
+            hasPlayer1: !!game.player1_address,
+            hasPlayer2: !!game.player2_address,
+            player1: game.player1_address || 'MISSING',
+            player2: game.player2_address || 'MISSING',
+          }, null, 2))
+          return null
+        }
+        
+        // CRITICAL: Verify both players have different addresses
+        if (game.player1_address.toLowerCase() === game.player2_address.toLowerCase()) {
+          console.error('[checkForMatch] ❌❌❌ REJECTING GAME: Both players have same address:', JSON.stringify({
+            gameId: game.game_id,
+            player1_address: game.player1_address,
+            player2_address: game.player2_address,
+          }, null, 2))
+          return null
+        }
+        
         console.log('[checkForMatch] ✅ Found game even though player is cancelled:', JSON.stringify({
           gameId: game.game_id,
           player1: game.player1_address?.slice(0, 10) + '...',
           player2: game.player2_address?.slice(0, 10) + '...',
+          bothPlayersExist: !!game.player1_address && !!game.player2_address,
+          addressesDifferent: game.player1_address?.toLowerCase() !== game.player2_address?.toLowerCase(),
         }, null, 2))
         
         // CRITICAL: Verify both players have active last_seen before returning this game
