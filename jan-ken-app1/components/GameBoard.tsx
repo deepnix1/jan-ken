@@ -427,34 +427,18 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
       try {
         // CRITICAL: Call writeContract - it should trigger the mutation
         // In Wagmi v3, writeContract is a mutation trigger function
+        // If this call succeeds (no exception), the transaction has been initiated
+        // Status updates will happen asynchronously via hooks and callbacks
         writeContract(finalParams);
         console.log('✅ [GameBoard] writeContract CALLED! (no error thrown)');
-        
-        // CRITICAL: Wait a bit for status to update (Wagmi updates state asynchronously)
-        await new Promise(resolve => setTimeout(resolve, 300));
-        
-        console.log('📊 Status after 300ms:', status);
-        console.log('📊 isPending after 300ms:', isPending);
-        console.log('📊 Hash after 300ms:', hash || 'NOT RECEIVED');
+        console.log('📊 Transaction initiated - status will update via hooks');
         console.log('⏰ Called at:', new Date().toISOString());
+        console.log('💡 Note: Status updates happen asynchronously - onSuccess/onError callbacks will handle results');
         
-        // CRITICAL: If status is still idle after calling, there might be an issue
-        if (status === 'idle' && !isPending && !hash) {
-          console.error('[GameBoard] ❌❌❌ CRITICAL: Status is still idle after writeContract call!');
-          console.error('[GameBoard] ❌ Transaction did not start. Possible causes:');
-          console.error('[GameBoard] ❌ 1. writeContract mutation is not properly configured');
-          console.error('[GameBoard] ❌ 2. Wallet connector is not ready or not connected');
-          console.error('[GameBoard] ❌ 3. Transaction parameters are invalid');
-          console.error('[GameBoard] ❌ 4. Network mismatch (wrong chain)');
-          console.error('[GameBoard] ❌ 5. Contract address or ABI issue');
-          
-          // Show user-friendly error
-          setTxError('Transaction failed to start. Please check your wallet connection and try again.');
-          setSelectedChoice(null);
-          setTxStartTime(null);
-          alert('Transaction failed to start. Please check your wallet connection and network settings.');
-          return;
-        }
+        // CRITICAL: Don't check status immediately - Wagmi updates state asynchronously
+        // The onSuccess/onError callbacks will handle success/failure
+        // If writeContract() didn't throw, the transaction was initiated successfully
+        // The wallet popup may take time to appear, and status may take time to update
       } catch (writeError: any) {
         console.error('❌ [GameBoard] ERROR calling writeContract:', writeError);
         console.error('[GameBoard] Error details:', {
