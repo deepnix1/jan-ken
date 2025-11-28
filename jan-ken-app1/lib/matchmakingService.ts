@@ -652,14 +652,32 @@ export async function tryMatch(betLevel: number): Promise<MatchResult | null> {
       .eq('status', 'waiting') // CRITICAL: Only update if still waiting
       .select()
 
-    console.log('[tryMatch] 📊 Player2 update result:', {
-      error: updateError2?.message || updateError2?.code || null,
+    console.log('[tryMatch] 📊 Player2 update result:', JSON.stringify({
+      error: updateError2 ? {
+        message: updateError2.message,
+        code: updateError2.code,
+        details: updateError2.details,
+      } : null,
       updated: updateData2?.length || 0,
       player2_id: player2.id,
-    })
+      updateData2: updateData2 ? updateData2.map(d => ({
+        id: d.id,
+        status: d.status,
+        matched_with: d.matched_with?.slice(0, 10) + '...',
+      })) : null,
+    }, null, 2))
 
     if (updateError2 || !updateData2 || updateData2.length === 0) {
-      console.error('[tryMatch] Error updating player2 queue status:', updateError2)
+      console.error('[tryMatch] ❌ Error updating player2 queue status:', JSON.stringify({
+        error: updateError2 ? {
+          message: updateError2.message,
+          code: updateError2.code,
+          details: updateError2.details,
+        } : 'No error object',
+        updateData2: updateData2 ? updateData2.length : 'No data',
+        player2_id: player2.id,
+        player2_address: player2.player_address?.slice(0, 10) + '...',
+      }, null, 2))
       // CRITICAL: Rollback player1 if player2 update fails
       await supabase
         .from('matchmaking_queue')
