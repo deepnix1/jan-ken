@@ -282,66 +282,47 @@ export function MatchFoundAnimation({ player1Address, player2Address, currentUse
     });
   }, [showAnimation, showMatchFound, showOpponentReady, isLoadingProfiles, countdown, mounted, opponentProfile, currentUserProfile, imagesLoaded]);
 
-  // DEBUG: Log DOM visibility
+  // DEBUG: Log DOM visibility - CRITICAL: Only check once when card appears, not continuously
   useEffect(() => {
-    if (showOpponentReady && mounted) {
-      const checkVisibility = () => {
-        const cardElement = document.querySelector('[data-opponent-ready-card]');
-        if (cardElement) {
-          const rect = cardElement.getBoundingClientRect();
-          const isVisible = rect.top >= 0 && rect.left >= 0 && 
-                           rect.bottom <= window.innerHeight && 
-                           rect.right <= window.innerWidth;
-          const isPartiallyVisible = rect.top < window.innerHeight && rect.bottom > 0 &&
-                                    rect.left < window.innerWidth && rect.right > 0;
-          
-          console.log('[MatchFound] 🔍 CARD VISIBILITY DEBUG:', {
-            exists: !!cardElement,
-            isVisible,
-            isPartiallyVisible,
-            rect: {
-              top: rect.top,
-              left: rect.left,
-              bottom: rect.bottom,
-              right: rect.right,
-              width: rect.width,
-              height: rect.height,
-            },
-            viewport: {
-              width: window.innerWidth,
-              height: window.innerHeight,
-            },
-            computedStyle: {
-              display: window.getComputedStyle(cardElement).display,
-              visibility: window.getComputedStyle(cardElement).visibility,
-              opacity: window.getComputedStyle(cardElement).opacity,
-              zIndex: window.getComputedStyle(cardElement).zIndex,
-              position: window.getComputedStyle(cardElement).position,
-              overflow: window.getComputedStyle(cardElement).overflow,
-            },
-            parent: {
-              tagName: cardElement.parentElement?.tagName,
-              className: cardElement.parentElement?.className,
-              overflow: cardElement.parentElement ? window.getComputedStyle(cardElement.parentElement).overflow : 'N/A',
-              zIndex: cardElement.parentElement ? window.getComputedStyle(cardElement.parentElement).zIndex : 'N/A',
-            },
-          });
-        } else {
-          console.warn('[MatchFound] ⚠️ Opponent Ready card element not found in DOM!');
-        }
-      };
+    if (!showOpponentReady || !mounted) return;
+    
+    // Only check visibility once when card appears, not continuously
+    const checkVisibility = () => {
+      const cardElement = document.querySelector('[data-opponent-ready-card]');
+      if (cardElement) {
+        const rect = cardElement.getBoundingClientRect();
+        const isVisible = rect.top >= 0 && rect.left >= 0 && 
+                         rect.bottom <= window.innerHeight && 
+                         rect.right <= window.innerWidth;
+        const isPartiallyVisible = rect.top < window.innerHeight && rect.bottom > 0 &&
+                                  rect.left < window.innerWidth && rect.right > 0;
+        
+        console.log('[MatchFound] 🔍 CARD VISIBILITY DEBUG:', {
+          exists: !!cardElement,
+          isVisible,
+          isPartiallyVisible,
+          rect: {
+            top: rect.top,
+            left: rect.left,
+            bottom: rect.bottom,
+            right: rect.right,
+            width: rect.width,
+            height: rect.height,
+          },
+          viewport: {
+            width: window.innerWidth,
+            height: window.innerHeight,
+          },
+        });
+      } else {
+        console.warn('[MatchFound] ⚠️ Opponent Ready card element not found in DOM!');
+      }
+    };
 
-      // Check immediately
-      setTimeout(checkVisibility, 100);
-      
-      // Check after animation
-      setTimeout(checkVisibility, 1000);
-      
-      // Check periodically
-      const interval = setInterval(checkVisibility, 2000);
-      
-      return () => clearInterval(interval);
-    }
+    // Check once after a short delay to allow DOM to update
+    const timeoutId = setTimeout(checkVisibility, 500);
+    
+    return () => clearTimeout(timeoutId);
   }, [showOpponentReady, mounted]);
 
   // Show loading state while profiles are being fetched - Hidden visually, works in background
