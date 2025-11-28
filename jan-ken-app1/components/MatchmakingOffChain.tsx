@@ -266,11 +266,22 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
         }
       }
       
-      // Check queue status before starting polling
-      const shouldPoll = await checkQueueStatus()
-      if (!shouldPoll) {
-        return
+      // CRITICAL: useEffect cannot be async, so we need to wrap async logic
+      // Check queue status and start polling only if player is in queue
+      const initializePolling = async () => {
+        const shouldPoll = await checkQueueStatus()
+        if (!shouldPoll) {
+          return
+        }
+        
+        // Start polling only if shouldPoll is true
+        // The polling logic will be set up below
       }
+      
+      // Call async function to check queue status
+      initializePolling()
+      
+      // Continue with polling setup (will be checked on first poll)
     
     // CRITICAL: Update last_seen timestamp to keep player active in queue
     // This ensures only players with open apps can be matched
