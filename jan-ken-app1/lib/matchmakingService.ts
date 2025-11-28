@@ -877,14 +877,25 @@ export async function checkForMatch(playerAddress: Address): Promise<MatchResult
     }
     
     // CRITICAL: Verify the matched_with player is also in queue and matched
-    const { data: matchedPlayer, error: matchedPlayerError } = await supabase
+    // Use limit(1) instead of maybeSingle() to avoid PGRST116 error
+    const { data: matchedPlayerEntries, error: matchedPlayerError } = await supabase
       .from('matchmaking_queue')
       .select('id, status, player_address, matched_with')
       .eq('player_address', queueEntry.matched_with.toLowerCase())
       .eq('status', 'matched')
-      .maybeSingle()
+      .limit(1)
     
-    if (matchedPlayerError || !matchedPlayer) {
+    if (matchedPlayerError && matchedPlayerError.code !== 'PGRST116') {
+      console.error('[checkForMatch] ❌ Error finding matched player:', JSON.stringify({
+        message: matchedPlayerError.message,
+        code: matchedPlayerError.code,
+      }))
+      return null
+    }
+    
+    const matchedPlayer = matchedPlayerEntries && matchedPlayerEntries.length > 0 ? matchedPlayerEntries[0] : null
+    
+    if (!matchedPlayer) {
       console.warn('[checkForMatch] ⚠️ Matched player not found in queue or not matched')
       return null
     }
@@ -902,20 +913,20 @@ export async function checkForMatch(playerAddress: Address): Promise<MatchResult
     
     while (retries > 0) {
       try {
-        const { data, error } = await supabase
+        // Use limit(1) instead of maybeSingle() to avoid PGRST116 error
+        const { data: gameEntries, error } = await supabase
           .from('games')
           .select('*')
           .or(`player1_address.eq.${playerAddress.toLowerCase()},player2_address.eq.${playerAddress.toLowerCase()}`)
           .eq('status', 'commit_phase')
           .order('created_at', { ascending: false })
           .limit(1)
-          .maybeSingle()
         
         if (error && error.code !== 'PGRST116') {
           throw error
         }
         
-        game = data
+        game = gameEntries && gameEntries.length > 0 ? gameEntries[0] : null
         break
       } catch (err: any) {
         if (err.message?.includes('fetch') || err.message?.includes('Load failed')) {
