@@ -1104,6 +1104,60 @@ export async function tryMatch(betLevel: number): Promise<MatchResult | null> {
       },
     }, null, 2))
     
+    // CRITICAL: FINAL VERIFICATION BEFORE GAME CREATION
+    // Ensure we still have exactly 2 different players with valid addresses
+    if (!player1 || !player2) {
+      console.error('[tryMatch] ❌❌❌ CRITICAL: Player1 or Player2 is null/undefined before game creation:', JSON.stringify({
+        hasPlayer1: !!player1,
+        hasPlayer2: !!player2,
+        player1_id: player1?.id,
+        player2_id: player2?.id,
+        betLevel,
+      }, null, 2))
+      // Rollback queue status
+      await supabase
+        .from('matchmaking_queue')
+        .update({ status: 'waiting', matched_at: null, matched_with: null })
+        .in('id', [player1?.id, player2?.id].filter(Boolean))
+      releaseLock(betLevel)
+      return null
+    }
+    
+    // CRITICAL: Verify both players have different addresses
+    if (!player1.player_address || !player2.player_address) {
+      console.error('[tryMatch] ❌❌❌ CRITICAL: Missing player addresses before game creation:', JSON.stringify({
+        player1_address: player1.player_address || 'MISSING',
+        player2_address: player2.player_address || 'MISSING',
+        player1_id: player1.id,
+        player2_id: player2.id,
+        betLevel,
+      }, null, 2))
+      // Rollback queue status
+      await supabase
+        .from('matchmaking_queue')
+        .update({ status: 'waiting', matched_at: null, matched_with: null })
+        .in('id', [player1.id, player2.id])
+      releaseLock(betLevel)
+      return null
+    }
+    
+    if (player1.player_address.toLowerCase() === player2.player_address.toLowerCase()) {
+      console.error('[tryMatch] ❌❌❌ CRITICAL: Player1 and Player2 have same address before game creation:', JSON.stringify({
+        player1_address: player1.player_address,
+        player2_address: player2.player_address,
+        player1_id: player1.id,
+        player2_id: player2.id,
+        betLevel,
+      }, null, 2))
+      // Rollback queue status
+      await supabase
+        .from('matchmaking_queue')
+        .update({ status: 'waiting', matched_at: null, matched_with: null })
+        .in('id', [player1.id, player2.id])
+      releaseLock(betLevel)
+      return null
+    }
+    
     // Step 4: Create game only after queue update is confirmed
     // CRITICAL: Use unique game ID with timestamps to prevent collisions
     const timestamp = Date.now()
@@ -1112,9 +1166,19 @@ export async function tryMatch(betLevel: number): Promise<MatchResult | null> {
     
     console.log('[tryMatch] 📊 Creating game with ID:', JSON.stringify({
       gameId,
-      player1: player1.player_address.slice(0, 10) + '...',
-      player2: player2.player_address.slice(0, 10) + '...',
+      player1: {
+        address: player1.player_address.slice(0, 10) + '...',
+        fullAddress: player1.player_address,
+        id: player1.id,
+      },
+      player2: {
+        address: player2.player_address.slice(0, 10) + '...',
+        fullAddress: player2.player_address,
+        id: player2.id,
+      },
       timestamp,
+      addressesDifferent: player1.player_address.toLowerCase() !== player2.player_address.toLowerCase(),
+      bothPlayersExist: !!player1 && !!player2,
       last_seen_verification: {
         player1_last_seen: gameCreationPlayer1.last_seen,
         player2_last_seen: gameCreationPlayer2.last_seen,
