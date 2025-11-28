@@ -146,11 +146,20 @@ export function RootProvider({ children }: { children: ReactNode }) {
       const originalError = console.error;
       console.error = (...args: unknown[]) => {
         const firstArg = args[0];
+        // Suppress known harmless errors
         if (
-          (typeof firstArg === 'string' && (firstArg.includes('Analytics SDK') || firstArg.includes('Failed to fetch'))) ||
-          (firstArg && typeof firstArg === 'object' && 'message' in firstArg && typeof firstArg.message === 'string' && (firstArg.message.includes('Analytics SDK') || firstArg.message.includes('Failed to fetch')))
+          (typeof firstArg === 'string' && (
+            firstArg.includes('Analytics SDK') || 
+            firstArg.includes('Failed to fetch') ||
+            firstArg.includes('origins don\'t match') // Farcaster SDK origin check in web browser
+          )) ||
+          (firstArg && typeof firstArg === 'object' && 'message' in firstArg && typeof firstArg.message === 'string' && (
+            firstArg.message.includes('Analytics SDK') || 
+            firstArg.message.includes('Failed to fetch') ||
+            firstArg.message.includes('origins don\'t match')
+          ))
         ) {
-          return; // Analytics hatalarını ignore et
+          return; // Ignore harmless errors
         }
         originalError.apply(console, args);
       };

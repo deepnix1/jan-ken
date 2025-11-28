@@ -180,6 +180,8 @@ export default function Home() {
     } else {
       console.warn('⚠️ Farcaster connector not found');
       console.log('Available connectors:', connectors);
+      console.log('ℹ️ This is normal if running in a regular web browser (not Farcaster Mini App)');
+      console.log('ℹ️ User can manually connect with MetaMask or other available connectors');
     }
   }, [appReady, isConnected, isPending, connectors, connect]);
 
