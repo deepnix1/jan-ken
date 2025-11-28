@@ -187,7 +187,7 @@ export function DebugPanel() {
           });
         }
         
-        // CRITICAL: Detect inactive players (last_seen > 30 seconds)
+        // CRITICAL: Detect inactive players (last_seen > 15 seconds) - stricter threshold
         if (logStr.includes('Found players with active last_seen') || logStr.includes('seconds_ago')) {
           // Try to extract seconds_ago from log data
           try {
@@ -195,21 +195,70 @@ export function DebugPanel() {
             if (logData && typeof logData === 'object') {
               const players = (logData as any)?.players || [];
               for (const player of players) {
-                if (player.seconds_ago && player.seconds_ago > 30) {
+                // Check if player is inactive (threshold is now 15 seconds)
+                if (player.seconds_ago && player.seconds_ago > 15) {
                   addIssue({
                     id: `inactive-player-${Date.now()}-${Math.random()}`,
-                    title: '⚠️ Inactive Player Detected',
+                    title: '⚠️ CRITICAL: Inactive Player Detected in Queue',
                     status: 'error',
-                    message: `Player with last_seen ${player.seconds_ago}s ago (threshold: 30s) - app may be closed`,
+                    message: `Player with last_seen ${player.seconds_ago}s ago (threshold: 15s) - app may be closed`,
                     details: {
                       address: player.address,
+                      fullAddress: player.fullAddress,
                       seconds_ago: player.seconds_ago,
-                      threshold: 30,
+                      threshold: 15,
                       severity: 'critical',
                       issue: 'inactive_player_in_queue',
+                      last_seen: player.last_seen,
                     },
                   });
                 }
+                // Also check isActive flag
+                if (player.isActive === false) {
+                  addIssue({
+                    id: `inactive-player-flag-${Date.now()}-${Math.random()}`,
+                    title: '⚠️ CRITICAL: Player Marked as Inactive',
+                    status: 'error',
+                    message: `Player marked as inactive (isActive: false) - should not be matched`,
+                    details: {
+                      address: player.address,
+                      fullAddress: player.fullAddress,
+                      isActive: player.isActive,
+                      seconds_ago: player.seconds_ago,
+                      last_seen: player.last_seen,
+                      severity: 'critical',
+                    },
+                  });
+                }
+              }
+            }
+          } catch (err) {
+            // Ignore parsing errors
+          }
+        }
+        
+        // CRITICAL: Detect match created with inactive players
+        if (logStr.includes('Match created successfully') && logStr.includes('last_seen_verification')) {
+          try {
+            const logData = args.length > 1 ? args[1] : null;
+            if (logData && typeof logData === 'object') {
+              const verification = (logData as any)?.last_seen_verification;
+              if (verification && (verification.player1_active === false || verification.player2_active === false)) {
+                addIssue({
+                  id: 'match-created-with-inactive-player',
+                  title: '⚠️ CRITICAL: Match Created with Inactive Player!',
+                  status: 'error',
+                  message: `Match was created but one or both players had inactive last_seen!`,
+                  details: {
+                    player1_active: verification.player1_active,
+                    player2_active: verification.player2_active,
+                    gameId: (logData as any)?.gameId,
+                    player1: (logData as any)?.player1,
+                    player2: (logData as any)?.player2,
+                    severity: 'critical',
+                    issue: 'match_created_with_inactive_player',
+                  },
+                });
               }
             }
           } catch (err) {

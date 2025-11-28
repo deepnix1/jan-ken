@@ -405,15 +405,28 @@ export async function tryMatch(betLevel: number): Promise<MatchResult | null> {
     }
     
     // CRITICAL: Log all found players with their last_seen timestamps for debugging
+    const queryNow = Date.now()
+    const queryFifteenSecondsAgo = queryNow - 15000
     console.log('[tryMatch] 📊 Found players with active last_seen:', JSON.stringify({
       count: allPlayers?.length || 0,
       betLevel,
-      players: (allPlayers || []).map(p => ({
-        address: p.player_address?.slice(0, 10) + '...',
-        last_seen: p.last_seen,
-        seconds_ago: p.last_seen ? Math.floor((Date.now() - new Date(p.last_seen).getTime()) / 1000) : null,
-        created_at: p.created_at,
-      })),
+      query_time: new Date(queryNow).toISOString(),
+      threshold_seconds: 15,
+      threshold_time: new Date(queryFifteenSecondsAgo).toISOString(),
+      players: (allPlayers || []).map(p => {
+        const pLastSeen = p.last_seen ? new Date(p.last_seen).getTime() : 0
+        const secondsAgo = p.last_seen ? Math.floor((queryNow - pLastSeen) / 1000) : null
+        const isActive = p.last_seen && pLastSeen >= queryFifteenSecondsAgo
+        return {
+          address: p.player_address?.slice(0, 10) + '...',
+          fullAddress: p.player_address,
+          last_seen: p.last_seen,
+          last_seen_timestamp: p.last_seen ? new Date(p.last_seen).toISOString() : null,
+          seconds_ago: secondsAgo,
+          isActive: isActive,
+          created_at: p.created_at,
+        }
+      }),
     }, null, 2))
     
     // CRITICAL: Filter out duplicate addresses (case-insensitive)
@@ -945,12 +958,32 @@ export async function tryMatch(betLevel: number): Promise<MatchResult | null> {
       return null
     }
 
+    // CRITICAL: Log both players' last_seen values when match is created
+    const finalP1LastSeen = verifiedPlayer1?.last_seen ? new Date(verifiedPlayer1.last_seen).getTime() : 0
+    const finalP2LastSeen = verifiedPlayer2?.last_seen ? new Date(verifiedPlayer2.last_seen).getTime() : 0
+    const finalNowForLog = Date.now()
+    
     console.log('[tryMatch] ✅✅✅ Match created successfully! ✅✅✅', JSON.stringify({
       gameId,
-      player1: player1.player_address.slice(0, 10) + '...',
-      player2: player2.player_address.slice(0, 10) + '...',
+      player1: {
+        address: player1.player_address.slice(0, 10) + '...',
+        fullAddress: player1.player_address,
+        last_seen: verifiedPlayer1?.last_seen || player1.last_seen,
+        seconds_ago: verifiedPlayer1?.last_seen ? Math.floor((finalNowForLog - finalP1LastSeen) / 1000) : (player1.last_seen ? Math.floor((finalNowForLog - new Date(player1.last_seen).getTime()) / 1000) : null),
+      },
+      player2: {
+        address: player2.player_address.slice(0, 10) + '...',
+        fullAddress: player2.player_address,
+        last_seen: verifiedPlayer2?.last_seen || player2.last_seen,
+        seconds_ago: verifiedPlayer2?.last_seen ? Math.floor((finalNowForLog - finalP2LastSeen) / 1000) : (player2.last_seen ? Math.floor((finalNowForLog - new Date(player2.last_seen).getTime()) / 1000) : null),
+      },
       betLevel,
       betAmount: player1.bet_amount,
+      last_seen_verification: {
+        player1_active: verifiedPlayer1?.last_seen ? (finalP1LastSeen >= (finalNowForLog - 15000)) : false,
+        player2_active: verifiedPlayer2?.last_seen ? (finalP2LastSeen >= (finalNowForLog - 15000)) : false,
+        threshold_seconds: 15,
+      },
     }, null, 2))
 
     releaseLock(betLevel)
