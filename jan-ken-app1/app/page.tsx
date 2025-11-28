@@ -28,7 +28,9 @@ export default function Home() {
   const [showMatchFound, setShowMatchFound] = useState(false);
   const [player1Address, setPlayer1Address] = useState<string | undefined>(undefined);
   const [player2Address, setPlayer2Address] = useState<string | undefined>(undefined);
-  const [appReady, setAppReady] = useState(false);
+  // CRITICAL: Start with appReady=true so app is always visible
+  // ready() only hides Farcaster splash screen, it doesn't control app visibility
+  const [appReady, setAppReady] = useState(true);
   const previousAddressRef = useRef<string | undefined>(undefined);
   const [userProfile, setUserProfile] = useState<{ pfpUrl: string | null; username: string | null } | null>(null);
   const [isLoadingProfile, setIsLoadingProfile] = useState(false);
