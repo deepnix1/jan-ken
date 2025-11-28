@@ -270,7 +270,7 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
         matchCheckIntervalRef.current = null;
       }
     };
-  }, [isConnected, address, hasJoinedQueue, onMatchFound]);
+  }, [isConnected, address, hasJoinedQueue, onMatchFound, showMatchFound]);
   
   // Update queue count
   useEffect(() => {
