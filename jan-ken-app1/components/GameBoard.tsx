@@ -687,9 +687,10 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
       </div>
 
       {/* Transaction Approved Notification - Enhanced */}
-      {/* CRITICAL: Hide notification when wallet popup is open (status === 'pending') to allow clicking Confirm button */}
-      {showApproved && status !== 'pending' && (
-        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 animate-fade-in">
+      {/* CRITICAL: Hide notification when wallet popup is open (status === 'pending' OR isPending) to allow clicking Confirm button */}
+      {/* PC Farcaster wallet: isPending might be true even if status is not 'pending' yet */}
+      {showApproved && status !== 'pending' && !isPending && (
+        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 animate-fade-in" style={{ pointerEvents: 'none' }}>
           <div className="relative bg-black/95 backdrop-blur-lg px-8 py-6 rounded-xl shadow-[0_0_60px_rgba(34,197,94,1)] border-3 border-green-500 min-w-[350px]">
             <div className="absolute inset-0 bg-gradient-to-r from-green-500/20 via-emerald-500/20 to-green-500/20 blur-xl"></div>
             <div className="relative flex flex-col items-center gap-3">
@@ -725,9 +726,10 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
       )}
 
       {/* Error Display */}
-      {/* CRITICAL: Hide error when wallet popup is open (status === 'pending') to allow clicking Confirm button */}
-      {(txError || writeError) && status !== 'pending' && (
-        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 animate-fade-in-down">
+      {/* CRITICAL: Hide error when wallet popup is open (status === 'pending' OR isPending) to allow clicking Confirm button */}
+      {/* PC Farcaster wallet: isPending might be true even if status is not 'pending' yet */}
+      {(txError || writeError) && status !== 'pending' && !isPending && (
+        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 animate-fade-in-down" style={{ pointerEvents: 'auto' }}>
           <div className="inline-flex flex-col items-center gap-4 px-8 py-6 bg-black/95 backdrop-blur-lg border-3 border-red-500 rounded-xl shadow-[0_0_60px_rgba(239,68,68,0.8)] min-w-[300px] max-w-[90vw]">
             <div className="flex items-center gap-4">
               <div className="text-4xl">❌</div>
@@ -756,8 +758,10 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
 
       {/* Transaction Status - Enhanced Visibility */}
       {/* CRITICAL: Hide our notification when wallet popup is open (status === 'pending') to allow clicking Confirm button */}
+      {/* PC Farcaster wallet: Only show when status is NOT 'pending' (i.e., preparing, not waiting for wallet) */}
+      {/* When status === 'pending', wallet popup is open - hide our notification */}
       {(isPending || isConfirming) && status !== 'pending' && (
-        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 animate-fade-in-down">
+        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-40 animate-fade-in-down" style={{ pointerEvents: 'none' }}>
           <div className="inline-flex flex-col items-center gap-4 px-8 py-6 bg-black/95 backdrop-blur-lg border-3 border-red-500 rounded-xl shadow-[0_0_60px_rgba(220,20,60,0.8)] min-w-[300px]">
             <div className="flex items-center gap-4">
               <div className="w-8 h-8 border-3 border-red-400 border-t-transparent rounded-full animate-spin shadow-[0_0_15px_rgba(220,20,60,1)]"></div>
