@@ -385,6 +385,30 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
             }, null, 2))
           }
         } else {
+          // CRITICAL: If checkForMatch returns null and player is cancelled, stop polling
+          // Double-check player status to prevent unnecessary polling
+          const { data: finalStatusCheck } = await supabase
+            .from('matchmaking_queue')
+            .select('status')
+            .eq('player_address', address.toLowerCase())
+            .limit(1);
+          
+          const finalStatus = finalStatusCheck?.[0]?.status;
+          if (finalStatus && finalStatus !== 'waiting' && finalStatus !== 'matched') {
+            console.log('[Matchmaking] 🛑 Player status is', finalStatus, '- stopping checkForMatch polling');
+            if (matchCheckIntervalRef.current) {
+              clearInterval(matchCheckIntervalRef.current);
+              matchCheckIntervalRef.current = null;
+            }
+            if (queueCountIntervalRef.current) {
+              clearInterval(queueCountIntervalRef.current);
+              queueCountIntervalRef.current = null;
+            }
+            setIsMatching(false);
+            setHasJoinedQueue(false);
+            return; // Stop this polling cycle
+          }
+          
           console.log('[Matchmaking] ⚠️ No match found in this polling cycle')
         }
       } catch (err: any) {

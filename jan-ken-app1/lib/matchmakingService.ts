@@ -1361,13 +1361,21 @@ export async function checkForMatch(playerAddress: Address): Promise<MatchResult
     // If player is not waiting or matched, they're cancelled or other status
     // CRITICAL: Even if cancelled, check games table - match might have been created before cancellation
     if (queueStatus.status !== 'waiting' && queueStatus.status !== 'matched') {
-      console.log('[checkForMatch] ⚠️ Player not waiting or matched:', JSON.stringify({
-        status: queueStatus.status,
-        queueId: queueStatus.id,
-        betLevel: queueStatus.bet_level,
-      }, null, 2))
+      // CRITICAL: Only check games table if status is 'cancelled' (not other statuses like 'matched' already processed)
+      // This prevents unnecessary polling for players who are definitely not in queue
+      if (queueStatus.status === 'cancelled') {
+        console.log('[checkForMatch] ⚠️ Player cancelled, checking games table for existing match (one-time check)...', JSON.stringify({
+          status: queueStatus.status,
+          queueId: queueStatus.id,
+          betLevel: queueStatus.bet_level,
+        }, null, 2))
+      } else {
+        // For other statuses (not waiting, not matched, not cancelled), return null immediately
+        console.log('[checkForMatch] ⚠️ Player not waiting or matched (status:', queueStatus.status, ') - returning null immediately')
+        return null
+      }
       
-      // CRITICAL: Even if cancelled, check games table - match might exist
+      // CRITICAL: Even if cancelled, check games table - match might exist (one-time check)
       console.log('[checkForMatch] 🔍 Player cancelled, but checking games table for existing match...')
       const { data: games, error: gamesError } = await supabase
         .from('games')

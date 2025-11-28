@@ -149,27 +149,64 @@ export function DebugPanel() {
           }
         }
         
-        // Add issue if popup is blocked or button not clickable
-        if (isBlocked) {
-          addIssue({
-            id: 'wallet-popup-blocked',
-            title: '⚠️ Wallet Popup Blocked by Overlay',
-            status: 'error',
-            message: `Wallet popup is visible but blocked by another element at (${Math.round(centerX)}, ${Math.round(centerY)})`,
-            details: {
-              popupElement: popupElement.tagName,
-              popupZIndex: zIndex,
-              popupRect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
-              blockingElement: elementAtCenter?.tagName || 'unknown',
-              blockingElementClass: (elementAtCenter as Element)?.className || 'unknown',
-              popupPointerEvents: pointerEvents,
-              popupVisibility: visibility,
-              popupDisplay: display,
-              popupOpacity: opacity,
-            },
-          });
+        // CRITICAL: If popup is blocked, try to fix it automatically
+        if (isBlocked && elementAtCenter) {
+          // Try to hide blocking element temporarily
+          const blockingEl = elementAtCenter as HTMLElement;
+          const originalDisplay = blockingEl.style.display;
+          const originalPointerEvents = blockingEl.style.pointerEvents;
+          const originalZIndex = blockingEl.style.zIndex;
+          
+          // Check if it's one of our notification elements
+          const isOurNotification = blockingEl.closest('[class*="fixed"]') && 
+                                   (blockingEl.closest('[class*="z-50"]') || blockingEl.closest('[class*="z-40"]'));
+          
+          if (isOurNotification) {
+            // Temporarily hide our notification
+            blockingEl.style.display = 'none';
+            blockingEl.style.pointerEvents = 'none';
+            blockingEl.style.zIndex = '-1';
+            
+            // Restore after 5 seconds (popup should be closed by then)
+            setTimeout(() => {
+              blockingEl.style.display = originalDisplay;
+              blockingEl.style.pointerEvents = originalPointerEvents;
+              blockingEl.style.zIndex = originalZIndex;
+            }, 5000);
+            
+            addIssue({
+              id: 'wallet-popup-blocked-fixed',
+              title: '✅ Wallet Popup Blocking Element Auto-Hidden',
+              status: 'ok',
+              message: `Automatically hid blocking element to allow wallet popup interaction`,
+              details: {
+                blockingElement: blockingEl.tagName,
+                blockingElementClass: blockingEl.className,
+                action: 'auto_hidden',
+              },
+            });
+          } else {
+            addIssue({
+              id: 'wallet-popup-blocked',
+              title: '⚠️ Wallet Popup Blocked by Overlay',
+              status: 'error',
+              message: `Wallet popup is visible but blocked by another element at (${Math.round(centerX)}, ${Math.round(centerY)})`,
+              details: {
+                popupElement: popupElement.tagName,
+                popupZIndex: zIndex,
+                popupRect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
+                blockingElement: elementAtCenter?.tagName || 'unknown',
+                blockingElementClass: (elementAtCenter as Element)?.className || 'unknown',
+                popupPointerEvents: pointerEvents,
+                popupVisibility: visibility,
+                popupDisplay: display,
+                popupOpacity: opacity,
+              },
+            });
+          }
         } else {
           removeIssue('wallet-popup-blocked');
+          removeIssue('wallet-popup-blocked-fixed');
         }
         
         if (confirmButtonFound && !confirmButtonClickable) {
