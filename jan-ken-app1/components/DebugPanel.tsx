@@ -152,36 +152,94 @@ export function DebugPanel() {
         // CRITICAL: If popup is blocked, try to fix it automatically
         if (isBlocked && elementAtCenter) {
           // Try to hide blocking element temporarily
-          const blockingEl = elementAtCenter as HTMLElement;
+          let blockingEl = elementAtCenter as HTMLElement;
           const originalDisplay = blockingEl.style.display;
           const originalPointerEvents = blockingEl.style.pointerEvents;
           const originalZIndex = blockingEl.style.zIndex;
+          const originalOpacity = blockingEl.style.opacity;
           
           // Check if it's one of our notification elements
-          const isOurNotification = blockingEl.closest('[class*="fixed"]') && 
-                                   (blockingEl.closest('[class*="z-50"]') || blockingEl.closest('[class*="z-40"]'));
+          // Look for fixed elements with z-50 or z-40, or elements with specific classes
+          let isOurNotification = 
+            (blockingEl.classList.contains('fixed') || blockingEl.closest('.fixed')) &&
+            (blockingEl.classList.contains('z-50') || 
+             blockingEl.classList.contains('z-40') || 
+             blockingEl.closest('.z-50') || 
+             blockingEl.closest('.z-40') ||
+             blockingEl.className.includes('z-50') ||
+             blockingEl.className.includes('z-40'));
           
-          if (isOurNotification) {
+          // Also check parent elements
+          let parent = blockingEl.parentElement;
+          let foundFixedParent = false;
+          while (parent && parent !== document.body) {
+            const parentClasses = parent.className || '';
+            if ((parentClasses.includes('fixed') || parent.classList.contains('fixed')) &&
+                (parentClasses.includes('z-50') || parentClasses.includes('z-40') || 
+                 parent.classList.contains('z-50') || parent.classList.contains('z-40'))) {
+              foundFixedParent = true;
+              blockingEl = parent as HTMLElement;
+              break;
+            }
+            parent = parent.parentElement;
+          }
+          
+          if (isOurNotification || foundFixedParent) {
             // Temporarily hide our notification
             blockingEl.style.display = 'none';
             blockingEl.style.pointerEvents = 'none';
             blockingEl.style.zIndex = '-1';
+            blockingEl.style.opacity = '0';
             
-            // Restore after 5 seconds (popup should be closed by then)
+            // Also hide all fixed elements with z-50 or z-40 that might be overlaying
+            const allFixedElements = document.querySelectorAll('.fixed.z-50, .fixed.z-40, [class*="fixed"][class*="z-50"], [class*="fixed"][class*="z-40"]');
+            const hiddenElements: Array<{ el: HTMLElement; display: string; pointerEvents: string; zIndex: string; opacity: string }> = [];
+            
+            allFixedElements.forEach((el) => {
+              const htmlEl = el as HTMLElement;
+              const elRect = htmlEl.getBoundingClientRect();
+              // Check if this element overlaps with popup
+              if (elRect.left < rect.right && elRect.right > rect.left &&
+                  elRect.top < rect.bottom && elRect.bottom > rect.top) {
+                hiddenElements.push({
+                  el: htmlEl,
+                  display: htmlEl.style.display,
+                  pointerEvents: htmlEl.style.pointerEvents,
+                  zIndex: htmlEl.style.zIndex,
+                  opacity: htmlEl.style.opacity,
+                });
+                htmlEl.style.display = 'none';
+                htmlEl.style.pointerEvents = 'none';
+                htmlEl.style.zIndex = '-1';
+                htmlEl.style.opacity = '0';
+              }
+            });
+            
+            // Restore after 10 seconds (popup should be closed by then)
             setTimeout(() => {
               blockingEl.style.display = originalDisplay;
               blockingEl.style.pointerEvents = originalPointerEvents;
               blockingEl.style.zIndex = originalZIndex;
-            }, 5000);
+              blockingEl.style.opacity = originalOpacity;
+              
+              // Restore all hidden elements
+              hiddenElements.forEach(({ el, display, pointerEvents, zIndex, opacity }) => {
+                el.style.display = display;
+                el.style.pointerEvents = pointerEvents;
+                el.style.zIndex = zIndex;
+                el.style.opacity = opacity;
+              });
+            }, 10000);
             
             addIssue({
               id: 'wallet-popup-blocked-fixed',
-              title: '✅ Wallet Popup Blocking Element Auto-Hidden',
+              title: '✅ Wallet Popup Blocking Elements Auto-Hidden',
               status: 'ok',
-              message: `Automatically hid blocking element to allow wallet popup interaction`,
+              message: `Automatically hid ${hiddenElements.length + 1} blocking element(s) to allow wallet popup interaction`,
               details: {
                 blockingElement: blockingEl.tagName,
                 blockingElementClass: blockingEl.className,
+                hiddenElementsCount: hiddenElements.length + 1,
                 action: 'auto_hidden',
               },
             });
