@@ -553,8 +553,8 @@ export async function tryMatch(betLevel: number): Promise<MatchResult | null> {
     }, null, 2))
 
     // CRITICAL: Verify both players are still waiting (prevent race conditions)
-    // Get full player data to verify addresses match
-    console.log('[tryMatch] 🔍 Step 2: Verifying players are still waiting:', JSON.stringify({
+    // Get full player data to verify addresses match AND last_seen is still active
+    console.log('[tryMatch] 🔍 Step 2: Verifying players are still waiting with active last_seen:', JSON.stringify({
       player1_id: player1.id,
       player1_address: player1.player_address?.slice(0, 10) + '...',
       player2_id: player2.id,
@@ -562,7 +562,7 @@ export async function tryMatch(betLevel: number): Promise<MatchResult | null> {
     }, null, 2))
     const { data: verifyPlayers, error: verifyError } = await supabase
       .from('matchmaking_queue')
-      .select('id, status, player_address, bet_level')
+      .select('id, status, player_address, bet_level, last_seen')
       .in('id', [player1.id, player2.id])
       .eq('status', 'waiting')
 

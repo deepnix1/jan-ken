@@ -231,6 +231,22 @@ export function DebugPanel() {
           });
         }
         
+        // CRITICAL: Detect inactive last_seen in tryMatch logs
+        if (logStr.includes('CRITICAL: Player1 has inactive last_seen') || logStr.includes('CRITICAL: Player2 has inactive last_seen') || logStr.includes('FINAL CHECK FAILED')) {
+          addIssue({
+            id: 'inactive-player-trymatch',
+            title: '⚠️ CRITICAL: Inactive Player in tryMatch',
+            status: 'error',
+            message: 'Player with inactive last_seen detected in tryMatch - matching prevented',
+            details: { 
+              step, 
+              data: args.length > 1 ? args.slice(1) : undefined,
+              issue: 'inactive_player_in_trymatch',
+              severity: 'critical',
+            },
+          });
+        }
+        
         // Create issues for important matchmaking events
         if (logStr.includes('[tryMatch] ⚠️') || logStr.includes('[tryMatch] ❌')) {
           addIssue({
@@ -241,6 +257,30 @@ export function DebugPanel() {
             details: { step, data: args.length > 1 ? args.slice(1) : undefined },
           });
         } else if (logStr.includes('[tryMatch] ✅') || logStr.includes('MATCH CREATED SUCCESSFULLY')) {
+          // CRITICAL: When match is created, log both players' last_seen values
+          if (logStr.includes('Match created successfully') || logStr.includes('✅✅✅ Match created')) {
+            try {
+              const logData = args.length > 1 ? args[1] : null;
+              if (logData && typeof logData === 'object') {
+                const matchData = logData as any;
+                addIssue({
+                  id: 'match-created-with-last-seen',
+                  title: 'Match Created - Check last_seen',
+                  status: 'warning',
+                  message: 'Match was created - verify both players had active last_seen',
+                  details: {
+                    gameId: matchData.gameId,
+                    player1: matchData.player1,
+                    player2: matchData.player2,
+                    betLevel: matchData.betLevel,
+                    issue: 'match_created_verification_needed',
+                  },
+                });
+              }
+            } catch (err) {
+              // Ignore parsing errors
+            }
+          }
           removeIssue('not-enough-players');
           removeIssue('fake-match-detected');
           addIssue({
