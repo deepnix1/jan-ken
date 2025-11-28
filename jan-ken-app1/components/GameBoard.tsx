@@ -328,11 +328,46 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
           farcasterProvider = await sdk.wallet.getEthereumProvider();
           console.log('[GameBoard] ✅ Farcaster wallet provider obtained:', !!farcasterProvider);
           if (farcasterProvider) {
-            console.log('[GameBoard] 📱 Provider chainId:', await farcasterProvider.request({ method: 'eth_chainId' }));
+            const chainId = await farcasterProvider.request({ method: 'eth_chainId' });
+            console.log('[GameBoard] 📱 Provider chainId:', chainId);
+            
+            // CRITICAL: Verify we're on the correct chain
+            const expectedChainId = '0x14a34'; // Base Sepolia (84532 in decimal)
+            if (chainId !== expectedChainId) {
+              console.error('[GameBoard] ❌ Wrong chain! Expected:', expectedChainId, 'Got:', chainId);
+              setTxError(`Wrong network. Please switch to Base Sepolia (Chain ID: 84532)`);
+              setSelectedChoice(null);
+              setTxStartTime(null);
+              return;
+            }
           }
         } catch (err) {
           console.warn('[GameBoard] ⚠️ Could not get Farcaster provider:', err);
         }
+      }
+      
+      // CRITICAL: Verify connector client is ready and has correct account
+      if (!connectorClient || !connectorClient.account) {
+        console.error('[GameBoard] ❌ Connector client not ready:', {
+          hasConnectorClient: !!connectorClient,
+          hasAccount: !!connectorClient?.account,
+        });
+        setTxError('Wallet not ready. Please reconnect your wallet.');
+        setSelectedChoice(null);
+        setTxStartTime(null);
+        return;
+      }
+      
+      // CRITICAL: Verify account matches address
+      if (connectorClient.account.address.toLowerCase() !== address?.toLowerCase()) {
+        console.error('[GameBoard] ❌ Account mismatch:', {
+          connectorAccount: connectorClient.account.address,
+          currentAddress: address,
+        });
+        setTxError('Account mismatch. Please reconnect your wallet.');
+        setSelectedChoice(null);
+        setTxStartTime(null);
+        return;
       }
       
       // CRITICAL: Force wallet popup by ensuring we're not in a pending state

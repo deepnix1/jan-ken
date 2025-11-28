@@ -173,20 +173,53 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
   
   // Check for matches (polling)
   useEffect(() => {
-    // CRITICAL: Stop polling if match found or not in queue
-    if (!isConnected || !address || !hasJoinedQueue || showMatchFound) {
-      if (matchCheckIntervalRef.current) {
-        clearInterval(matchCheckIntervalRef.current);
-        matchCheckIntervalRef.current = null;
-        console.log('[Matchmaking] 🛑 Stopped checkForMatch polling:', JSON.stringify({
-          isConnected,
-          hasAddress: !!address,
-          hasJoinedQueue,
-          showMatchFound,
-        }, null, 2))
+      // CRITICAL: Stop polling if match found or not in queue
+      if (!isConnected || !address || !hasJoinedQueue || showMatchFound) {
+        if (matchCheckIntervalRef.current) {
+          clearInterval(matchCheckIntervalRef.current);
+          matchCheckIntervalRef.current = null;
+          console.log('[Matchmaking] 🛑 Stopped checkForMatch polling:', JSON.stringify({
+            isConnected,
+            hasAddress: !!address,
+            hasJoinedQueue,
+            showMatchFound,
+          }, null, 2))
+        }
+        return;
       }
-      return;
-    }
+      
+      // CRITICAL: Check if player is still in queue before polling
+      // This prevents unnecessary polling for cancelled players
+      const checkQueueStatus = async () => {
+        try {
+          const { data: queueStatus } = await supabase
+            .from('matchmaking_queue')
+            .select('status')
+            .eq('player_address', address.toLowerCase())
+            .eq('status', 'waiting')
+            .limit(1)
+          
+          // If player is not waiting, stop polling
+          if (!queueStatus || queueStatus.length === 0) {
+            console.log('[Matchmaking] 🛑 Player not in waiting queue, stopping checkForMatch polling')
+            if (matchCheckIntervalRef.current) {
+              clearInterval(matchCheckIntervalRef.current);
+              matchCheckIntervalRef.current = null;
+            }
+            return false
+          }
+          return true
+        } catch (err) {
+          console.error('[Matchmaking] ❌ Error checking queue status:', err)
+          return true // Continue polling on error
+        }
+      }
+      
+      // Check queue status before starting polling
+      const shouldPoll = await checkQueueStatus()
+      if (!shouldPoll) {
+        return
+      }
     
     // CRITICAL: Update last_seen timestamp to keep player active in queue
     // This ensures only players with open apps can be matched
