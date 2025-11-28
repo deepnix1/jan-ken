@@ -719,7 +719,16 @@ export async function tryMatch(betLevel: number): Promise<MatchResult | null> {
       .eq('status', 'matched')
 
     if (verifyUpdateError || !verifyUpdate || verifyUpdate.length !== 2) {
-      console.error('[tryMatch] ⚠️ Queue update verification failed, match may have been aborted')
+      console.error('[tryMatch] ⚠️ Queue update verification failed, match may have been aborted:', JSON.stringify({
+        verifyUpdateError: verifyUpdateError ? {
+          message: verifyUpdateError.message,
+          code: verifyUpdateError.code,
+        } : null,
+        verifyUpdateCount: verifyUpdate?.length || 0,
+        required: 2,
+        player1_id: player1.id,
+        player2_id: player2.id,
+      }, null, 2))
       // Rollback both players
       await supabase
         .from('matchmaking_queue')
