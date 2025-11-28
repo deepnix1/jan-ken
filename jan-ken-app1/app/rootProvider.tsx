@@ -45,6 +45,44 @@ export function RootProvider({ children }: { children: ReactNode }) {
     }
   }, [mounted]);
 
+  // Detect if we're in Farcaster Mini App environment
+  // Per Farcaster docs: https://miniapps.farcaster.xyz/docs/guides/wallets
+  // - Mobile: Farcaster Mini App içinde çalışır, sdk.wallet.getEthereumProvider() kullanır
+  // - PC/Browser: Farcaster Mini App dışında çalışır, browser wallet connectors (MetaMask) kullanır
+  const [isFarcasterEnv, setIsFarcasterEnv] = useState(false);
+  
+  useEffect(() => {
+    if (mounted && typeof window !== 'undefined') {
+      const checkFarcasterEnv = async () => {
+        try {
+          // Per Farcaster docs: sdk.wallet.getEthereumProvider() is only available in Farcaster Mini App
+          if (sdk && sdk.wallet && typeof sdk.wallet.getEthereumProvider === 'function') {
+            try {
+              const provider = await sdk.wallet.getEthereumProvider();
+              if (provider) {
+                setIsFarcasterEnv(true);
+                console.log('✅ Detected Farcaster Mini App environment (Mobile)');
+              } else {
+                setIsFarcasterEnv(false);
+                console.log('⚠️ Not in Farcaster Mini App environment - no provider (PC/Browser)');
+              }
+            } catch (err) {
+              setIsFarcasterEnv(false);
+              console.log('⚠️ Not in Farcaster Mini App environment - provider error (PC/Browser):', err);
+            }
+          } else {
+            setIsFarcasterEnv(false);
+            console.log('⚠️ Not in Farcaster Mini App environment - SDK not available (PC/Browser)');
+          }
+        } catch (error) {
+          setIsFarcasterEnv(false);
+          console.log('⚠️ Error checking Farcaster environment (assuming PC/Browser):', error);
+        }
+      };
+      checkFarcasterEnv();
+    }
+  }, [mounted]);
+
   // Create config only on client side after mount
   const config = useMemo(() => {
     if (typeof window === 'undefined' || !mounted) {
@@ -53,24 +91,49 @@ export function RootProvider({ children }: { children: ReactNode }) {
     
     const connectors: any[] = [];
     
-    // Add Farcaster Mini App connector (per Farcaster docs)
-    // The connector automatically uses sdk.wallet.getEthereumProvider() internally
-    try {
-      const farcasterConnector = miniAppConnector();
-      connectors.push(farcasterConnector);
-    } catch (error) {
-      console.error('Error creating Farcaster connector:', error);
-    }
+    // CRITICAL: Per Farcaster docs - wallet configuration differs for PC vs Mobile
+    // https://miniapps.farcaster.xyz/docs/guides/wallets
+    // https://miniapps.farcaster.xyz/docs/guides/agents-checklist
     
-    // Add MetaMask connector if available (for PC/browser testing)
-    if (metaMaskConnector) {
+    if (isFarcasterEnv) {
+      // MOBILE: In Farcaster Mini App environment
+      // Per Farcaster docs: The connector automatically uses sdk.wallet.getEthereumProvider()
+      // This works seamlessly in Farcaster Mini App (mobile)
       try {
-        const mmConnector = metaMaskConnector();
-        if (typeof mmConnector === 'function') {
-          connectors.push(mmConnector);
-        }
+        const farcasterConnector = miniAppConnector();
+        connectors.push(farcasterConnector);
+        console.log('✅ Added Farcaster Mini App connector (Mobile environment)');
       } catch (error) {
-        console.log('Error adding MetaMask connector:', error);
+        console.error('❌ Error creating Farcaster connector:', error);
+      }
+    } else {
+      // PC/BROWSER: Outside Farcaster Mini App environment
+      // Per Farcaster docs: Use browser wallet connectors (MetaMask, etc.)
+      // Farcaster connector may not work properly outside Farcaster Mini App
+      console.log('📱 PC/Browser environment detected - using browser wallet connectors');
+      
+      // Add MetaMask connector for PC/browser (primary connector)
+      if (metaMaskConnector) {
+        try {
+          const mmConnector = metaMaskConnector();
+          if (typeof mmConnector === 'function') {
+            connectors.push(mmConnector);
+            console.log('✅ Added MetaMask connector (PC/Browser - primary)');
+          }
+        } catch (error) {
+          console.log('⚠️ Error adding MetaMask connector:', error);
+        }
+      }
+      
+      // CRITICAL: Also try Farcaster connector as fallback for PC
+      // Some PC browsers might have Farcaster SDK available (e.g., Farcaster web app)
+      // But it should be secondary to MetaMask
+      try {
+        const farcasterConnector = miniAppConnector();
+        connectors.push(farcasterConnector);
+        console.log('✅ Added Farcaster connector as fallback (PC/Browser)');
+      } catch (error) {
+        console.log('⚠️ Farcaster connector not available in PC/Browser:', error);
       }
     }
     
