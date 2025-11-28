@@ -860,6 +860,43 @@ export async function tryMatch(betLevel: number): Promise<MatchResult | null> {
     }
 
     // Update player2
+    // CRITICAL: Check player2's current status before updating
+    const { data: player2CurrentStatus, error: player2StatusError } = await supabase
+      .from('matchmaking_queue')
+      .select('id, status, matched_with')
+      .eq('id', player2.id)
+      .single()
+    
+    if (player2StatusError || !player2CurrentStatus) {
+      console.error('[tryMatch] ❌ Error checking player2 current status:', JSON.stringify({
+        error: player2StatusError?.message || 'No error object',
+        player2_id: player2.id,
+      }, null, 2))
+      // Rollback player1
+      await supabase
+        .from('matchmaking_queue')
+        .update({ status: 'waiting', matched_at: null, matched_with: null })
+        .eq('id', player1.id)
+      releaseLock(betLevel)
+      return null
+    }
+    
+    // CRITICAL: If player2 is already matched with someone else, skip this match
+    if (player2CurrentStatus.status !== 'waiting') {
+      console.error('[tryMatch] ❌ Player2 is not waiting (status:', player2CurrentStatus.status, '), cannot match:', JSON.stringify({
+        player2_id: player2.id,
+        player2_status: player2CurrentStatus.status,
+        player2_matched_with: player2CurrentStatus.matched_with?.slice(0, 10) + '...',
+      }, null, 2))
+      // Rollback player1
+      await supabase
+        .from('matchmaking_queue')
+        .update({ status: 'waiting', matched_at: null, matched_with: null })
+        .eq('id', player1.id)
+      releaseLock(betLevel)
+      return null
+    }
+    
     const { error: updateError2, data: updateData2 } = await supabase
       .from('matchmaking_queue')
       .update({
@@ -879,6 +916,7 @@ export async function tryMatch(betLevel: number): Promise<MatchResult | null> {
       } : null,
       updated: updateData2?.length || 0,
       player2_id: player2.id,
+      player2_previous_status: player2CurrentStatus.status,
       updateData2: updateData2 ? updateData2.map(d => ({
         id: d.id,
         status: d.status,
@@ -896,6 +934,7 @@ export async function tryMatch(betLevel: number): Promise<MatchResult | null> {
         updateData2: updateData2 ? updateData2.length : 'No data',
         player2_id: player2.id,
         player2_address: player2.player_address?.slice(0, 10) + '...',
+        player2_previous_status: player2CurrentStatus.status,
       }, null, 2))
       // CRITICAL: Rollback player1 if player2 update fails
       await supabase

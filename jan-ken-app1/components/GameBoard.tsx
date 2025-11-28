@@ -34,14 +34,39 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
       onSuccess: (hash) => {
         console.log('[GameBoard] ✅✅✅ TRANSACTION HASH RECEIVED IN onSuccess! ✅✅✅', hash);
         setTxStartTime(null);
+        setTxError(null); // Clear any previous errors
       },
-      onError: (error) => {
+      onError: (error: any) => {
         console.error('[GameBoard] ❌❌❌ TRANSACTION ERROR IN onError! ❌❌❌', error);
-        setSelectedChoice(null);
-        setTxStartTime(null);
+        
+        // CRITICAL: Check if error is "User rejected" - this might be a false positive
+        const errorMessage = error?.message || String(error);
+        const isRejected = errorMessage.includes('rejected') || errorMessage.includes('Rejected') || errorMessage.includes('User rejected');
+        
+        if (isRejected) {
+          console.warn('[GameBoard] ⚠️ User rejected transaction - but checking if wallet popup actually appeared...');
+          // Don't immediately reset - wait a bit to see if it's a timing issue
+          setTimeout(() => {
+            if (!hash && !isPending) {
+              console.error('[GameBoard] ❌ Confirmed: Transaction was rejected by user');
+              setSelectedChoice(null);
+              setTxStartTime(null);
+              setTxError('Transaction was rejected. Please try again and make sure to approve in your wallet.');
+            }
+          }, 1000);
+        } else {
+          // Other errors - reset immediately
+          setSelectedChoice(null);
+          setTxStartTime(null);
+          setTxError(errorMessage);
+        }
       },
       onSettled: (data, error) => {
-        console.log('[GameBoard] 📊 Transaction settled:', { hash: data, error: error?.message });
+        console.log('[GameBoard] 📊 Transaction settled:', { 
+          hash: data || 'none', 
+          error: error?.message || 'none',
+          hasError: !!error,
+        });
       },
     },
   });
