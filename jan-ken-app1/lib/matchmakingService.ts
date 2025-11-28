@@ -420,28 +420,6 @@ export async function tryMatch(betLevel: number): Promise<MatchResult | null> {
       betLevel,
     }, null, 2))
 
-    if (error) {
-      console.error('[tryMatch] ❌ Error finding players:', {
-        error: error.message || error.code || error,
-        betLevel,
-      })
-      releaseLock(betLevel)
-      return null
-    }
-
-    console.log('[tryMatch] 📊 Found players:', JSON.stringify({
-      count: players?.length || 0,
-      betLevel,
-      players: players?.map(p => ({
-        id: p.id,
-        address: p.player_address?.slice(0, 10) + '...',
-        fullAddress: p.player_address, // Log full address for debugging
-        status: p.status,
-        created_at: p.created_at,
-        bet_level: p.bet_level,
-      })) || [],
-    }, null, 2))
-
     // CRITICAL: Must have exactly 2 players
     if (!players || players.length < 2) {
       console.log('[tryMatch] ⚠️ Not enough players:', JSON.stringify({
