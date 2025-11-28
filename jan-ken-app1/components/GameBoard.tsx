@@ -144,8 +144,8 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
 
   // CRITICAL: When isPending becomes true (wallet popup opens), hide all overlaying elements
   useEffect(() => {
-    if (isPending || status === 'pending') {
-      console.log('[GameBoard] 🔍 Wallet popup detected (isPending or status pending) - hiding ALL overlaying elements...');
+    if (isPending) {
+      console.log('[GameBoard] 🔍 Wallet popup detected (isPending) - hiding ALL overlaying elements...');
       
       // Find and hide ALL fixed elements that might be overlaying (not just notifications)
       const overlayingElements: Array<{ el: HTMLElement; originalDisplay: string; originalPointerEvents: string; originalZIndex: string; originalOpacity: string; originalVisibility: string }> = [];
