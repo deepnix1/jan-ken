@@ -715,7 +715,17 @@ export async function tryMatch(betLevel: number): Promise<MatchResult | null> {
     }
 
     // Step 4: Create game only after queue update is confirmed
-    const gameId = `game-${player1.player_address}-${player2.player_address}-${Date.now()}`
+    // CRITICAL: Use unique game ID with timestamps to prevent collisions
+    const timestamp = Date.now()
+    const randomSuffix = Math.random().toString(36).substring(2, 9)
+    const gameId = `game-${player1.player_address.slice(0, 10)}-${player2.player_address.slice(0, 10)}-${timestamp}-${randomSuffix}`
+    
+    console.log('[tryMatch] 📊 Creating game with ID:', JSON.stringify({
+      gameId,
+      player1: player1.player_address.slice(0, 10) + '...',
+      player2: player2.player_address.slice(0, 10) + '...',
+      timestamp,
+    }, null, 2))
 
     const { data: game, error: gameError } = await supabase
       .from('games')

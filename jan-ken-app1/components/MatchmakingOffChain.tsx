@@ -181,7 +181,13 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
     }
     
     const checkMatch = async () => {
-      console.log('[Matchmaking] 🔄 Polling checkForMatch - address:', address?.slice(0, 10) + '...')
+      const isMobile = typeof window !== 'undefined' ? /Mobile|Android|iPhone|iPad/.test(navigator.userAgent) : false;
+      console.log('[Matchmaking] 🔄 Polling checkForMatch - address:', address?.slice(0, 10) + '...', JSON.stringify({
+        isMobile,
+        userAgent: typeof window !== 'undefined' ? navigator.userAgent : 'server',
+        isConnected,
+        hasJoinedQueue,
+      }, null, 2))
       try {
         const match = await checkForMatch(address);
         if (match) {
