@@ -25,6 +25,26 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
   const [queueCount, setQueueCount] = useState<number>(0);
   const [playerFid, setPlayerFid] = useState<number | null>(null);
   
+  // CRITICAL: When showMatchFound becomes true, immediately stop all matching UI
+  useEffect(() => {
+    if (showMatchFound) {
+      console.log('[Matchmaking] 🛑 showMatchFound is true - stopping all matching UI and polling');
+      setIsMatching(false);
+      setHasJoinedQueue(false);
+      setIsJoining(false);
+      
+      // Clear all intervals
+      if (matchCheckIntervalRef.current) {
+        clearInterval(matchCheckIntervalRef.current);
+        matchCheckIntervalRef.current = null;
+      }
+      if (queueCountIntervalRef.current) {
+        clearInterval(queueCountIntervalRef.current);
+        queueCountIntervalRef.current = null;
+      }
+    }
+  }, [showMatchFound]);
+  
   // Convert betAmount to betLevel
   const betLevel = useMemo(() => getBetLevelFromAmount(betAmount), [betAmount]);
   
