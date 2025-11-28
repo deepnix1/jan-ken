@@ -36,35 +36,33 @@ export default function Home() {
   const [isConnecting, setIsConnecting] = useState(false); // For loading screen
   const [isTransitioning, setIsTransitioning] = useState(false); // For page transitions
 
-  // Call sdk.actions.ready() when interface is ready (per Farcaster docs)
-  // https://miniapps.farcaster.xyz/docs/getting-started#making-your-app-display
+  // CRITICAL: Call sdk.actions.ready() to hide Farcaster splash screen
+  // Per Farcaster docs: https://miniapps.farcaster.xyz/docs/getting-started#making-your-app-display
   // "After your app loads, you must call sdk.actions.ready() to hide the splash screen and display your content"
+  // IMPORTANT: ready() only hides the splash screen - it does NOT control app content visibility
+  // App content should ALWAYS be rendered, ready() just tells Farcaster we're ready
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
     let mounted = true;
+    let readyCalled = false;
     
     // Function to call ready() when SDK is available
-    // Per docs: "await sdk.actions.ready()"
     const callReady = async () => {
+      if (readyCalled) return true; // Prevent multiple calls
+      
       try {
         // Try imported SDK first
         if (sdk && sdk.actions && typeof sdk.actions.ready === 'function') {
           console.log('🔍 Calling sdk.actions.ready() (imported SDK)...');
           try {
             await sdk.actions.ready();
-            if (mounted) {
-              setAppReady(true);
-              console.log('✅ Farcaster SDK ready() called (imported SDK) - splash screen hidden');
-            }
+            readyCalled = true;
+            console.log('✅ Farcaster SDK ready() called - splash screen hidden');
             return true;
           } catch (readyError: any) {
             console.error('❌ Error calling sdk.actions.ready():', readyError);
-            // Even if ready() fails, show the app
-            if (mounted) {
-              setAppReady(true);
-              console.log('⚠️ ready() failed but enabling app anyway');
-            }
+            // Continue anyway - app should work even if ready() fails
             return false;
           }
         }
@@ -74,42 +72,33 @@ export default function Home() {
           console.log('🔍 Calling window.farcaster.sdk.actions.ready()...');
           try {
             await (window as any).farcaster.sdk.actions.ready();
-            if (mounted) {
-              setAppReady(true);
-              console.log('✅ Farcaster SDK ready() called (window SDK) - splash screen hidden');
-            }
+            readyCalled = true;
+            console.log('✅ Farcaster SDK ready() called (window SDK) - splash screen hidden');
             return true;
           } catch (readyError: any) {
             console.error('❌ Error calling window.farcaster.sdk.actions.ready():', readyError);
-            // Even if ready() fails, show the app
-            if (mounted) {
-              setAppReady(true);
-              console.log('⚠️ ready() failed but enabling app anyway');
-            }
+            // Continue anyway - app should work even if ready() fails
             return false;
           }
         }
         
         return false;
       } catch (error) {
-        console.error('Error calling sdk.actions.ready():', error);
-        // If we're not in Farcaster environment, continue anyway
-        if (mounted) {
-          setAppReady(true);
-        }
+        console.error('Error in callReady():', error);
         return false;
       }
     };
     
-    // Try immediately
+    // Call ready() immediately if SDK is available
+    // If not available, try polling for a short time
     callReady().then((success) => {
       if (success) {
         return;
       }
       
-      // If SDK not ready, wait for it with polling
+      // If SDK not ready, wait for it with polling (max 2 seconds)
       let attempts = 0;
-      const maxAttempts = 50; // 5 seconds max (50 * 100ms)
+      const maxAttempts = 20; // 2 seconds max (20 * 100ms)
       
       const checkSDK = setInterval(async () => {
         attempts++;
@@ -120,26 +109,12 @@ export default function Home() {
           return;
         }
         
-        // Log debug info every 10 attempts (1 second)
-        if (attempts % 10 === 0) {
-          console.log(`🔍 Checking for Farcaster SDK... (attempt ${attempts}/${maxAttempts})`, {
-            hasImportedSDK: !!sdk,
-            hasSDKActions: !!(sdk && sdk.actions),
-            hasReadyFunction: !!(sdk && sdk.actions && typeof sdk.actions.ready === 'function'),
-            hasWindowSDK: !!(window as any).farcaster?.sdk,
-            userAgent: navigator.userAgent,
-          });
-        }
-        
         if (attempts >= maxAttempts) {
           clearInterval(checkSDK);
           // SDK not available - might be normal web browser (not Farcaster Mini App)
           // Per Farcaster docs: "If you're not in a Farcaster environment, continue anyway"
-          console.log('ℹ️ Farcaster SDK not available - this is normal if running in a regular web browser or PC');
+          console.log('ℹ️ Farcaster SDK not available - this is normal if running in a regular web browser');
           console.log('ℹ️ App will continue to work normally without Farcaster SDK');
-          if (mounted) {
-            setAppReady(true);
-          }
         }
       }, 100); // Check every 100ms
       
@@ -426,31 +401,6 @@ export default function Home() {
     // For now, we just reset the UI state
   };
 
-  // CRITICAL: Per Farcaster docs, if not in Farcaster environment, app should work normally
-  // Don't block app rendering if SDK is not available (PC browser case)
-  // https://miniapps.farcaster.xyz/docs/guides/loading
-  useEffect(() => {
-    // If SDK check takes too long (2 seconds), assume we're not in Farcaster environment
-    // OR if we're in Farcaster but ready() failed, still show the app
-    const timeout = setTimeout(() => {
-      if (!appReady) {
-        console.log('ℹ️ Farcaster SDK check timeout - enabling app anyway');
-        console.log('ℹ️ This is normal if running in PC browser or if ready() failed');
-        setAppReady(true);
-      }
-    }, 2000); // Reduced to 2 seconds for faster loading
-    
-    return () => clearTimeout(timeout);
-  }, [appReady]);
-
-  // Don't block rendering - show app even if appReady is false (for PC browser)
-  // CRITICAL: Per Farcaster docs, if ready() fails or takes too long, show app anyway
-  // Only show loading screen briefly, then force show app
-  const isFarcasterEnv = 
-    (typeof window !== 'undefined' && 
-     ((sdk && sdk.actions && typeof sdk.actions.ready === 'function') ||
-      (window as any).farcaster?.sdk?.actions?.ready));
-
   return (
           <>
           {/* Loading Screens */}
@@ -461,18 +411,9 @@ export default function Home() {
             />
           )}
           
-          {/* Only show loading briefly if in Farcaster environment and not ready */}
-          {/* After 2 seconds, app will be shown anyway due to timeout */}
-          {!appReady && isFarcasterEnv && (
-            <LoadingScreen 
-              message="LOADING..." 
-              subMessage="Initializing Farcaster Mini App"
-            />
-          )}
-          
-          {/* CRITICAL: Always show app content - don't block on appReady */}
-          {/* This ensures app works even if ready() fails */}
-          <div style={{ display: appReady ? 'block' : 'none' }}>
+          {/* CRITICAL: App content is ALWAYS rendered */}
+          {/* Per Farcaster docs: ready() only hides the splash screen, it does NOT control app visibility */}
+          {/* App should work in both Farcaster Mini App environment AND regular web browsers */}
           
           <main className="min-h-screen bg-gradient-to-b from-black via-gray-900 to-black relative overflow-hidden">
       {/* Japanese Background Effects */}
