@@ -68,6 +68,11 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
     }
   }, [address, isConnected]);
   
+  // CRITICAL: If showMatchFound is true, don't render anything (match found animation will be shown by parent)
+  if (showMatchFound) {
+    return null;
+  }
+  
   if (!betLevel) {
     return (
       <div className="text-center p-8">
