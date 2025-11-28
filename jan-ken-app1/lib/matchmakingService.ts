@@ -634,8 +634,32 @@ export async function tryMatch(betLevel: number): Promise<MatchResult | null> {
       .eq('status', 'waiting') // CRITICAL: Only update if still waiting
       .select()
 
+    console.log('[tryMatch] 📊 Player1 update result:', JSON.stringify({
+      error: updateError1 ? {
+        message: updateError1.message,
+        code: updateError1.code,
+        details: updateError1.details,
+      } : null,
+      updated: updateData1?.length || 0,
+      player1_id: player1.id,
+      updateData1: updateData1 ? updateData1.map(d => ({
+        id: d.id,
+        status: d.status,
+        matched_with: d.matched_with?.slice(0, 10) + '...',
+      })) : null,
+    }, null, 2))
+
     if (updateError1 || !updateData1 || updateData1.length === 0) {
-      console.error('[tryMatch] Error updating player1 queue status:', updateError1)
+      console.error('[tryMatch] ❌ Error updating player1 queue status:', JSON.stringify({
+        error: updateError1 ? {
+          message: updateError1.message,
+          code: updateError1.code,
+          details: updateError1.details,
+        } : 'No error object',
+        updateData1: updateData1 ? updateData1.length : 'No data',
+        player1_id: player1.id,
+        player1_address: player1.player_address?.slice(0, 10) + '...',
+      }, null, 2))
       releaseLock(betLevel)
       return null
     }
