@@ -349,6 +349,40 @@ export function DebugPanel() {
       
       const errorStr = serializedArgs.join(' ');
       
+      // CRITICAL: Detect last_seen update failures in errors
+      if (errorStr.includes('Could not update last_seen') || errorStr.includes('CRITICAL: Could not update last_seen') || errorStr.includes('CRITICAL ERROR updating last_seen')) {
+        addIssue({
+          id: 'last-seen-update-failed',
+          title: '⚠️ CRITICAL: last_seen Update Failed',
+          status: 'error',
+          message: 'Player will be excluded from matching - app may be considered inactive',
+          details: {
+            error: errorStr,
+            severity: 'critical',
+            impact: 'player_excluded_from_matching',
+          },
+        });
+      }
+      
+      // CRITICAL: Detect inactive players being matched (last_seen too old)
+      if (errorStr.includes('last_seen') && (errorStr.includes('seconds_ago') || errorStr.includes('Found players'))) {
+        // Extract seconds_ago from log if available
+        const secondsAgoMatch = errorStr.match(/seconds_ago[:\s]+(\d+)/);
+        if (secondsAgoMatch && parseInt(secondsAgoMatch[1]) > 30) {
+          addIssue({
+            id: `inactive-player-matched-${Date.now()}`,
+            title: '⚠️ Inactive Player Being Matched',
+            status: 'error',
+            message: `Player with last_seen > 30 seconds ago (${secondsAgoMatch[1]}s) is being matched - app may be closed`,
+            details: {
+              seconds_ago: parseInt(secondsAgoMatch[1]),
+              threshold: 30,
+              severity: 'critical',
+            },
+          });
+        }
+      }
+      
       // Also create a structured error object for details
       const structuredError = args.map(arg => {
         if (arg instanceof Error) {
