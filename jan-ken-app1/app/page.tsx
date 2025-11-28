@@ -58,11 +58,17 @@ export default function Home() {
           try {
             await sdk.actions.ready();
             readyCalled = true;
+            if (mounted) {
+              setAppReady(true); // Set appReady for auto-connect logic
+            }
             console.log('✅ Farcaster SDK ready() called - splash screen hidden');
             return true;
           } catch (readyError: any) {
             console.error('❌ Error calling sdk.actions.ready():', readyError);
             // Continue anyway - app should work even if ready() fails
+            if (mounted) {
+              setAppReady(true); // Still set appReady so app works
+            }
             return false;
           }
         }
@@ -73,18 +79,32 @@ export default function Home() {
           try {
             await (window as any).farcaster.sdk.actions.ready();
             readyCalled = true;
+            if (mounted) {
+              setAppReady(true); // Set appReady for auto-connect logic
+            }
             console.log('✅ Farcaster SDK ready() called (window SDK) - splash screen hidden');
             return true;
           } catch (readyError: any) {
             console.error('❌ Error calling window.farcaster.sdk.actions.ready():', readyError);
             // Continue anyway - app should work even if ready() fails
+            if (mounted) {
+              setAppReady(true); // Still set appReady so app works
+            }
             return false;
           }
         }
         
+        // If no SDK available, still set appReady (for PC browser)
+        if (mounted) {
+          setAppReady(true);
+        }
         return false;
       } catch (error) {
         console.error('Error in callReady():', error);
+        // Still set appReady so app works
+        if (mounted) {
+          setAppReady(true);
+        }
         return false;
       }
     };
@@ -115,6 +135,9 @@ export default function Home() {
           // Per Farcaster docs: "If you're not in a Farcaster environment, continue anyway"
           console.log('ℹ️ Farcaster SDK not available - this is normal if running in a regular web browser');
           console.log('ℹ️ App will continue to work normally without Farcaster SDK');
+          if (mounted && !appReady) {
+            setAppReady(true); // Ensure appReady is set even if SDK not found
+          }
         }
       }, 100); // Check every 100ms
       
@@ -124,7 +147,7 @@ export default function Home() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [appReady]);
 
   // Auto-connect wallet when app is ready (Farcaster Mini App)
   useEffect(() => {
