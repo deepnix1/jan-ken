@@ -169,9 +169,15 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
             player1: match.player1Address.slice(0, 10) + '...',
             player2: match.player2Address.slice(0, 10) + '...',
             betLevel: match.betLevel,
+            currentPlayer: address?.slice(0, 10) + '...',
+            isPlayer1: match.player1Address.toLowerCase() === address?.toLowerCase(),
+            isPlayer2: match.player2Address.toLowerCase() === address?.toLowerCase(),
+            userAgent: typeof window !== 'undefined' ? navigator.userAgent : 'server',
+            isMobile: typeof window !== 'undefined' ? /Mobile|Android|iPhone|iPad/.test(navigator.userAgent) : false,
           }, null, 2))
           
           // CRITICAL: Stop all polling immediately
+          console.log('[Matchmaking] 🛑 Stopping all polling...')
           setIsMatching(false);
           setHasJoinedQueue(false);
           
@@ -179,18 +185,33 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
           if (matchCheckIntervalRef.current) {
             clearInterval(matchCheckIntervalRef.current);
             matchCheckIntervalRef.current = null;
+            console.log('[Matchmaking] ✅ matchCheckInterval cleared')
           }
           if (queueCountIntervalRef.current) {
             clearInterval(queueCountIntervalRef.current);
             queueCountIntervalRef.current = null;
+            console.log('[Matchmaking] ✅ queueCountInterval cleared')
           }
           
-          // CRITICAL: Call onMatchFound with a small delay to ensure state is updated
-          console.log('[Matchmaking] 🎯 Calling onMatchFound callback...')
-          setTimeout(() => {
+          // CRITICAL: Call onMatchFound immediately (no delay needed)
+          console.log('[Matchmaking] 🎯🎯🎯 Calling onMatchFound callback IMMEDIATELY...')
+          console.log('[Matchmaking] 📞 onMatchFound function exists:', typeof onMatchFound === 'function')
+          console.log('[Matchmaking] 📞 onMatchFound will be called with:', JSON.stringify({
+            gameId: match.gameId,
+            player1: match.player1Address.slice(0, 10) + '...',
+            player2: match.player2Address.slice(0, 10) + '...',
+          }, null, 2))
+          
+          try {
             onMatchFound(match.gameId, match.player1Address, match.player2Address);
-            console.log('[Matchmaking] ✅ onMatchFound callback called')
-          }, 100);
+            console.log('[Matchmaking] ✅✅✅ onMatchFound callback CALLED SUCCESSFULLY! ✅✅✅')
+          } catch (callbackError: any) {
+            console.error('[Matchmaking] ❌❌❌ ERROR calling onMatchFound:', JSON.stringify({
+              error: callbackError?.message || String(callbackError),
+              name: callbackError?.name,
+              stack: callbackError?.stack?.split('\n').slice(0, 5).join('\n'),
+            }, null, 2))
+          }
         } else {
           console.log('[Matchmaking] ⚠️ No match found in this polling cycle')
         }
@@ -253,7 +274,17 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
                 const isPlayer2 = result.player2Address.toLowerCase() === address?.toLowerCase()
                 
                 if (isPlayer1 || isPlayer2) {
-                  console.log('[Matchmaking] 🎯🎯🎯 WE ARE IN THE MATCH! Triggering onMatchFound immediately!')
+                  console.log('[Matchmaking] 🎯🎯🎯 WE ARE IN THE MATCH! Triggering onMatchFound immediately!', JSON.stringify({
+                    gameId: result.gameId,
+                    player1: result.player1Address.slice(0, 10) + '...',
+                    player2: result.player2Address.slice(0, 10) + '...',
+                    currentPlayer: address?.slice(0, 10) + '...',
+                    isPlayer1,
+                    isPlayer2,
+                    userAgent: typeof window !== 'undefined' ? navigator.userAgent : 'server',
+                    isMobile: typeof window !== 'undefined' ? /Mobile|Android|iPhone|iPad/.test(navigator.userAgent) : false,
+                  }, null, 2))
+                  
                   setIsMatching(false);
                   setHasJoinedQueue(false);
                   
@@ -268,7 +299,16 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
                   }
                   
                   // Call onMatchFound immediately
-                  onMatchFound(result.gameId, result.player1Address, result.player2Address);
+                  console.log('[Matchmaking] 📞 Calling onMatchFound from queue count update...')
+                  try {
+                    onMatchFound(result.gameId, result.player1Address, result.player2Address);
+                    console.log('[Matchmaking] ✅ onMatchFound called successfully from queue count update')
+                  } catch (callbackError: any) {
+                    console.error('[Matchmaking] ❌ Error calling onMatchFound from queue count update:', JSON.stringify({
+                      error: callbackError?.message || String(callbackError),
+                      name: callbackError?.name,
+                    }, null, 2))
+                  }
                 } else {
                   console.log('[Matchmaking] ⚠️ Match created but we are not one of the players')
                 }

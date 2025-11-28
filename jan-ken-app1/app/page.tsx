@@ -414,11 +414,28 @@ export default function Home() {
   };
 
   const handleMatchFound = (id: string, p1Address?: string, p2Address?: string) => {
-    console.log('[Home] 🎮 handleMatchFound called:', { id, p1Address, p2Address });
+    console.log('[Home] 🎮🎮🎮 handleMatchFound CALLED! 🎮🎮🎮', JSON.stringify({
+      id,
+      p1Address: p1Address?.slice(0, 10) + '...',
+      p2Address: p2Address?.slice(0, 10) + '...',
+      currentAddress: address?.slice(0, 10) + '...',
+      gameState,
+      showMatchFound: false, // Before update
+    }, null, 2));
+    
+    // CRITICAL: Set all state synchronously
     setPlayer1Address(p1Address);
     setPlayer2Address(p2Address);
-    setGameId(id); // Set gameId immediately
+    setGameId(id);
     setShowMatchFound(true);
+    
+    console.log('[Home] ✅ State updated:', JSON.stringify({
+      gameId: id,
+      player1Address: p1Address?.slice(0, 10) + '...',
+      player2Address: p2Address?.slice(0, 10) + '...',
+      showMatchFound: true, // After update
+    }, null, 2));
+    
     // Game state will be set to 'playing' when animation closes (onClose callback)
   };
 

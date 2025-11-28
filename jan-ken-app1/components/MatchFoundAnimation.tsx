@@ -13,6 +13,14 @@ interface MatchFoundAnimationProps {
 }
 
 export function MatchFoundAnimation({ player1Address, player2Address, currentUserAddress, onClose }: MatchFoundAnimationProps) {
+  console.log('[MatchFoundAnimation] 🎬 Component RENDERED!', JSON.stringify({
+    player1Address: player1Address?.slice(0, 10) + '...',
+    player2Address: player2Address?.slice(0, 10) + '...',
+    currentUserAddress: currentUserAddress?.slice(0, 10) + '...',
+    userAgent: typeof window !== 'undefined' ? navigator.userAgent : 'server',
+    isMobile: typeof window !== 'undefined' ? /Mobile|Android|iPhone|iPad/.test(navigator.userAgent) : false,
+  }, null, 2));
+  
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const hasShownRef = useRef(false); // Prevent multiple renders
   const [showAnimation, setShowAnimation] = useState(false); // Start hidden - wait for profiles
