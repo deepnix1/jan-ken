@@ -172,10 +172,17 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
   
   // Check for matches (polling)
   useEffect(() => {
-    if (!isConnected || !address || !hasJoinedQueue) {
+    // CRITICAL: Stop polling if match found or not in queue
+    if (!isConnected || !address || !hasJoinedQueue || showMatchFound) {
       if (matchCheckIntervalRef.current) {
         clearInterval(matchCheckIntervalRef.current);
         matchCheckIntervalRef.current = null;
+        console.log('[Matchmaking] 🛑 Stopped checkForMatch polling:', JSON.stringify({
+          isConnected,
+          hasAddress: !!address,
+          hasJoinedQueue,
+          showMatchFound,
+        }, null, 2))
       }
       return;
     }

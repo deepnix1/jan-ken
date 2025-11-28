@@ -832,11 +832,13 @@ export async function tryMatch(betLevel: number): Promise<MatchResult | null> {
       return null
     }
 
-    console.log('[tryMatch] ✅ Match created successfully:', {
+    console.log('[tryMatch] ✅✅✅ Match created successfully! ✅✅✅', JSON.stringify({
       gameId,
       player1: player1.player_address.slice(0, 10) + '...',
       player2: player2.player_address.slice(0, 10) + '...',
-    })
+      betLevel,
+      betAmount: player1.bet_amount,
+    }, null, 2))
 
     releaseLock(betLevel)
     return {
@@ -901,12 +903,52 @@ export async function checkForMatch(playerAddress: Address): Promise<MatchResult
     }
     
     // If player is not waiting or matched, they're cancelled or other status
+    // CRITICAL: Even if cancelled, check games table - match might have been created before cancellation
     if (queueStatus.status !== 'waiting' && queueStatus.status !== 'matched') {
-      console.log('[checkForMatch] ⚠️ Player not waiting or matched:', {
+      console.log('[checkForMatch] ⚠️ Player not waiting or matched:', JSON.stringify({
         status: queueStatus.status,
         queueId: queueStatus.id,
-      })
-      return null // Cancelled or other status
+        betLevel: queueStatus.bet_level,
+      }, null, 2))
+      
+      // CRITICAL: Even if cancelled, check games table - match might exist
+      console.log('[checkForMatch] 🔍 Player cancelled, but checking games table for existing match...')
+      const { data: games, error: gamesError } = await supabase
+        .from('games')
+        .select('*')
+        .or(`player1_address.eq.${playerAddress.toLowerCase()},player2_address.eq.${playerAddress.toLowerCase()}`)
+        .eq('status', 'commit_phase')
+        .order('created_at', { ascending: false })
+        .limit(1)
+      
+      if (gamesError) {
+        console.error('[checkForMatch] ❌ Error searching games table:', JSON.stringify({
+          error: gamesError.message,
+          code: gamesError.code,
+        }, null, 2))
+        return null
+      }
+      
+      if (games && games.length > 0) {
+        const game = games[0]
+        console.log('[checkForMatch] ✅ Found game even though player is cancelled:', JSON.stringify({
+          gameId: game.game_id,
+          player1: game.player1_address?.slice(0, 10) + '...',
+          player2: game.player2_address?.slice(0, 10) + '...',
+        }, null, 2))
+        
+        return {
+          gameId: game.game_id,
+          player1Address: game.player1_address as Address,
+          player1Fid: game.player1_fid,
+          player2Address: game.player2_address as Address,
+          player2Fid: game.player2_fid,
+          betLevel: game.bet_level,
+          betAmount: BigInt(game.bet_amount || '0'),
+        }
+      }
+      
+      return null // Cancelled and no game found
     }
     
     // CRITICAL: If player is still waiting, try to match them
