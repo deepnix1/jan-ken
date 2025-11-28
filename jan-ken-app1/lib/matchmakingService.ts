@@ -404,16 +404,29 @@ export async function tryMatch(betLevel: number): Promise<MatchResult | null> {
       return null
     }
     
+    // CRITICAL: Filter out players with missing or invalid addresses FIRST
+    const validPlayers = (allPlayers || []).filter(p => {
+      if (!p.player_address || p.player_address.trim() === '') {
+        console.warn('[tryMatch] ⚠️ Filtering out player with missing address:', JSON.stringify({
+          id: p.id,
+          hasAddress: !!p.player_address,
+        }, null, 2))
+        return false
+      }
+      return true
+    })
+    
     // CRITICAL: Log all found players with their last_seen timestamps for debugging
     const queryNow = Date.now()
     const queryFifteenSecondsAgo = queryNow - 15000
     console.log('[tryMatch] 📊 Found players with active last_seen:', JSON.stringify({
-      count: allPlayers?.length || 0,
+      totalFound: allPlayers?.length || 0,
+      validCount: validPlayers.length,
       betLevel,
       query_time: new Date(queryNow).toISOString(),
       threshold_seconds: 15,
       threshold_time: new Date(queryFifteenSecondsAgo).toISOString(),
-      players: (allPlayers || []).map(p => {
+      players: validPlayers.map(p => {
         const pLastSeen = p.last_seen ? new Date(p.last_seen).getTime() : 0
         const secondsAgo = p.last_seen ? Math.floor((queryNow - pLastSeen) / 1000) : null
         const isActive = p.last_seen && pLastSeen >= queryFifteenSecondsAgo
