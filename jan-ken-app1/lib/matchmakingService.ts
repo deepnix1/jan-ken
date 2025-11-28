@@ -336,13 +336,15 @@ export async function joinQueue(params: JoinQueueParams): Promise<string> {
  * CRITICAL: Uses atomic operations and locking to prevent fake matches
  */
 export async function tryMatch(betLevel: number): Promise<MatchResult | null> {
-  console.log('[tryMatch] 🔍 Starting match attempt for betLevel', betLevel)
+  console.log('[tryMatch] 🔍🔍🔍 Starting match attempt for betLevel', betLevel)
   
   // CRITICAL: Acquire lock to prevent concurrent matching attempts
   if (!acquireLock(betLevel)) {
     console.log('[tryMatch] ⚠️ Lock already held for betLevel', betLevel, '- skipping match attempt')
     return null
   }
+  
+  console.log('[tryMatch] ✅ Lock acquired for betLevel', betLevel)
 
   try {
     // Step 1: Find two waiting players with same bet level

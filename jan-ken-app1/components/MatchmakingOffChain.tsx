@@ -235,26 +235,53 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
         
         // CRITICAL: If 2+ players waiting, force tryMatch
         if (count >= 2) {
-          console.log('[Matchmaking] 🚀 2+ players waiting, forcing tryMatch for betLevel', betLevel)
+          console.log('[Matchmaking] 🚀🚀🚀 2+ players waiting, forcing tryMatch for betLevel', betLevel)
           // Import tryMatch and call it directly
           const { tryMatch: tryMatchFn } = await import('@/lib/matchmakingService')
           tryMatchFn(betLevel)
             .then(result => {
               if (result) {
-                console.log('[Matchmaking] ✅ Force tryMatch successful!', JSON.stringify({
+                console.log('[Matchmaking] ✅✅✅ Force tryMatch successful!', JSON.stringify({
                   gameId: result.gameId,
                   player1: result.player1Address.slice(0, 10) + '...',
                   player2: result.player2Address.slice(0, 10) + '...',
-                }))
+                  betLevel: result.betLevel,
+                }, null, 2))
+                
+                // CRITICAL: If we're one of the matched players, trigger match found immediately
+                const isPlayer1 = result.player1Address.toLowerCase() === address?.toLowerCase()
+                const isPlayer2 = result.player2Address.toLowerCase() === address?.toLowerCase()
+                
+                if (isPlayer1 || isPlayer2) {
+                  console.log('[Matchmaking] 🎯🎯🎯 WE ARE IN THE MATCH! Triggering onMatchFound immediately!')
+                  setIsMatching(false);
+                  setHasJoinedQueue(false);
+                  
+                  // Clear intervals
+                  if (matchCheckIntervalRef.current) {
+                    clearInterval(matchCheckIntervalRef.current);
+                    matchCheckIntervalRef.current = null;
+                  }
+                  if (queueCountIntervalRef.current) {
+                    clearInterval(queueCountIntervalRef.current);
+                    queueCountIntervalRef.current = null;
+                  }
+                  
+                  // Call onMatchFound immediately
+                  onMatchFound(result.gameId, result.player1Address, result.player2Address);
+                } else {
+                  console.log('[Matchmaking] ⚠️ Match created but we are not one of the players')
+                }
               } else {
-                console.log('[Matchmaking] ⚠️ Force tryMatch returned null')
+                console.log('[Matchmaking] ⚠️ Force tryMatch returned null - no match created')
               }
             })
             .catch(err => {
               console.error('[Matchmaking] ❌ Force tryMatch error:', JSON.stringify({
                 error: err?.message || String(err),
                 name: err?.name,
-              }))
+                stack: err?.stack?.split('\n').slice(0, 5).join('\n'),
+              }, null, 2))
             })
         }
       } catch (err) {
