@@ -1245,6 +1245,67 @@ export async function checkForMatch(playerAddress: Address): Promise<MatchResult
           player2: game.player2_address?.slice(0, 10) + '...',
         }, null, 2))
         
+        // CRITICAL: Verify both players have active last_seen before returning this game
+        // This prevents returning games where one player's app is closed
+        const checkNow = Date.now()
+        const checkFifteenSecondsAgo = checkNow - 15000
+        
+        const { data: player1Queue, error: p1Error } = await supabase
+          .from('matchmaking_queue')
+          .select('last_seen, status')
+          .eq('player_address', game.player1_address.toLowerCase())
+          .order('created_at', { ascending: false })
+          .limit(1)
+        
+        const { data: player2Queue, error: p2Error } = await supabase
+          .from('matchmaking_queue')
+          .select('last_seen, status')
+          .eq('player_address', game.player2_address.toLowerCase())
+          .order('created_at', { ascending: false })
+          .limit(1)
+        
+        const p1LastSeen = player1Queue && player1Queue.length > 0 && player1Queue[0].last_seen 
+          ? new Date(player1Queue[0].last_seen).getTime() 
+          : 0
+        const p2LastSeen = player2Queue && player2Queue.length > 0 && player2Queue[0].last_seen 
+          ? new Date(player2Queue[0].last_seen).getTime() 
+          : 0
+        
+        const p1Active = p1LastSeen > 0 && p1LastSeen >= checkFifteenSecondsAgo
+        const p2Active = p2LastSeen > 0 && p2LastSeen >= checkFifteenSecondsAgo
+        
+        console.log('[checkForMatch] 🔍 Verifying both players have active last_seen:', JSON.stringify({
+          player1: {
+            address: game.player1_address?.slice(0, 10) + '...',
+            last_seen: player1Queue && player1Queue.length > 0 ? player1Queue[0].last_seen : null,
+            seconds_ago: p1LastSeen > 0 ? Math.floor((checkNow - p1LastSeen) / 1000) : null,
+            isActive: p1Active,
+          },
+          player2: {
+            address: game.player2_address?.slice(0, 10) + '...',
+            last_seen: player2Queue && player2Queue.length > 0 ? player2Queue[0].last_seen : null,
+            seconds_ago: p2LastSeen > 0 ? Math.floor((checkNow - p2LastSeen) / 1000) : null,
+            isActive: p2Active,
+          },
+          threshold: 15,
+        }, null, 2))
+        
+        // CRITICAL: If either player is inactive, reject this game
+        if (!p1Active || !p2Active) {
+          console.error('[checkForMatch] ❌❌❌ REJECTING GAME: One or both players have inactive last_seen:', JSON.stringify({
+            gameId: game.game_id,
+            player1_active: p1Active,
+            player2_active: p2Active,
+            player1_last_seen: player1Queue && player1Queue.length > 0 ? player1Queue[0].last_seen : null,
+            player2_last_seen: player2Queue && player2Queue.length > 0 ? player2Queue[0].last_seen : null,
+            player1_seconds_ago: p1LastSeen > 0 ? Math.floor((checkNow - p1LastSeen) / 1000) : null,
+            player2_seconds_ago: p2LastSeen > 0 ? Math.floor((checkNow - p2LastSeen) / 1000) : null,
+          }, null, 2))
+          return null // Reject game with inactive player
+        }
+        
+        console.log('[checkForMatch] ✅ Both players have active last_seen - returning game')
+        
         return {
           gameId: game.game_id,
           player1Address: game.player1_address as Address,
@@ -1385,6 +1446,66 @@ export async function checkForMatch(playerAddress: Address): Promise<MatchResult
             player1: game.player1_address?.slice(0, 10) + '...',
             player2: game.player2_address?.slice(0, 10) + '...',
           }))
+          
+          // CRITICAL: Verify both players have active last_seen before returning this game
+          const checkNow = Date.now()
+          const checkFifteenSecondsAgo = checkNow - 15000
+          
+          const { data: player1Queue, error: p1Error } = await supabase
+            .from('matchmaking_queue')
+            .select('last_seen, status')
+            .eq('player_address', game.player1_address.toLowerCase())
+            .order('created_at', { ascending: false })
+            .limit(1)
+          
+          const { data: player2Queue, error: p2Error } = await supabase
+            .from('matchmaking_queue')
+            .select('last_seen, status')
+            .eq('player_address', game.player2_address.toLowerCase())
+            .order('created_at', { ascending: false })
+            .limit(1)
+          
+          const p1LastSeen = player1Queue && player1Queue.length > 0 && player1Queue[0].last_seen 
+            ? new Date(player1Queue[0].last_seen).getTime() 
+            : 0
+          const p2LastSeen = player2Queue && player2Queue.length > 0 && player2Queue[0].last_seen 
+            ? new Date(player2Queue[0].last_seen).getTime() 
+            : 0
+          
+          const p1Active = p1LastSeen > 0 && p1LastSeen >= checkFifteenSecondsAgo
+          const p2Active = p2LastSeen > 0 && p2LastSeen >= checkFifteenSecondsAgo
+          
+          console.log('[checkForMatch] 🔍 Verifying both players have active last_seen (matched status):', JSON.stringify({
+            player1: {
+              address: game.player1_address?.slice(0, 10) + '...',
+              last_seen: player1Queue && player1Queue.length > 0 ? player1Queue[0].last_seen : null,
+              seconds_ago: p1LastSeen > 0 ? Math.floor((checkNow - p1LastSeen) / 1000) : null,
+              isActive: p1Active,
+            },
+            player2: {
+              address: game.player2_address?.slice(0, 10) + '...',
+              last_seen: player2Queue && player2Queue.length > 0 ? player2Queue[0].last_seen : null,
+              seconds_ago: p2LastSeen > 0 ? Math.floor((checkNow - p2LastSeen) / 1000) : null,
+              isActive: p2Active,
+            },
+            threshold: 15,
+          }, null, 2))
+          
+          // CRITICAL: If either player is inactive, reject this game
+          if (!p1Active || !p2Active) {
+            console.error('[checkForMatch] ❌❌❌ REJECTING GAME: One or both players have inactive last_seen (matched status):', JSON.stringify({
+              gameId: game.game_id,
+              player1_active: p1Active,
+              player2_active: p2Active,
+              player1_last_seen: player1Queue && player1Queue.length > 0 ? player1Queue[0].last_seen : null,
+              player2_last_seen: player2Queue && player2Queue.length > 0 ? player2Queue[0].last_seen : null,
+              player1_seconds_ago: p1LastSeen > 0 ? Math.floor((checkNow - p1LastSeen) / 1000) : null,
+              player2_seconds_ago: p2LastSeen > 0 ? Math.floor((checkNow - p2LastSeen) / 1000) : null,
+            }, null, 2))
+            return null // Reject game with inactive player
+          }
+          
+          console.log('[checkForMatch] ✅ Both players have active last_seen - returning game (matched status)')
           
           // Return match result
           return {
