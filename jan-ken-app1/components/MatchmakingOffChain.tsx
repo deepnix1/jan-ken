@@ -64,7 +64,28 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
       return
     }
     
-    if (!isConnected || !address || hasJoinedQueue) return;
+    // CRITICAL: Don't join queue if wallet is not connected
+    if (!isConnected) {
+      console.log('[Matchmaking] ⚠️ Wallet not connected, skipping queue join')
+      setError('Please connect your wallet first.')
+      return
+    }
+    
+    // CRITICAL: Don't join queue if address is not available
+    if (!address) {
+      console.log('[Matchmaking] ⚠️ Wallet address not available, skipping queue join')
+      setError('Wallet address not available.')
+      return
+    }
+    
+    // CRITICAL: Check if app is visible
+    if (typeof document !== 'undefined' && document.hidden) {
+      console.log('[Matchmaking] ⚠️ App is hidden, skipping queue join')
+      setError('App must be visible to join queue.')
+      return
+    }
+    
+    if (hasJoinedQueue) return;
     
     // Validate bet level (must be valid)
     if (!betLevel || betLevel === 0) {
