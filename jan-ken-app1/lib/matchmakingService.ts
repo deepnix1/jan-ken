@@ -1369,6 +1369,22 @@ export async function checkForMatch(playerAddress: Address): Promise<MatchResult
       
       // CRITICAL: For cancelled status, check games table ONCE and then return null
       // This prevents continuous polling for cancelled players
+      // Use a static Set to track which players we've already checked
+      const cancelledCheckKey = `${playerAddress.toLowerCase()}-${queueStatus.id}`
+      if (!(globalThis as any).__cancelledPlayersChecked) {
+        (globalThis as any).__cancelledPlayersChecked = new Set<string>()
+      }
+      const checkedSet = (globalThis as any).__cancelledPlayersChecked as Set<string>
+      
+      if (checkedSet.has(cancelledCheckKey)) {
+        // Already checked this cancelled player - return null immediately
+        console.log('[checkForMatch] 🛑 Player cancelled - already checked games table, returning null to stop polling')
+        return null
+      }
+      
+      // Mark as checked
+      checkedSet.add(cancelledCheckKey)
+      
       console.log('[checkForMatch] ⚠️ Player cancelled, checking games table for existing match (ONE-TIME CHECK - will return null after)...', JSON.stringify({
         status: queueStatus.status,
         queueId: queueStatus.id,

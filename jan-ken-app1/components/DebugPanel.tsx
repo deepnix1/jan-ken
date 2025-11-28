@@ -87,10 +87,50 @@ export function DebugPanel() {
         const iframes = document.querySelectorAll('iframe');
         for (const iframe of iframes) {
           const src = iframe.getAttribute('src') || '';
-          if (src.includes('farcaster') || src.includes('wallet') || src.includes('privy')) {
+          const name = iframe.getAttribute('name') || '';
+          const id = iframe.getAttribute('id') || '';
+          const className = iframe.getAttribute('class') || '';
+          // Check if it's a wallet popup iframe (Farcaster wallet uses iframes)
+          if (src.includes('farcaster') || 
+              src.includes('wallet') || 
+              src.includes('privy') ||
+              name.includes('wallet') ||
+              id.includes('wallet') ||
+              className.includes('wallet') ||
+              // Also check for any visible iframe that might be a popup
+              (iframe.offsetWidth > 200 && iframe.offsetHeight > 200)) {
             popupFound = true;
             popupElement = iframe;
             break;
+          }
+        }
+      }
+      
+      // Also check for any element with high z-index that might be a wallet popup
+      if (!popupFound) {
+        const allElements = document.querySelectorAll('*');
+        for (const el of allElements) {
+          const htmlEl = el as HTMLElement;
+          const style = window.getComputedStyle(htmlEl);
+          const zIndex = parseInt(style.zIndex) || 0;
+          // Check for elements with very high z-index (wallet popups usually have z-index > 1000)
+          if (zIndex > 1000 && 
+              (htmlEl.offsetWidth > 300 && htmlEl.offsetHeight > 200) &&
+              style.position === 'fixed' &&
+              style.display !== 'none' &&
+              style.visibility !== 'hidden') {
+            // Check if it contains wallet-related text or buttons
+            const text = htmlEl.textContent || '';
+            const hasWalletText = text.includes('Confirm') || 
+                                 text.includes('Approve') || 
+                                 text.includes('Transaction') ||
+                                 text.includes('wallet') ||
+                                 htmlEl.querySelector('button') !== null;
+            if (hasWalletText) {
+              popupFound = true;
+              popupElement = htmlEl;
+              break;
+            }
           }
         }
       }
