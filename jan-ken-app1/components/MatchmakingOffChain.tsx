@@ -171,8 +171,8 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
     joinQueueAsync();
   }, [isConnected, address, betLevel, betAmount, playerFid, hasJoinedQueue]);
   
-  // Check for matches (polling)
-  useEffect(() => {
+    // Check for matches (polling)
+    useEffect(() => {
       // CRITICAL: Stop polling if match found or not in queue
       if (!isConnected || !address || !hasJoinedQueue || showMatchFound) {
         if (matchCheckIntervalRef.current) {
@@ -215,11 +215,25 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
         }
       }
       
-      // Check queue status before starting polling
-      const shouldPoll = await checkQueueStatus()
-      if (!shouldPoll) {
-        return
-      }
+      // CRITICAL: Check queue status before starting polling (async)
+      // We need to check this asynchronously, so we'll do it inside the checkMatch function
+      let queueStatusChecked = false
+      let shouldPoll = true
+      
+      // Check queue status once before starting polling
+      checkQueueStatus().then((result) => {
+        shouldPoll = result
+        queueStatusChecked = true
+        if (!shouldPoll) {
+          if (matchCheckIntervalRef.current) {
+            clearInterval(matchCheckIntervalRef.current);
+            matchCheckIntervalRef.current = null;
+          }
+        }
+      }).catch((err) => {
+        console.error('[Matchmaking] ❌ Error in initial queue status check:', err)
+        queueStatusChecked = true
+      })
     
     // CRITICAL: Update last_seen timestamp to keep player active in queue
     // This ensures only players with open apps can be matched
@@ -285,18 +299,42 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
       }
     };
     
-    const checkMatch = async () => {
-      const isMobile = typeof window !== 'undefined' ? /Mobile|Android|iPhone|iPad/.test(navigator.userAgent) : false;
-      console.log('[Matchmaking] 🔄 Polling checkForMatch - address:', address?.slice(0, 10) + '...', JSON.stringify({
-        isMobile,
-        userAgent: typeof window !== 'undefined' ? navigator.userAgent : 'server',
-        isConnected,
-        hasJoinedQueue,
-        isVisible: typeof document !== 'undefined' ? !document.hidden : true,
-      }, null, 2))
-      
-      // CRITICAL: Update last_seen before checking for match
-      await updateLastSeen();
+      const checkMatch = async () => {
+        // CRITICAL: Check queue status if not checked yet
+        if (!queueStatusChecked) {
+          const result = await checkQueueStatus()
+          shouldPoll = result
+          queueStatusChecked = true
+          if (!shouldPoll) {
+            console.log('[Matchmaking] 🛑 Queue status check failed, stopping polling')
+            if (matchCheckIntervalRef.current) {
+              clearInterval(matchCheckIntervalRef.current);
+              matchCheckIntervalRef.current = null;
+            }
+            return
+          }
+        }
+        
+        // CRITICAL: If we already know we shouldn't poll, stop
+        if (!shouldPoll) {
+          if (matchCheckIntervalRef.current) {
+            clearInterval(matchCheckIntervalRef.current);
+            matchCheckIntervalRef.current = null;
+          }
+          return
+        }
+        
+        const isMobile = typeof window !== 'undefined' ? /Mobile|Android|iPhone|iPad/.test(navigator.userAgent) : false;
+        console.log('[Matchmaking] 🔄 Polling checkForMatch - address:', address?.slice(0, 10) + '...', JSON.stringify({
+          isMobile,
+          userAgent: typeof window !== 'undefined' ? navigator.userAgent : 'server',
+          isConnected,
+          hasJoinedQueue,
+          isVisible: typeof document !== 'undefined' ? !document.hidden : true,
+        }, null, 2))
+        
+        // CRITICAL: Update last_seen before checking for match
+        await updateLastSeen();
       
       try {
         const match = await checkForMatch(address);
