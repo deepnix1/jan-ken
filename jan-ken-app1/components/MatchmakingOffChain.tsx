@@ -334,6 +334,24 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
     // Then poll every 2 seconds
     matchCheckIntervalRef.current = setInterval(checkMatch, 2000);
     
+    // CRITICAL: Separate heartbeat interval for last_seen updates (every 10 seconds)
+    // This ensures last_seen is updated even if checkForMatch is not called
+    const heartbeatInterval = setInterval(() => {
+      if (address && hasJoinedQueue && typeof document !== 'undefined' && !document.hidden) {
+        updateLastSeen().catch(err => {
+          console.error('[Matchmaking] ❌ Heartbeat updateLastSeen error:', err);
+        });
+      }
+    }, 10000); // Every 10 seconds
+    
+    return () => {
+      if (matchCheckIntervalRef.current) {
+        clearInterval(matchCheckIntervalRef.current);
+        matchCheckIntervalRef.current = null;
+      }
+      clearInterval(heartbeatInterval);
+    };
+    
     return () => {
       if (matchCheckIntervalRef.current) {
         clearInterval(matchCheckIntervalRef.current);

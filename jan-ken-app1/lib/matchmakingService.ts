@@ -380,9 +380,10 @@ export async function tryMatch(betLevel: number): Promise<MatchResult | null> {
     console.log('[tryMatch] 🔍 Step 1: Finding waiting players for betLevel', betLevel)
     
     // CRITICAL: First get all unique waiting players for this bet level
-    // Only include players who were active in the last 30 seconds (app is open)
-    const thirtySecondsAgo = new Date(Date.now() - 30000).toISOString()
-    console.log('[tryMatch] 🔍 Filtering players by last_seen >=', thirtySecondsAgo)
+    // Only include players who were active in the last 15 seconds (app is open)
+    // Using 15 seconds instead of 30 for stricter control (based on web research best practices)
+    const fifteenSecondsAgo = new Date(Date.now() - 15000).toISOString()
+    console.log('[tryMatch] 🔍 Filtering players by last_seen >=', fifteenSecondsAgo, '(15 second threshold)')
     
     const { data: allPlayers, error: allPlayersError } = await supabase
       .from('matchmaking_queue')
@@ -390,14 +391,14 @@ export async function tryMatch(betLevel: number): Promise<MatchResult | null> {
       .eq('bet_level', betLevel)
       .eq('status', 'waiting')
       .not('last_seen', 'is', null) // CRITICAL: Exclude NULL last_seen (inactive players)
-      .gte('last_seen', thirtySecondsAgo) // Active in last 30 seconds
+      .gte('last_seen', fifteenSecondsAgo) // Active in last 15 seconds (stricter)
       .order('created_at', { ascending: true })
     
     if (allPlayersError) {
       console.error('[tryMatch] ❌ Error finding all players:', JSON.stringify({
         error: allPlayersError.message || allPlayersError.code || allPlayersError,
         betLevel,
-        thirtySecondsAgo,
+        fifteenSecondsAgo,
       }, null, 2))
       releaseLock(betLevel)
       return null
@@ -476,30 +477,31 @@ export async function tryMatch(betLevel: number): Promise<MatchResult | null> {
     const player2 = players[1]
     
     // CRITICAL: Verify both players have valid last_seen (app is open)
+    // Using 15 seconds threshold for stricter control (based on web research)
     const now = Date.now()
     const player1LastSeen = player1.last_seen ? new Date(player1.last_seen).getTime() : 0
     const player2LastSeen = player2.last_seen ? new Date(player2.last_seen).getTime() : 0
-    const thirtySecondsAgoMs = now - 30000
+    const fifteenSecondsAgoMs = now - 15000 // 15 seconds threshold (stricter)
     
-    if (!player1.last_seen || player1LastSeen < thirtySecondsAgoMs) {
+    if (!player1.last_seen || player1LastSeen < fifteenSecondsAgoMs) {
       console.error('[tryMatch] ❌❌❌ CRITICAL: Player1 has inactive last_seen:', JSON.stringify({
         player1_address: player1.player_address?.slice(0, 10) + '...',
         last_seen: player1.last_seen,
         seconds_ago: player1.last_seen ? Math.floor((now - player1LastSeen) / 1000) : null,
-        threshold: 30,
-        isActive: player1.last_seen && player1LastSeen >= thirtySecondsAgoMs,
+        threshold: 15,
+        isActive: player1.last_seen && player1LastSeen >= fifteenSecondsAgoMs,
       }, null, 2))
       releaseLock(betLevel)
       return null
     }
     
-    if (!player2.last_seen || player2LastSeen < thirtySecondsAgoMs) {
+    if (!player2.last_seen || player2LastSeen < fifteenSecondsAgoMs) {
       console.error('[tryMatch] ❌❌❌ CRITICAL: Player2 has inactive last_seen:', JSON.stringify({
         player2_address: player2.player_address?.slice(0, 10) + '...',
         last_seen: player2.last_seen,
         seconds_ago: player2.last_seen ? Math.floor((now - player2LastSeen) / 1000) : null,
-        threshold: 30,
-        isActive: player2.last_seen && player2LastSeen >= thirtySecondsAgoMs,
+        threshold: 15,
+        isActive: player2.last_seen && player2LastSeen >= fifteenSecondsAgoMs,
       }, null, 2))
       releaseLock(betLevel)
       return null
