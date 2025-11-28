@@ -45,6 +45,201 @@ export function DebugPanel() {
   const matchmakingLogsRef = useRef<MatchmakingLog[]>([]);
   const writeContractCallsRef = useRef<Array<{ timestamp: string; params: any; result?: any; error?: any }>>([]);
 
+  // Monitor wallet popup DOM elements
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    let popupCheckInterval: NodeJS.Timeout | null = null;
+    
+    const checkWalletPopup = () => {
+      // Check for Farcaster wallet popup elements
+      // Farcaster wallet typically uses iframes or specific class names
+      const possibleSelectors = [
+        'iframe[src*="farcaster"]',
+        'iframe[src*="wallet.farcaster"]',
+        'iframe[src*="privy.farcaster"]',
+        '[data-farcaster-wallet]',
+        '[data-wallet-popup]',
+        '.wallet-popup',
+        '.farcaster-wallet',
+        'div[role="dialog"]',
+        '[aria-modal="true"]',
+      ];
+      
+      let popupFound = false;
+      let popupElement: HTMLElement | null = null;
+      
+      for (const selector of possibleSelectors) {
+        try {
+          const element = document.querySelector(selector);
+          if (element) {
+            popupFound = true;
+            popupElement = element as HTMLElement;
+            break;
+          }
+        } catch (e) {
+          // Ignore selector errors
+        }
+      }
+      
+      // Also check for iframes in general (wallet popups often use iframes)
+      if (!popupFound) {
+        const iframes = document.querySelectorAll('iframe');
+        for (const iframe of iframes) {
+          const src = iframe.getAttribute('src') || '';
+          if (src.includes('farcaster') || src.includes('wallet') || src.includes('privy')) {
+            popupFound = true;
+            popupElement = iframe;
+            break;
+          }
+        }
+      }
+      
+      if (popupFound && popupElement) {
+        const rect = popupElement.getBoundingClientRect();
+        const computedStyle = window.getComputedStyle(popupElement);
+        const zIndex = computedStyle.zIndex;
+        const pointerEvents = computedStyle.pointerEvents;
+        const visibility = computedStyle.visibility;
+        const display = computedStyle.display;
+        const opacity = computedStyle.opacity;
+        
+        // Check if popup is visible
+        const isVisible = rect.width > 0 && rect.height > 0 && 
+                         display !== 'none' && 
+                         visibility !== 'hidden' && 
+                         opacity !== '0';
+        
+        // Check for overlaying elements
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        const elementAtCenter = document.elementFromPoint(centerX, centerY);
+        const isBlocked = elementAtCenter && !popupElement.contains(elementAtCenter);
+        
+        // Check for Confirm button
+        let confirmButtonFound = false;
+        let confirmButtonClickable = false;
+        if (popupElement.tagName === 'IFRAME') {
+          try {
+            const iframeDoc = (popupElement as HTMLIFrameElement).contentDocument || 
+                            (popupElement as HTMLIFrameElement).contentWindow?.document;
+            if (iframeDoc) {
+              const confirmButtons = iframeDoc.querySelectorAll('button, [role="button"], a[href]');
+              confirmButtonFound = confirmButtons.length > 0;
+              for (const btn of confirmButtons) {
+                const btnStyle = iframeDoc.defaultView?.getComputedStyle(btn as Element);
+                if (btnStyle && btnStyle.pointerEvents !== 'none' && btnStyle.display !== 'none') {
+                  confirmButtonClickable = true;
+                  break;
+                }
+              }
+            }
+          } catch (e) {
+            // Cross-origin iframe - can't access
+          }
+        } else {
+          const confirmButtons = popupElement.querySelectorAll('button, [role="button"], a[href]');
+          confirmButtonFound = confirmButtons.length > 0;
+          for (const btn of confirmButtons) {
+            const btnStyle = window.getComputedStyle(btn as Element);
+            if (btnStyle.pointerEvents !== 'none' && btnStyle.display !== 'none') {
+              confirmButtonClickable = true;
+              break;
+            }
+          }
+        }
+        
+        // Add issue if popup is blocked or button not clickable
+        if (isBlocked) {
+          addIssue({
+            id: 'wallet-popup-blocked',
+            title: '⚠️ Wallet Popup Blocked by Overlay',
+            status: 'error',
+            message: `Wallet popup is visible but blocked by another element at (${Math.round(centerX)}, ${Math.round(centerY)})`,
+            details: {
+              popupElement: popupElement.tagName,
+              popupZIndex: zIndex,
+              popupRect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
+              blockingElement: elementAtCenter?.tagName || 'unknown',
+              blockingElementClass: (elementAtCenter as Element)?.className || 'unknown',
+              popupPointerEvents: pointerEvents,
+              popupVisibility: visibility,
+              popupDisplay: display,
+              popupOpacity: opacity,
+            },
+          });
+        } else {
+          removeIssue('wallet-popup-blocked');
+        }
+        
+        if (confirmButtonFound && !confirmButtonClickable) {
+          addIssue({
+            id: 'wallet-popup-button-not-clickable',
+            title: '⚠️ Wallet Popup Button Not Clickable',
+            status: 'error',
+            message: 'Confirm button found in wallet popup but not clickable (pointer-events: none or display: none)',
+            details: {
+              popupElement: popupElement.tagName,
+              popupZIndex: zIndex,
+              popupPointerEvents: pointerEvents,
+            },
+          });
+        } else if (confirmButtonFound && confirmButtonClickable) {
+          removeIssue('wallet-popup-button-not-clickable');
+        }
+        
+        // Log popup status
+        const log: TransactionLog = {
+          id: `popup-${Date.now()}`,
+          type: 'wallet',
+          message: `Wallet popup detected: visible=${isVisible}, z-index=${zIndex}, blocked=${isBlocked}, buttonClickable=${confirmButtonClickable}`,
+          timestamp: new Date().toISOString(),
+          data: {
+            isVisible,
+            zIndex,
+            pointerEvents,
+            visibility,
+            display,
+            opacity,
+            rect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
+            isBlocked,
+            confirmButtonFound,
+            confirmButtonClickable,
+          },
+        };
+        logsRef.current.push(log);
+        if (logsRef.current.length > 100) logsRef.current.shift();
+        setTransactionLogs([...logsRef.current]);
+      } else {
+        removeIssue('wallet-popup-blocked');
+        removeIssue('wallet-popup-button-not-clickable');
+      }
+    };
+    
+    // Check immediately
+    checkWalletPopup();
+    
+    // Check every 500ms
+    popupCheckInterval = setInterval(checkWalletPopup, 500);
+    
+    // Also listen for DOM mutations to catch popup when it appears
+    const observer = new MutationObserver(() => {
+      checkWalletPopup();
+    });
+    
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['style', 'class'],
+    });
+    
+    return () => {
+      if (popupCheckInterval) clearInterval(popupCheckInterval);
+      observer.disconnect();
+    };
+  }, []);
+  
   // Intercept console.log for transaction monitoring
   // CRITICAL: This must run FIRST, before any other code
   useEffect(() => {
@@ -753,6 +948,16 @@ export function DebugPanel() {
       return [...prev, { ...issue, timestamp: new Date().toISOString() }];
     });
   };
+  
+  // Expose addIssue to window for wallet popup monitoring
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as any).__debugPanelAddIssue = addIssue;
+      return () => {
+        delete (window as any).__debugPanelAddIssue;
+      };
+    }
+  }, []);
 
   const removeIssue = (id: string) => {
     setIssues(prev => prev.filter(i => i.id !== id));
@@ -976,31 +1181,31 @@ ${transactionLogs.slice(-20).map(log => `[${log.type.toUpperCase()}] ${log.messa
           <div className="overflow-y-auto flex-1 p-4">
             {activeTab === 'issues' && (
               <div className="space-y-2">
-                {issues.length === 0 ? (
-                  <div className="text-center py-8">
-                    <p className="text-green-400 text-lg">✅</p>
-                    <p className="text-gray-400 text-sm mt-2">No issues detected</p>
-                  </div>
-                ) : (
-                  issues.map((issue) => (
-                    <div
-                      key={issue.id}
-                      className={`border-2 rounded-lg p-3 ${getStatusColor(issue.status)}`}
-                    >
-                      <div className="flex items-start gap-2">
-                        <span className="text-lg flex-shrink-0">{getStatusEmoji(issue.status)}</span>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-2">
-                            <h4 className="font-bold text-sm flex-1">{issue.title}</h4>
-                            <button
+            {issues.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-green-400 text-lg">✅</p>
+                <p className="text-gray-400 text-sm mt-2">No issues detected</p>
+              </div>
+            ) : (
+              issues.map((issue) => (
+                <div
+                  key={issue.id}
+                  className={`border-2 rounded-lg p-3 ${getStatusColor(issue.status)}`}
+                >
+                  <div className="flex items-start gap-2">
+                    <span className="text-lg flex-shrink-0">{getStatusEmoji(issue.status)}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <h4 className="font-bold text-sm flex-1">{issue.title}</h4>
+                        <button
                               onClick={() => copyToClipboard(`[${issue.status.toUpperCase()}] ${issue.title}\n${issue.message}\n${issue.details ? JSON.stringify(issue.details, null, 2) : ''}\nTime: ${new Date(issue.timestamp).toLocaleString()}`)}
-                              className="text-xs opacity-60 hover:opacity-100 flex-shrink-0"
-                              title="Copy this issue"
-                            >
-                              📋
-                            </button>
-                          </div>
-                          <p className="text-xs mt-1 opacity-90 break-words">{issue.message}</p>
+                          className="text-xs opacity-60 hover:opacity-100 flex-shrink-0"
+                          title="Copy this issue"
+                        >
+                          📋
+                        </button>
+                      </div>
+                      <p className="text-xs mt-1 opacity-90 break-words">{issue.message}</p>
                           {issue.details && (
                             <details className="mt-2">
                               <summary className="text-xs opacity-60 cursor-pointer">Details</summary>
@@ -1009,13 +1214,13 @@ ${transactionLogs.slice(-20).map(log => `[${log.type.toUpperCase()}] ${log.messa
                               </pre>
                             </details>
                           )}
-                          <p className="text-xs mt-1 opacity-60">
-                            {new Date(issue.timestamp).toLocaleTimeString()}
-                          </p>
-                        </div>
-                      </div>
+                      <p className="text-xs mt-1 opacity-60">
+                        {new Date(issue.timestamp).toLocaleTimeString()}
+                      </p>
                     </div>
-                  ))
+                  </div>
+                </div>
+              ))
                 )}
               </div>
             )}
