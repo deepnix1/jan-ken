@@ -750,7 +750,6 @@ export default function Home() {
           
           {/* Debug Panel - Always visible for mobile debugging */}
           <DebugPanel />
-          </div>
           </>
   );
 }
