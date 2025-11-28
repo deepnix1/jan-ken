@@ -155,35 +155,33 @@ export default function Home() {
     };
   }, []); // Remove appReady dependency to avoid re-running
 
-  // Auto-connect wallet when app is ready (Farcaster Mini App)
+  // Per Farcaster docs: https://miniapps.farcaster.xyz/docs/guides/wallets
+  // "If a user already has a connected wallet the connector will automatically connect to it (e.g. isConnected will be true)"
+  // The connector automatically connects, no manual connect() call needed
+  // We just log the connection status for debugging
   useEffect(() => {
-    if (!appReady || isConnected || isPending) return;
+    if (typeof window === 'undefined') return;
     
-    console.log('🔄 Auto-connecting wallet in Farcaster Mini App...');
-    console.log('Connectors available:', connectors.map(c => c.name));
-    
-    // Auto-connect with Farcaster connector
-    const farcasterConnector = connectors.find(c => 
-      c.name === 'Farcaster Mini App' || 
-      c.name?.includes('Farcaster')
-    );
-    
-    if (farcasterConnector) {
-      console.log('✅ Found Farcaster connector, auto-connecting...');
-      setIsConnecting(true);
-      connect({ connector: farcasterConnector });
-      
-      // Hide loading after attempt
-      setTimeout(() => {
-        setIsConnecting(false);
-      }, 3000);
+    if (isConnected) {
+      console.log('✅ Wallet connected automatically via Farcaster connector');
+      console.log('Address:', address);
     } else {
-      console.warn('⚠️ Farcaster connector not found');
-      console.log('Available connectors:', connectors);
-      console.log('ℹ️ This is normal if running in a regular web browser (not Farcaster Mini App)');
-      console.log('ℹ️ User can manually connect with MetaMask or other available connectors');
+      console.log('ℹ️ Wallet not connected yet - connector will auto-connect if available');
+      console.log('Available connectors:', connectors.map(c => c.name));
+      
+      // In Farcaster Mini App, connector should auto-connect
+      // In regular web browser, user needs to manually connect
+      const farcasterConnector = connectors.find(c => 
+        c.name === 'Farcaster Mini App' || 
+        c.name?.includes('Farcaster')
+      );
+      
+      if (!farcasterConnector) {
+        console.log('ℹ️ Farcaster connector not found - this is normal in regular web browser');
+        console.log('ℹ️ User can manually connect with MetaMask or other available connectors');
+      }
     }
-  }, [appReady, isConnected, isPending, connectors, connect]);
+  }, [isConnected, address, connectors]);
 
   useEffect(() => {
     if (!isConnected) {
@@ -354,6 +352,9 @@ export default function Home() {
     previousAddressRef.current = address;
   }, [address]);
 
+  // Per Farcaster docs: https://miniapps.farcaster.xyz/docs/guides/wallets
+  // "If a user already has a connected wallet the connector will automatically connect to it"
+  // For manual connection (e.g., in regular web browser), use connect() with the connector
   const handleConnect = () => {
     if (connectors.length === 0) {
       console.error('No connectors available');
@@ -363,18 +364,22 @@ export default function Home() {
     
     setIsConnecting(true); // Show loading screen
     
-    // Per Farcaster docs: In Mini Apps, connector automatically connects if user has wallet
-    // Try Farcaster Mini App connector first (it should be first in array)
-    const farcasterConnector = connectors.find(c => c.name === 'Farcaster Mini App' || c.name?.includes('Farcaster'));
+    // Per Farcaster docs: connect({ connector: connectors[0] })
+    // In Farcaster Mini App, Farcaster connector should be first
+    // In regular web browser, MetaMask or other connectors will be available
+    const farcasterConnector = connectors.find(c => 
+      c.name === 'Farcaster Mini App' || 
+      c.name?.includes('Farcaster')
+    );
     const connector = farcasterConnector || connectors[0];
     
-    // Per Farcaster docs: connect({ connector: connectors[0] })
+    console.log('🔄 Connecting with connector:', connector.name);
     connect({ connector });
     
     // Hide loading after attempt (success or fail will be handled by useEffect)
     setTimeout(() => {
       setIsConnecting(false);
-    }, 2000);
+    }, 3000);
   };
 
   const handleBetSelect = (betAmount: bigint) => {
