@@ -140,36 +140,72 @@ export function RootProvider({ children }: { children: ReactNode }) {
     }
   }, [mounted, sdkReady]);
 
-  // Analytics hatasını önlemek için console.error'ı suppress et
+  // Suppress harmless console errors and warnings (Analytics SDK, Farcaster origin checks, etc.)
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const originalError = console.error;
+      const originalWarn = console.warn;
+      
+      // Helper function to check if a message should be suppressed
+      const shouldSuppress = (arg: unknown): boolean => {
+        if (typeof arg === 'string') {
+          return (
+            arg.includes('Analytics SDK') || 
+            arg.includes('Failed to fetch') ||
+            arg.includes('origins don\'t match') || // Farcaster SDK origin check in web browser
+            arg.includes('wallet.farcaster.xyz') ||
+            arg.includes('privy.farcaster.xyz')
+          );
+        }
+        if (arg && typeof arg === 'object') {
+          // Check message property
+          if ('message' in arg && typeof arg.message === 'string') {
+            return (
+              arg.message.includes('Analytics SDK') || 
+              arg.message.includes('Failed to fetch') ||
+              arg.message.includes('origins don\'t match') ||
+              arg.message.includes('wallet.farcaster.xyz') ||
+              arg.message.includes('privy.farcaster.xyz')
+            );
+          }
+          // Check toString() result
+          try {
+            const str = String(arg);
+            return (
+              str.includes('origins don\'t match') ||
+              str.includes('wallet.farcaster.xyz') ||
+              str.includes('privy.farcaster.xyz')
+            );
+          } catch {
+            // Ignore toString errors
+          }
+        }
+        return false;
+      };
+      
+      // Suppress console.error for harmless errors
       console.error = (...args: unknown[]) => {
-        const firstArg = args[0];
-        // Suppress known harmless errors
-        if (
-          (typeof firstArg === 'string' && (
-            firstArg.includes('Analytics SDK') || 
-            firstArg.includes('Failed to fetch') ||
-            firstArg.includes('origins don\'t match') || // Farcaster SDK origin check in web browser
-            firstArg.includes('origins don\'t match https://wallet.farcaster.xyz') || // Farcaster wallet extension
-            firstArg.includes('origins don\'t match https://privy.farcaster.xyz') // Farcaster wallet extension
-          )) ||
-          (firstArg && typeof firstArg === 'object' && 'message' in firstArg && typeof firstArg.message === 'string' && (
-            firstArg.message.includes('Analytics SDK') || 
-            firstArg.message.includes('Failed to fetch') ||
-            firstArg.message.includes('origins don\'t match') ||
-            firstArg.message.includes('origins don\'t match https://wallet.farcaster.xyz') ||
-            firstArg.message.includes('origins don\'t match https://privy.farcaster.xyz')
-          ))
-        ) {
+        // Check all arguments, not just the first one
+        const shouldIgnore = args.some(arg => shouldSuppress(arg));
+        if (shouldIgnore) {
           return; // Ignore harmless errors
         }
         originalError.apply(console, args);
       };
       
+      // Suppress console.warn for harmless warnings
+      console.warn = (...args: unknown[]) => {
+        // Check all arguments, not just the first one
+        const shouldIgnore = args.some(arg => shouldSuppress(arg));
+        if (shouldIgnore) {
+          return; // Ignore harmless warnings
+        }
+        originalWarn.apply(console, args);
+      };
+      
       return () => {
         console.error = originalError;
+        console.warn = originalWarn;
       };
     }
   }, []);
