@@ -63,11 +63,15 @@ export function RootProvider({ children }: { children: ReactNode }) {
     }
     
     // Add MetaMask connector if available (for PC/browser testing)
+    // CRITICAL: MetaMask should be added AFTER Farcaster connector
+    // In Farcaster Mini App, Farcaster connector will be used
+    // In regular web browser, user can choose MetaMask
     if (metaMaskConnector) {
       try {
         const mmConnector = metaMaskConnector();
         if (typeof mmConnector === 'function') {
           connectors.push(mmConnector);
+          console.log('✅ MetaMask connector added for PC/web browser support');
         }
       } catch (error) {
         console.log('Error adding MetaMask connector:', error);

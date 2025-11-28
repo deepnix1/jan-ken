@@ -384,16 +384,36 @@ export default function Home() {
     
     setIsConnecting(true); // Show loading screen
     
-    // Per Farcaster docs: connect({ connector: connectors[0] })
-    // In Farcaster Mini App, Farcaster connector should be first
-    // In regular web browser, MetaMask or other connectors will be available
-    const farcasterConnector = connectors.find(c => 
-      c.name === 'Farcaster Mini App' || 
-      c.name?.includes('Farcaster')
-    );
-    const connector = farcasterConnector || connectors[0];
+    // CRITICAL: Choose connector based on environment
+    // - Mobile (Farcaster Mini App): Use Farcaster connector
+    // - PC (Web Browser): Prefer MetaMask if available, otherwise Farcaster
+    let connector;
+    
+    if (isFarcasterEnv) {
+      // In Farcaster Mini App, always use Farcaster connector
+      const farcasterConnector = connectors.find(c => 
+        c.name === 'Farcaster Mini App' || 
+        c.name?.includes('Farcaster')
+      );
+      connector = farcasterConnector || connectors[0];
+      console.log('📱 Farcaster Mini App detected - using Farcaster connector');
+    } else {
+      // In regular web browser, prefer MetaMask if available
+      const metaMaskConnector = connectors.find(c => 
+        c.name === 'MetaMask' || 
+        c.name?.includes('MetaMask')
+      );
+      const farcasterConnector = connectors.find(c => 
+        c.name === 'Farcaster Mini App' || 
+        c.name?.includes('Farcaster')
+      );
+      // Prefer MetaMask, fallback to Farcaster, then first available
+      connector = metaMaskConnector || farcasterConnector || connectors[0];
+      console.log('💻 Web browser detected - using connector:', connector.name);
+    }
     
     console.log('🔄 Connecting with connector:', connector.name);
+    console.log('📋 Available connectors:', connectors.map(c => c.name));
     connect({ connector });
     
     // Hide loading after attempt (success or fail will be handled by useEffect)
