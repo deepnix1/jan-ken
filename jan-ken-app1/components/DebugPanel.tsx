@@ -170,6 +170,67 @@ export function DebugPanel() {
           });
         }
         
+        // CRITICAL: Detect last_seen update failures in logs
+        if (logStr.includes('Could not update last_seen') || logStr.includes('CRITICAL: Could not update last_seen') || logStr.includes('CRITICAL ERROR updating last_seen')) {
+          addIssue({
+            id: 'last-seen-update-failed',
+            title: '⚠️ CRITICAL: last_seen Update Failed',
+            status: 'error',
+            message: 'Player will be excluded from matching - app may be considered inactive',
+            details: { 
+              step, 
+              data: args.length > 1 ? args.slice(1) : undefined,
+              issue: 'last_seen_update_failure',
+              severity: 'critical',
+              impact: 'player_excluded_from_matching',
+            },
+          });
+        }
+        
+        // CRITICAL: Detect inactive players (last_seen > 30 seconds)
+        if (logStr.includes('Found players with active last_seen') || logStr.includes('seconds_ago')) {
+          // Try to extract seconds_ago from log data
+          try {
+            const logData = args.length > 1 ? args[1] : null;
+            if (logData && typeof logData === 'object') {
+              const players = (logData as any)?.players || [];
+              for (const player of players) {
+                if (player.seconds_ago && player.seconds_ago > 30) {
+                  addIssue({
+                    id: `inactive-player-${Date.now()}-${Math.random()}`,
+                    title: '⚠️ Inactive Player Detected',
+                    status: 'error',
+                    message: `Player with last_seen ${player.seconds_ago}s ago (threshold: 30s) - app may be closed`,
+                    details: {
+                      address: player.address,
+                      seconds_ago: player.seconds_ago,
+                      threshold: 30,
+                      severity: 'critical',
+                      issue: 'inactive_player_in_queue',
+                    },
+                  });
+                }
+              }
+            }
+          } catch (err) {
+            // Ignore parsing errors
+          }
+        }
+        
+        // CRITICAL: Detect app hidden but player still in queue
+        if (logStr.includes('App is hidden - not updating last_seen')) {
+          addIssue({
+            id: 'app-hidden-no-update',
+            title: '⚠️ App Hidden - last_seen Not Updated',
+            status: 'warning',
+            message: 'App is hidden - last_seen will not be updated. Player will be excluded from matching soon.',
+            details: {
+              issue: 'app_hidden',
+              impact: 'player_will_be_excluded',
+            },
+          });
+        }
+        
         // Create issues for important matchmaking events
         if (logStr.includes('[tryMatch] ⚠️') || logStr.includes('[tryMatch] ❌')) {
           addIssue({
