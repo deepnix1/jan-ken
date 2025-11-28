@@ -414,28 +414,55 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
         args: finalParams.args ? finalParams.args.map((a: any) => a.toString()) : txParams.args,
       }, null, 2));
       
+      // CRITICAL: Verify writeContract is actually a function before calling
+      if (typeof writeContract !== 'function') {
+        const error = new Error('writeContract is not a function');
+        console.error('[GameBoard] ❌❌❌ CRITICAL: writeContract is not a function!', {
+          type: typeof writeContract,
+          value: writeContract,
+        });
+        throw error;
+      }
+      
       try {
         // CRITICAL: Call writeContract - it should trigger the mutation
+        // In Wagmi v3, writeContract is a mutation trigger function
         writeContract(finalParams);
         console.log('✅ [GameBoard] writeContract CALLED! (no error thrown)');
         
-        // CRITICAL: Wait a bit for status to update
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // CRITICAL: Wait a bit for status to update (Wagmi updates state asynchronously)
+        await new Promise(resolve => setTimeout(resolve, 300));
         
-        console.log('📊 Status after 100ms:', status);
-        console.log('📊 isPending after 100ms:', isPending);
+        console.log('📊 Status after 300ms:', status);
+        console.log('📊 isPending after 300ms:', isPending);
+        console.log('📊 Hash after 300ms:', hash || 'NOT RECEIVED');
         console.log('⏰ Called at:', new Date().toISOString());
         
         // CRITICAL: If status is still idle after calling, there might be an issue
-        if (status === 'idle' && !isPending) {
-          console.warn('[GameBoard] ⚠️ Status is still idle after writeContract call - transaction may not have started');
-          console.warn('[GameBoard] ⚠️ This could mean:');
-          console.warn('[GameBoard] ⚠️ 1. writeContract function is not working');
-          console.warn('[GameBoard] ⚠️ 2. Wallet connector is not ready');
-          console.warn('[GameBoard] ⚠️ 3. Transaction parameters are invalid');
+        if (status === 'idle' && !isPending && !hash) {
+          console.error('[GameBoard] ❌❌❌ CRITICAL: Status is still idle after writeContract call!');
+          console.error('[GameBoard] ❌ Transaction did not start. Possible causes:');
+          console.error('[GameBoard] ❌ 1. writeContract mutation is not properly configured');
+          console.error('[GameBoard] ❌ 2. Wallet connector is not ready or not connected');
+          console.error('[GameBoard] ❌ 3. Transaction parameters are invalid');
+          console.error('[GameBoard] ❌ 4. Network mismatch (wrong chain)');
+          console.error('[GameBoard] ❌ 5. Contract address or ABI issue');
+          
+          // Show user-friendly error
+          setTxError('Transaction failed to start. Please check your wallet connection and try again.');
+          setSelectedChoice(null);
+          setTxStartTime(null);
+          alert('Transaction failed to start. Please check your wallet connection and network settings.');
+          return;
         }
       } catch (writeError: any) {
         console.error('❌ [GameBoard] ERROR calling writeContract:', writeError);
+        console.error('[GameBoard] Error details:', {
+          message: writeError?.message,
+          name: writeError?.name,
+          code: (writeError as any)?.code,
+          shortMessage: (writeError as any)?.shortMessage,
+        });
         throw writeError;
       }
     } catch (error: any) {
