@@ -414,6 +414,7 @@ export default function Home() {
   };
 
   const handleMatchFound = (id: string, p1Address?: string, p2Address?: string) => {
+    console.log('[Home] 🎮 handleMatchFound called:', { id, p1Address, p2Address });
     setPlayer1Address(p1Address);
     setPlayer2Address(p2Address);
     setGameId(id); // Set gameId immediately

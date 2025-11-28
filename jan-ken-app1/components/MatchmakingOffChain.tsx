@@ -164,16 +164,18 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
       try {
         const match = await checkForMatch(address);
         if (match) {
-          console.log('[Matchmaking] ✅ MATCH FOUND!', JSON.stringify({
+          console.log('[Matchmaking] ✅✅✅ MATCH FOUND! ✅✅✅', JSON.stringify({
             gameId: match.gameId,
             player1: match.player1Address.slice(0, 10) + '...',
             player2: match.player2Address.slice(0, 10) + '...',
             betLevel: match.betLevel,
-          }))
+          }, null, 2))
+          
+          // CRITICAL: Stop all polling immediately
           setIsMatching(false);
           setHasJoinedQueue(false);
           
-          // Clear intervals
+          // Clear intervals immediately
           if (matchCheckIntervalRef.current) {
             clearInterval(matchCheckIntervalRef.current);
             matchCheckIntervalRef.current = null;
@@ -183,8 +185,12 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
             queueCountIntervalRef.current = null;
           }
           
-          // Call onMatchFound
-          onMatchFound(match.gameId, match.player1Address, match.player2Address);
+          // CRITICAL: Call onMatchFound with a small delay to ensure state is updated
+          console.log('[Matchmaking] 🎯 Calling onMatchFound callback...')
+          setTimeout(() => {
+            onMatchFound(match.gameId, match.player1Address, match.player2Address);
+            console.log('[Matchmaking] ✅ onMatchFound callback called')
+          }, 100);
         } else {
           console.log('[Matchmaking] ⚠️ No match found in this polling cycle')
         }
@@ -193,7 +199,7 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
           error: err?.message || String(err),
           name: err?.name,
           stack: err?.stack?.split('\n').slice(0, 3).join('\n'),
-        }))
+        }, null, 2))
       }
     };
     

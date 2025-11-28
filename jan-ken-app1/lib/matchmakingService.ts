@@ -707,15 +707,26 @@ export async function checkForMatch(playerAddress: Address): Promise<MatchResult
         console.log('[checkForMatch] 🚀 Calling tryMatch for betLevel', queueStatus.bet_level)
         const matchResult = await tryMatch(queueStatus.bet_level)
         if (matchResult) {
-          // Match was created, now check if we're the matched player
-          // The match will be picked up in the next check
-          console.log('[checkForMatch] ✅ Match created, will be picked up in next check')
-          console.log('[checkForMatch] 📊 Match details:', JSON.stringify({
+          // CRITICAL: Match was created - check if we're one of the matched players
+          console.log('[checkForMatch] ✅ Match created!', JSON.stringify({
             gameId: matchResult.gameId,
             player1: matchResult.player1Address.slice(0, 10) + '...',
             player2: matchResult.player2Address.slice(0, 10) + '...',
             betLevel: matchResult.betLevel,
+            currentPlayer: playerAddress.slice(0, 10) + '...',
           }))
+          
+          // CRITICAL: If we're one of the matched players, return the match immediately
+          const isPlayer1 = matchResult.player1Address.toLowerCase() === playerAddress.toLowerCase()
+          const isPlayer2 = matchResult.player2Address.toLowerCase() === playerAddress.toLowerCase()
+          
+          if (isPlayer1 || isPlayer2) {
+            console.log('[checkForMatch] ✅✅✅ WE ARE MATCHED! Returning match immediately!')
+            return matchResult
+          } else {
+            console.log('[checkForMatch] ⚠️ Match created but we are not one of the players')
+            // Continue to check if we're already matched in queue
+          }
         } else {
           console.log('[checkForMatch] ⚠️ tryMatch returned null (no match found or error occurred)')
         }
