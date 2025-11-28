@@ -379,11 +379,13 @@ export async function tryMatch(betLevel: number): Promise<MatchResult | null> {
     console.log('[tryMatch] 🔍 Step 1: Finding waiting players for betLevel', betLevel)
     
     // CRITICAL: First get all unique waiting players for this bet level
+    // Only include players who were active in the last 30 seconds (app is open)
     const { data: allPlayers, error: allPlayersError } = await supabase
       .from('matchmaking_queue')
-      .select('id, player_address, status, bet_level, created_at, player_fid, bet_amount')
+      .select('id, player_address, status, bet_level, created_at, player_fid, bet_amount, last_seen')
       .eq('bet_level', betLevel)
       .eq('status', 'waiting')
+      .gte('last_seen', new Date(Date.now() - 30000).toISOString()) // Active in last 30 seconds
       .order('created_at', { ascending: true })
     
     if (allPlayersError) {

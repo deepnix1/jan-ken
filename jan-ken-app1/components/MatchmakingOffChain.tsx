@@ -6,6 +6,7 @@ import { formatEther } from 'viem';
 import { getBetLevelFromAmount } from '@/lib/contract';
 import { isValidBetAmount, isValidAddress } from '@/lib/security';
 import { joinQueue, checkForMatch, leaveQueue, getQueueCount, MatchResult } from '@/lib/matchmakingService';
+import { supabase } from '@/lib/supabase';
 import { getFarcasterProfileByAddress } from '@/lib/farcasterProfile';
 
 interface MatchmakingProps {
