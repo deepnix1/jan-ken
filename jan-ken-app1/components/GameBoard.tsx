@@ -29,7 +29,22 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
   const [player2Profile, setPlayer2Profile] = useState<{ pfpUrl: string | null; username: string | null } | null>(null);
   const [txError, setTxError] = useState<string | null>(null);
 
-  const { data: hash, writeContract, isPending, error: writeError, reset: resetWriteContract, status } = useWriteContract();
+  const { data: hash, writeContract, isPending, error: writeError, reset: resetWriteContract, status } = useWriteContract({
+    mutation: {
+      onSuccess: (hash) => {
+        console.log('[GameBoard] ✅✅✅ TRANSACTION HASH RECEIVED IN onSuccess! ✅✅✅', hash);
+        setTxStartTime(null);
+      },
+      onError: (error) => {
+        console.error('[GameBoard] ❌❌❌ TRANSACTION ERROR IN onError! ❌❌❌', error);
+        setSelectedChoice(null);
+        setTxStartTime(null);
+      },
+      onSettled: (data, error) => {
+        console.log('[GameBoard] 📊 Transaction settled:', { hash: data, error: error?.message });
+      },
+    },
+  });
   const [txStartTime, setTxStartTime] = useState<number | null>(null);
   
   // Debug logging for connector client - ENHANCED VISIBILITY
@@ -68,16 +83,25 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
     },
   });
   
-  // Monitor status changes and hash
+  // Monitor status changes and hash - ENHANCED LOGGING
   useEffect(() => {
-    console.log('📊 GameBoard transaction status:', {
-      status,
-      isPending,
-      hash,
-      hasError: !!writeError,
-      selectedChoice,
-      timestamp: new Date().toISOString(),
-    });
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('📊 [GameBoard] Transaction Status Update');
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('Status:', status);
+    console.log('isPending:', isPending);
+    console.log('Hash:', hash || 'NOT RECEIVED YET');
+    console.log('Has Error:', !!writeError);
+    console.log('Error Message:', writeError?.message || 'none');
+    console.log('Selected Choice:', selectedChoice);
+    console.log('Timestamp:', new Date().toISOString());
+    console.log('═══════════════════════════════════════════════════════════');
+
+    // CRITICAL: If hash received, log it prominently
+    if (hash) {
+      console.log('🎉🎉🎉 TRANSACTION HASH RECEIVED! 🎉🎉🎉', hash);
+      setTxStartTime(null);
+    }
 
     // If status is 'success' but no hash yet, wait a bit
     if (status === 'success' && !hash) {
@@ -88,6 +112,7 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
     if (status === 'error' && !writeError && selectedChoice) {
       console.error('❌ Transaction status is error but no writeError');
       setSelectedChoice(null);
+      setTxStartTime(null);
       alert('Transaction failed. Please try again.');
     }
   }, [status, isPending, hash, writeError, selectedChoice]);
@@ -307,41 +332,64 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
       console.log('⏰ Calling at:', new Date().toISOString());
       console.log('═══════════════════════════════════════════════════════════');
       
-      // Call writeContract - this MUST trigger wallet popup
+      // CRITICAL: Call writeContract - this MUST trigger wallet popup
       // In Wagmi v3, writeContract returns void but triggers the mutation
-      writeContract(finalParams);
+      console.log('═══════════════════════════════════════════════════════════');
+      console.log('🚀 [GameBoard] CALLING writeContract NOW!');
+      console.log('═══════════════════════════════════════════════════════════');
+      console.log('Final params:', JSON.stringify({
+        address: finalParams.address || txParams.address,
+        functionName: finalParams.functionName || txParams.functionName,
+        args: finalParams.args ? finalParams.args.map((a: any) => a.toString()) : txParams.args,
+      }, null, 2));
+      console.log('Connector client ready:', !!connectorClient);
+      console.log('Farcaster provider ready:', !!farcasterProvider);
+      console.log('Timestamp:', new Date().toISOString());
+      console.log('═══════════════════════════════════════════════════════════');
       
-      console.log('✅ [GameBoard] writeContract CALLED!');
+      try {
+        writeContract(finalParams);
+        console.log('✅ [GameBoard] writeContract CALLED! (no error thrown)');
+      } catch (writeError: any) {
+        console.error('❌ [GameBoard] ERROR calling writeContract:', writeError);
+        throw writeError;
+      }
+      
       console.log('📊 Status immediately after call:', status);
       console.log('📊 isPending immediately after call:', isPending);
       console.log('⏰ Called at:', new Date().toISOString());
       
-      // Monitor status changes to detect if wallet popup appeared
+      // CRITICAL: Monitor status changes to detect if wallet popup appeared and hash received
+      let checkCount = 0;
+      const maxChecks = 50; // 10 seconds (50 * 200ms)
       const statusCheckInterval = setInterval(() => {
-        console.log('[GameBoard] 📊 Status check:', {
+        checkCount++;
+        console.log(`[GameBoard] 📊 Status check #${checkCount}:`, {
           status,
           isPending,
           hasHash: !!hash,
+          hashValue: hash || 'NOT RECEIVED',
           timestamp: new Date().toISOString(),
         });
         
         // If status changed to pending, wallet popup likely appeared
         if (status === 'pending' || isPending) {
           console.log('[GameBoard] ✅ Transaction status is pending - wallet popup should be visible');
-          clearInterval(statusCheckInterval);
         }
         
-        // If we have a hash, transaction was sent
+        // CRITICAL: If we have a hash, transaction was sent
         if (hash) {
-          console.log('[GameBoard] ✅ Transaction hash received:', hash);
+          console.log('🎉🎉🎉 [GameBoard] ✅✅✅ TRANSACTION HASH RECEIVED! ✅✅✅', hash);
+          clearInterval(statusCheckInterval);
+          setTxStartTime(null);
+        }
+        
+        // Stop checking after max attempts
+        if (checkCount >= maxChecks) {
+          console.warn('[GameBoard] ⚠️ Status check timeout - stopping monitoring');
           clearInterval(statusCheckInterval);
         }
       }, 200);
-      
-      // Clear interval after 10 seconds
-      setTimeout(() => {
-        clearInterval(statusCheckInterval);
-      }, 10000);
       
       console.log('[GameBoard] ⏳ Waiting for wallet popup and transaction hash...');
     } catch (error: any) {
