@@ -343,64 +343,108 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
     };
   }, [isConnected, hasJoinedQueue, betLevel]);
   
-  // Cleanup on unmount - CRITICAL: Leave queue when component unmounts or app closes
+  // CRITICAL: Cleanup - Leave queue when component unmounts, visibility changes, or wallet disconnects
   useEffect(() => {
+    if (!isConnected || !address) {
+      // If wallet disconnected, leave queue immediately
+      if (hasJoinedQueue) {
+        console.log('[Matchmaking] 🚪 Wallet disconnected - leaving queue immediately', JSON.stringify({
+          address: address?.slice(0, 10) + '...',
+          isConnected,
+        }, null, 2));
+        leaveQueue(address || '' as any).catch(err => {
+          console.error('[Matchmaking] ❌ Error leaving queue on disconnect:', err);
+        });
+        setHasJoinedQueue(false);
+        setIsMatching(false);
+      }
+      return;
+    }
+    
     // Function to leave queue
     const cleanup = async () => {
       if (address && hasJoinedQueue) {
         try {
-          console.log('[Matchmaking] 🧹 Cleanup: Leaving queue on unmount/app close')
-          await leaveQueue(address)
-          setHasJoinedQueue(false)
-        } catch (err) {
-          console.error('[Matchmaking] Error leaving queue on cleanup:', err)
+          console.log('[Matchmaking] 🧹 Cleanup: Leaving queue', JSON.stringify({
+            address: address.slice(0, 10) + '...',
+            reason: 'cleanup',
+          }, null, 2));
+          await leaveQueue(address);
+          setHasJoinedQueue(false);
+          setIsMatching(false);
+          console.log('[Matchmaking] ✅ Successfully left queue on cleanup');
+        } catch (err: any) {
+          console.error('[Matchmaking] ❌ Error leaving queue on cleanup:', JSON.stringify({
+            error: err?.message || String(err),
+            name: err?.name,
+          }, null, 2));
         }
       }
       
       // Clear intervals
       if (matchCheckIntervalRef.current) {
-        clearInterval(matchCheckIntervalRef.current)
-        matchCheckIntervalRef.current = null
+        clearInterval(matchCheckIntervalRef.current);
+        matchCheckIntervalRef.current = null;
       }
       if (queueCountIntervalRef.current) {
-        clearInterval(queueCountIntervalRef.current)
-        queueCountIntervalRef.current = null
+        clearInterval(queueCountIntervalRef.current);
+        queueCountIntervalRef.current = null;
       }
-    }
+    };
 
-    // Handle page visibility change (app closed/minimized)
+    // CRITICAL: Leave queue on visibility change (tab hidden/closed/background)
     const handleVisibilityChange = () => {
       if (document.hidden && hasJoinedQueue) {
-        console.log('[Matchmaking] 👁️ Page hidden, leaving queue')
-        cleanup()
+        console.log('[Matchmaking] 👁️ Tab hidden/closed - leaving queue', JSON.stringify({
+          address: address?.slice(0, 10) + '...',
+          hidden: document.hidden,
+        }, null, 2));
+        cleanup();
       }
-    }
+    };
 
-    // Handle beforeunload (browser/tab close)
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+    // CRITICAL: Leave queue on beforeunload (page close/navigation)
+    const handleBeforeUnload = () => {
       if (hasJoinedQueue && address) {
-        console.log('[Matchmaking] 🚪 Before unload, leaving queue')
-        // Use sendBeacon for reliable cleanup on page close
-        const data = JSON.stringify({ playerAddress: address })
-        const blob = new Blob([data], { type: 'application/json' })
-        
+        console.log('[Matchmaking] 🚪 Page unloading - leaving queue', JSON.stringify({
+          address: address.slice(0, 10) + '...',
+        }, null, 2));
+        // Use sendBeacon for reliable cleanup
         if (navigator.sendBeacon) {
-          navigator.sendBeacon('/api/match/leave', blob)
+          try {
+            const data = JSON.stringify({ playerAddress: address });
+            const blob = new Blob([data], { type: 'application/json' });
+            navigator.sendBeacon('/api/match/leave', blob);
+          } catch (err) {
+            console.error('[Matchmaking] ❌ Error sending beacon:', err);
+          }
         } else {
           // Fallback: sync fetch with keepalive
           fetch('/api/match/leave', {
             method: 'POST',
-            body: data,
+            body: JSON.stringify({ playerAddress: address }),
             headers: { 'Content-Type': 'application/json' },
             keepalive: true,
-          }).catch(() => {})
+          }).catch(() => {});
         }
+        cleanup();
       }
-    }
-
+    };
+    
+    // CRITICAL: Monitor wallet connection status
+    const checkWalletConnection = () => {
+      if (!isConnected || !address) {
+        console.log('[Matchmaking] ⚠️ Wallet disconnected - leaving queue');
+        cleanup();
+      }
+    };
+    
     // Add event listeners
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-    window.addEventListener('beforeunload', handleBeforeUnload)
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    // Check wallet connection periodically (every 2 seconds)
+    const walletCheckInterval = setInterval(checkWalletConnection, 2000);
 
     // Cleanup on unmount
     return () => {

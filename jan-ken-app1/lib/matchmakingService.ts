@@ -61,6 +61,18 @@ export async function joinQueue(params: JoinQueueParams): Promise<string> {
   const { playerAddress, playerFid, betLevel, betAmount } = params
 
   try {
+    // CRITICAL: Check if app is visible (client-side only)
+    if (typeof document !== 'undefined' && document.hidden) {
+      console.error('[joinQueue] ❌ App is hidden - cannot join queue')
+      throw new Error('App must be visible to join queue')
+    }
+    
+    // CRITICAL: Check if window is available (client-side only)
+    if (typeof window === 'undefined') {
+      console.error('[joinQueue] ❌ Window not available - cannot join queue')
+      throw new Error('Window not available - cannot join queue')
+    }
+    
     // CRITICAL: Validate bet amount before proceeding
     if (!betAmount || betAmount === BigInt(0)) {
       throw new Error('Bet amount is required. Please select a bet amount before joining the queue.')
