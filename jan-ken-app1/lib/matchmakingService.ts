@@ -367,25 +367,49 @@ export async function tryMatch(betLevel: number): Promise<MatchResult | null> {
       return null
     }
 
-    console.log('[tryMatch] 📊 Found players:', {
+    console.log('[tryMatch] 📊 Found players:', JSON.stringify({
       count: players?.length || 0,
       betLevel,
       players: players?.map(p => ({
         id: p.id,
         address: p.player_address?.slice(0, 10) + '...',
+        fullAddress: p.player_address, // Log full address for debugging
         status: p.status,
         created_at: p.created_at,
+        bet_level: p.bet_level,
       })) || [],
-    })
+    }, null, 2))
 
+    // CRITICAL: Must have exactly 2 players
     if (!players || players.length < 2) {
-      console.log('[tryMatch] ⚠️ Not enough players:', {
+      console.log('[tryMatch] ⚠️ Not enough players:', JSON.stringify({
         found: players?.length || 0,
         required: 2,
         betLevel,
-      })
+        players: players?.map(p => ({
+          id: p.id,
+          address: p.player_address,
+          status: p.status,
+        })) || [],
+      }, null, 2))
       releaseLock(betLevel)
       return null // Not enough players
+    }
+
+    // CRITICAL: Must have exactly 2 players, not more
+    if (players.length > 2) {
+      console.error('[tryMatch] ⚠️ Too many players found:', JSON.stringify({
+        found: players.length,
+        required: 2,
+        betLevel,
+        players: players.map(p => ({
+          id: p.id,
+          address: p.player_address,
+          status: p.status,
+        })),
+      }, null, 2))
+      releaseLock(betLevel)
+      return null
     }
 
     const player1 = players[0]
@@ -393,23 +417,44 @@ export async function tryMatch(betLevel: number): Promise<MatchResult | null> {
     
     // CRITICAL: Verify player addresses are valid and not the same
     if (!player1.player_address || !player2.player_address) {
-      console.error('[tryMatch] ⚠️ Invalid player addresses')
+      console.error('[tryMatch] ⚠️ Invalid player addresses:', JSON.stringify({
+        player1_address: player1.player_address,
+        player2_address: player2.player_address,
+      }, null, 2))
       releaseLock(betLevel)
       return null
     }
     
-    if (player1.player_address.toLowerCase() === player2.player_address.toLowerCase()) {
-      console.error('[tryMatch] ⚠️ Cannot match player with themselves')
+    // CRITICAL: Verify addresses are different (case-insensitive)
+    const addr1 = player1.player_address.toLowerCase().trim()
+    const addr2 = player2.player_address.toLowerCase().trim()
+    
+    if (addr1 === addr2 || addr1 === '' || addr2 === '') {
+      console.error('[tryMatch] ⚠️ Cannot match player with themselves or invalid addresses:', JSON.stringify({
+        player1_address: player1.player_address,
+        player2_address: player2.player_address,
+        normalized1: addr1,
+        normalized2: addr2,
+        areEqual: addr1 === addr2,
+      }, null, 2))
       releaseLock(betLevel)
       return null
     }
+    
+    console.log('[tryMatch] ✅ Player addresses verified as different:', JSON.stringify({
+      player1: addr1.slice(0, 10) + '...',
+      player2: addr2.slice(0, 10) + '...',
+      areDifferent: addr1 !== addr2,
+    }, null, 2))
 
     // CRITICAL: Verify both players are still waiting (prevent race conditions)
     // Get full player data to verify addresses match
-    console.log('[tryMatch] 🔍 Step 2: Verifying players are still waiting:', {
+    console.log('[tryMatch] 🔍 Step 2: Verifying players are still waiting:', JSON.stringify({
       player1_id: player1.id,
+      player1_address: player1.player_address?.slice(0, 10) + '...',
       player2_id: player2.id,
-    })
+      player2_address: player2.player_address?.slice(0, 10) + '...',
+    }, null, 2))
     const { data: verifyPlayers, error: verifyError } = await supabase
       .from('matchmaking_queue')
       .select('id, status, player_address, bet_level')
