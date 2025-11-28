@@ -661,35 +661,49 @@ export async function checkForMatch(playerAddress: Address): Promise<MatchResult
   console.log('[checkForMatch] 🔍 Starting checkForMatch for player:', playerAddress.slice(0, 10) + '...')
   try {
     // CRITICAL: First verify player is still in queue
+    // Use limit(1) instead of maybeSingle() to avoid PGRST116 error
     console.log('[checkForMatch] 📊 Fetching queue status from Supabase...')
-    const { data: queueStatus, error: statusError } = await supabase
+    const { data: queueEntries, error: statusError } = await supabase
       .from('matchmaking_queue')
-      .select('id, status, bet_level')
+      .select('id, status, bet_level, player_address')
       .eq('player_address', playerAddress.toLowerCase())
-      .maybeSingle()
+      .limit(1)
     
     console.log('[checkForMatch] 📊 Queue status result:', JSON.stringify({
-      found: !!queueStatus,
-      status: queueStatus?.status,
-      betLevel: queueStatus?.bet_level,
-      queueId: queueStatus?.id,
+      found: !!queueEntries && queueEntries.length > 0,
+      count: queueEntries?.length || 0,
+      status: queueEntries?.[0]?.status,
+      betLevel: queueEntries?.[0]?.bet_level,
+      queueId: queueEntries?.[0]?.id,
       error: statusError ? {
         message: statusError.message,
         code: statusError.code,
       } : null,
     }))
     
+    // If error occurred (not PGRST116), log and return null
+    if (statusError && statusError.code !== 'PGRST116') {
+      console.error('[checkForMatch] ❌ Error fetching queue status:', JSON.stringify({
+        message: statusError.message,
+        code: statusError.code,
+      }))
+      return null
+    }
+    
+    // Get first entry if exists
+    const queueStatus = queueEntries && queueEntries.length > 0 ? queueEntries[0] : null
+    
     // If player is not in queue at all, return null
-    if (statusError && statusError.code === 'PGRST116') {
-      console.log('[checkForMatch] ⚠️ Player not in queue (PGRST116)')
+    if (!queueStatus) {
+      console.log('[checkForMatch] ⚠️ Player not in queue')
       return null // Not in queue
     }
     
     // If player is not waiting or matched, they're cancelled or other status
-    if (!queueStatus || (queueStatus.status !== 'waiting' && queueStatus.status !== 'matched')) {
+    if (queueStatus.status !== 'waiting' && queueStatus.status !== 'matched') {
       console.log('[checkForMatch] ⚠️ Player not waiting or matched:', {
-        status: queueStatus?.status,
-        hasQueueStatus: !!queueStatus,
+        status: queueStatus.status,
+        queueId: queueStatus.id,
       })
       return null // Cancelled or other status
     }
@@ -759,15 +773,17 @@ export async function checkForMatch(playerAddress: Address): Promise<MatchResult
     while (retries > 0) {
       try {
         // First, try to find queue entry with matched status
-        const { data: matchedQueueEntry, error: queueError } = await supabase
+        // Use limit(1) instead of maybeSingle() to avoid PGRST116 error
+        const { data: matchedQueueEntries, error: queueError } = await supabase
           .from('matchmaking_queue')
           .select('*')
           .eq('player_address', playerAddress.toLowerCase())
           .eq('status', 'matched')
-          .maybeSingle()
+          .limit(1)
         
         console.log('[checkForMatch] 📊 Matched queue entry check:', JSON.stringify({
-          found: !!matchedQueueEntry,
+          found: !!matchedQueueEntries && matchedQueueEntries.length > 0,
+          count: matchedQueueEntries?.length || 0,
           error: queueError ? {
             message: queueError.message,
             code: queueError.code,
@@ -778,8 +794,8 @@ export async function checkForMatch(playerAddress: Address): Promise<MatchResult
           throw queueError
         }
         
-        if (matchedQueueEntry) {
-          queueEntry = matchedQueueEntry
+        if (matchedQueueEntries && matchedQueueEntries.length > 0) {
+          queueEntry = matchedQueueEntries[0]
           console.log('[checkForMatch] ✅ Found matched queue entry:', JSON.stringify({
             id: queueEntry.id,
             matched_with: queueEntry.matched_with,
