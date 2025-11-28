@@ -281,7 +281,7 @@ export function DebugPanel() {
         }
         
         // CRITICAL: Detect inactive last_seen in tryMatch logs
-        if (logStr.includes('CRITICAL: Player1 has inactive last_seen') || logStr.includes('CRITICAL: Player2 has inactive last_seen') || logStr.includes('FINAL CHECK FAILED')) {
+        if (logStr.includes('CRITICAL: Player1 has inactive last_seen') || logStr.includes('CRITICAL: Player2 has inactive last_seen') || logStr.includes('FINAL CHECK FAILED') || logStr.includes('GAME CREATION BLOCKED') || logStr.includes('ABSOLUTE FINAL CHECK FAILED')) {
           addIssue({
             id: 'inactive-player-trymatch',
             title: '⚠️ CRITICAL: Inactive Player in tryMatch',
@@ -291,6 +291,22 @@ export function DebugPanel() {
               step, 
               data: args.length > 1 ? args.slice(1) : undefined,
               issue: 'inactive_player_in_trymatch',
+              severity: 'critical',
+            },
+          });
+        }
+        
+        // CRITICAL: Detect game rejection in checkForMatch
+        if (logStr.includes('REJECTING GAME') || logStr.includes('One or both players have inactive last_seen')) {
+          addIssue({
+            id: 'game-rejected-inactive-player',
+            title: '⚠️ CRITICAL: Game Rejected - Inactive Player',
+            status: 'error',
+            message: 'Game was rejected because one or both players have inactive last_seen',
+            details: { 
+              step, 
+              data: args.length > 1 ? args.slice(1) : undefined,
+              issue: 'game_rejected_inactive_player',
               severity: 'critical',
             },
           });
