@@ -515,12 +515,26 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
     };
 
     // CRITICAL: Leave queue on visibility change (tab hidden/closed/background)
-    const handleVisibilityChange = () => {
-      if (document.hidden && hasJoinedQueue) {
-        console.log('[Matchmaking] 👁️ Tab hidden/closed - leaving queue', JSON.stringify({
+    // Also set last_seen to NULL when app is hidden (based on web research)
+    const handleVisibilityChange = async () => {
+      if (document.hidden && hasJoinedQueue && address) {
+        console.log('[Matchmaking] 👁️ Tab hidden/closed - setting last_seen to NULL and leaving queue', JSON.stringify({
           address: address?.slice(0, 10) + '...',
           hidden: document.hidden,
         }, null, 2));
+        
+        // CRITICAL: Set last_seen to NULL when app is hidden (prevents matching)
+        try {
+          await supabase
+            .from('matchmaking_queue')
+            .update({ last_seen: null })
+            .eq('player_address', address.toLowerCase())
+            .eq('status', 'waiting')
+          console.log('[Matchmaking] ✅ Set last_seen to NULL (app hidden)');
+        } catch (err) {
+          console.error('[Matchmaking] ❌ Error setting last_seen to NULL:', err);
+        }
+        
         cleanup();
       }
     };
