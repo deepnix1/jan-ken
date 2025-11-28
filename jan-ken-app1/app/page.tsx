@@ -37,6 +37,8 @@ export default function Home() {
   const [showGame, setShowGame] = useState(false); // For "Let's Play" button
   const [isConnecting, setIsConnecting] = useState(false); // For loading screen
   const [isTransitioning, setIsTransitioning] = useState(false); // For page transitions
+  const [isFarcasterEnv, setIsFarcasterEnv] = useState(false); // Track if we're in Farcaster Mini App
+  const [hasCheckedAutoConnect, setHasCheckedAutoConnect] = useState(false); // Track if we've checked for auto-connect
 
   // CRITICAL: Set appReady immediately - app should ALWAYS be visible
   // ready() only hides Farcaster splash screen, it doesn't control app visibility
@@ -155,33 +157,51 @@ export default function Home() {
     };
   }, []); // Remove appReady dependency to avoid re-running
 
-  // Per Farcaster docs: https://miniapps.farcaster.xyz/docs/guides/wallets
-  // "If a user already has a connected wallet the connector will automatically connect to it (e.g. isConnected will be true)"
-  // The connector automatically connects, no manual connect() call needed
-  // We just log the connection status for debugging
+  // Detect Farcaster Mini App environment
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
+    // Check if we're in Farcaster Mini App environment
+    const inFarcasterEnv = !!(
+      (sdk && sdk.actions && typeof sdk.actions.ready === 'function') ||
+      (window as any).farcaster?.sdk?.actions?.ready ||
+      connectors.some(c => c.name === 'Farcaster Mini App' || c.name?.includes('Farcaster'))
+    );
+    
+    setIsFarcasterEnv(inFarcasterEnv);
+    console.log('🔍 Farcaster environment detected:', inFarcasterEnv);
+  }, [connectors]);
+
+  // Per Farcaster docs: https://miniapps.farcaster.xyz/docs/guides/wallets
+  // "If a user already has a connected wallet the connector will automatically connect to it (e.g. isConnected will be true)"
+  // The connector automatically connects, but it may take a moment
+  // Wait a bit for auto-connect in Farcaster Mini App before showing connect button
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
     if (isConnected) {
       console.log('✅ Wallet connected automatically via Farcaster connector');
       console.log('Address:', address);
-    } else {
-      console.log('ℹ️ Wallet not connected yet - connector will auto-connect if available');
+      setHasCheckedAutoConnect(true);
+      return;
+    }
+    
+    // In Farcaster Mini App, wait a bit for auto-connect
+    if (isFarcasterEnv && !hasCheckedAutoConnect) {
+      console.log('⏳ Waiting for Farcaster connector to auto-connect...');
       console.log('Available connectors:', connectors.map(c => c.name));
       
-      // In Farcaster Mini App, connector should auto-connect
-      // In regular web browser, user needs to manually connect
-      const farcasterConnector = connectors.find(c => 
-        c.name === 'Farcaster Mini App' || 
-        c.name?.includes('Farcaster')
-      );
+      // Wait up to 3 seconds for auto-connect in Farcaster Mini App
+      const timeout = setTimeout(() => {
+        console.log('ℹ️ Auto-connect timeout - connector may need manual connection');
+        setHasCheckedAutoConnect(true);
+      }, 3000);
       
-      if (!farcasterConnector) {
-        console.log('ℹ️ Farcaster connector not found - this is normal in regular web browser');
-        console.log('ℹ️ User can manually connect with MetaMask or other available connectors');
-      }
+      return () => clearTimeout(timeout);
+    } else if (!isFarcasterEnv) {
+      // In regular web browser, show connect button immediately
+      setHasCheckedAutoConnect(true);
     }
-  }, [isConnected, address, connectors]);
+  }, [isConnected, address, connectors, isFarcasterEnv, hasCheckedAutoConnect]);
 
   useEffect(() => {
     if (!isConnected) {
@@ -586,7 +606,7 @@ export default function Home() {
             
             {/* Content */}
             <div className="relative z-10 w-full">
-            {!isConnected ? (
+            {!isConnected && hasCheckedAutoConnect ? (
               <div className="flex flex-col items-center gap-8 py-16 animate-fade-in-up">
                   <div className="text-center space-y-4">
                     <div className="flex justify-center mb-6">
