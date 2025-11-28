@@ -142,6 +142,83 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
     }
   }, [status, isPending, hash, writeError, selectedChoice]);
 
+  // CRITICAL: When isPending becomes true (wallet popup opens), hide all overlaying elements
+  useEffect(() => {
+    if (isPending || status === 'pending') {
+      console.log('[GameBoard] 🔍 Wallet popup detected (isPending or status pending) - hiding overlaying elements...');
+      
+      // Find and hide all fixed elements with z-50 or z-40 that might be overlaying
+      const overlayingElements: Array<{ el: HTMLElement; originalDisplay: string; originalPointerEvents: string; originalZIndex: string; originalOpacity: string }> = [];
+      
+      // Check all fixed elements
+      const allFixedElements = document.querySelectorAll('.fixed');
+      allFixedElements.forEach((el) => {
+        const htmlEl = el as HTMLElement;
+        const style = window.getComputedStyle(htmlEl);
+        const zIndex = parseInt(style.zIndex) || 0;
+        const classes = htmlEl.className || '';
+        
+        // Check if it's a notification element (z-50, z-40, or contains notification classes)
+        if ((zIndex >= 40 || classes.includes('z-50') || classes.includes('z-40') || 
+             classes.includes('z-[50]') || classes.includes('z-[40]')) &&
+            style.display !== 'none' &&
+            style.visibility !== 'hidden' &&
+            style.opacity !== '0') {
+          // Check if it's one of our notification elements (not the wallet popup itself)
+          const text = htmlEl.textContent || '';
+          const isOurNotification = text.includes('Transaction') || 
+                                   text.includes('Error') || 
+                                   text.includes('Confirmed') ||
+                                   text.includes('Confirming') ||
+                                   classes.includes('animate-fade-in') ||
+                                   classes.includes('animate-fade-in-down');
+          
+          if (isOurNotification) {
+            overlayingElements.push({
+              el: htmlEl,
+              originalDisplay: htmlEl.style.display,
+              originalPointerEvents: htmlEl.style.pointerEvents,
+              originalZIndex: htmlEl.style.zIndex,
+              originalOpacity: htmlEl.style.opacity,
+            });
+            
+            // Hide the element
+            htmlEl.style.display = 'none';
+            htmlEl.style.pointerEvents = 'none';
+            htmlEl.style.zIndex = '-1';
+            htmlEl.style.opacity = '0';
+          }
+        }
+      });
+      
+      if (overlayingElements.length > 0) {
+        console.log(`[GameBoard] ✅ Hidden ${overlayingElements.length} overlaying element(s) to allow wallet popup interaction`);
+      }
+      
+      // Restore elements after 15 seconds (popup should be closed by then)
+      const restoreTimeout = setTimeout(() => {
+        overlayingElements.forEach(({ el, originalDisplay, originalPointerEvents, originalZIndex, originalOpacity }) => {
+          el.style.display = originalDisplay;
+          el.style.pointerEvents = originalPointerEvents;
+          el.style.zIndex = originalZIndex;
+          el.style.opacity = originalOpacity;
+        });
+        console.log(`[GameBoard] ✅ Restored ${overlayingElements.length} element(s)`);
+      }, 15000);
+      
+      return () => {
+        clearTimeout(restoreTimeout);
+        // Also restore on cleanup
+        overlayingElements.forEach(({ el, originalDisplay, originalPointerEvents, originalZIndex, originalOpacity }) => {
+          el.style.display = originalDisplay;
+          el.style.pointerEvents = originalPointerEvents;
+          el.style.zIndex = originalZIndex;
+          el.style.opacity = originalOpacity;
+        });
+      };
+    }
+  }, [isPending, status]);
+
   // Monitor transaction status and detect stuck transactions
   useEffect(() => {
     if (isPending && !hash && txStartTime) {
