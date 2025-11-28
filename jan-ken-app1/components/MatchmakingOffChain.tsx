@@ -128,6 +128,8 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
         
         console.log('[Matchmaking] ✅ Joined queue successfully. Queue ID:', queueId);
         setHasJoinedQueue(true);
+        setIsMatching(true);
+        setIsJoining(false);
         setError(null);
       } catch (err: any) {
         // Log detailed error information with proper serialization
@@ -166,6 +168,8 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
         
         setError(errorMessage);
         setHasJoinedQueue(false);
+        setIsMatching(false);
+        setIsJoining(false);
       }
     };
     
