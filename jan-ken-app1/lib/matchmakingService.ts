@@ -744,6 +744,75 @@ export async function tryMatch(betLevel: number): Promise<MatchResult | null> {
       addressesDifferent: verifiedAddr1 !== verifiedAddr2,
     }, null, 2))
 
+    // CRITICAL: ONE MORE TIME - Verify both players have active last_seen RIGHT BEFORE updating
+    // This is the absolute final check before any database updates
+    const absoluteFinalNow = Date.now()
+    const absoluteFinalFifteenSecondsAgo = absoluteFinalNow - 15000
+    
+    // Re-fetch both players' last_seen values one more time
+    const { data: absoluteFinalCheck, error: absoluteFinalError } = await supabase
+      .from('matchmaking_queue')
+      .select('id, player_address, last_seen, status')
+      .in('id', [player1.id, player2.id])
+      .eq('status', 'waiting')
+    
+    if (absoluteFinalError || !absoluteFinalCheck || absoluteFinalCheck.length !== 2) {
+      console.error('[tryMatch] ❌❌❌ ABSOLUTE FINAL CHECK FAILED - Cannot verify players:', JSON.stringify({
+        error: absoluteFinalError?.message || 'No error',
+        found: absoluteFinalCheck?.length || 0,
+        required: 2,
+      }, null, 2))
+      releaseLock(betLevel)
+      return null
+    }
+    
+    const absoluteFinalPlayer1 = absoluteFinalCheck.find(p => p.id === player1.id)
+    const absoluteFinalPlayer2 = absoluteFinalCheck.find(p => p.id === player2.id)
+    
+    if (!absoluteFinalPlayer1 || !absoluteFinalPlayer2) {
+      console.error('[tryMatch] ❌❌❌ ABSOLUTE FINAL CHECK FAILED - Players not found')
+      releaseLock(betLevel)
+      return null
+    }
+    
+    const absP1LastSeen = absoluteFinalPlayer1.last_seen ? new Date(absoluteFinalPlayer1.last_seen).getTime() : 0
+    const absP2LastSeen = absoluteFinalPlayer2.last_seen ? new Date(absoluteFinalPlayer2.last_seen).getTime() : 0
+    
+    if (!absoluteFinalPlayer1.last_seen || absP1LastSeen < absoluteFinalFifteenSecondsAgo) {
+      console.error('[tryMatch] ❌❌❌ ABSOLUTE FINAL CHECK FAILED: Player1 last_seen inactive:', JSON.stringify({
+        player1_address: absoluteFinalPlayer1.player_address?.slice(0, 10) + '...',
+        last_seen: absoluteFinalPlayer1.last_seen,
+        seconds_ago: absoluteFinalPlayer1.last_seen ? Math.floor((absoluteFinalNow - absP1LastSeen) / 1000) : null,
+        threshold: 15,
+      }, null, 2))
+      releaseLock(betLevel)
+      return null
+    }
+    
+    if (!absoluteFinalPlayer2.last_seen || absP2LastSeen < absoluteFinalFifteenSecondsAgo) {
+      console.error('[tryMatch] ❌❌❌ ABSOLUTE FINAL CHECK FAILED: Player2 last_seen inactive:', JSON.stringify({
+        player2_address: absoluteFinalPlayer2.player_address?.slice(0, 10) + '...',
+        last_seen: absoluteFinalPlayer2.last_seen,
+        seconds_ago: absoluteFinalPlayer2.last_seen ? Math.floor((absoluteFinalNow - absP2LastSeen) / 1000) : null,
+        threshold: 15,
+      }, null, 2))
+      releaseLock(betLevel)
+      return null
+    }
+    
+    console.log('[tryMatch] ✅✅✅ ABSOLUTE FINAL CHECK PASSED - Both players active:', JSON.stringify({
+      player1: {
+        address: absoluteFinalPlayer1.player_address?.slice(0, 10) + '...',
+        last_seen: absoluteFinalPlayer1.last_seen,
+        seconds_ago: Math.floor((absoluteFinalNow - absP1LastSeen) / 1000),
+      },
+      player2: {
+        address: absoluteFinalPlayer2.player_address?.slice(0, 10) + '...',
+        last_seen: absoluteFinalPlayer2.last_seen,
+        seconds_ago: Math.floor((absoluteFinalNow - absP2LastSeen) / 1000),
+      },
+    }, null, 2))
+    
     // Step 2: Atomically update both players to 'matched' status FIRST
     // CRITICAL: Update each player separately with their matched_with address
     // This prevents them from being matched again
