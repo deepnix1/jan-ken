@@ -486,8 +486,33 @@ export async function tryMatch(betLevel: number): Promise<MatchResult | null> {
       return null
     }
 
+    // CRITICAL: Verify we have exactly 2 players before proceeding
+    if (!players[0] || !players[1]) {
+      console.error('[tryMatch] ❌❌❌ CRITICAL: Missing player1 or player2:', JSON.stringify({
+        hasPlayer1: !!players[0],
+        hasPlayer2: !!players[1],
+        playersLength: players.length,
+        betLevel,
+      }, null, 2))
+      releaseLock(betLevel)
+      return null
+    }
+    
     const player1 = players[0]
     const player2 = players[1]
+    
+    // CRITICAL: Verify both players are different (not the same address)
+    if (player1.player_address.toLowerCase() === player2.player_address.toLowerCase()) {
+      console.error('[tryMatch] ❌❌❌ CRITICAL: Player1 and Player2 have the same address:', JSON.stringify({
+        player1_address: player1.player_address,
+        player2_address: player2.player_address,
+        player1_id: player1.id,
+        player2_id: player2.id,
+        betLevel,
+      }, null, 2))
+      releaseLock(betLevel)
+      return null
+    }
     
     // CRITICAL: Verify both players have valid last_seen (app is open)
     // Using 15 seconds threshold for stricter control (based on web research)
