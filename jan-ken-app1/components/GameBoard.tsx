@@ -407,51 +407,37 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
       console.log('Timestamp:', new Date().toISOString());
       console.log('═══════════════════════════════════════════════════════════');
       
+      // CRITICAL: Call writeContract - this MUST trigger wallet popup
+      console.log('[GameBoard] 🚀 About to call writeContract with params:', JSON.stringify({
+        address: finalParams.address || txParams.address,
+        functionName: finalParams.functionName || txParams.functionName,
+        args: finalParams.args ? finalParams.args.map((a: any) => a.toString()) : txParams.args,
+      }, null, 2));
+      
       try {
+        // CRITICAL: Call writeContract - it should trigger the mutation
         writeContract(finalParams);
         console.log('✅ [GameBoard] writeContract CALLED! (no error thrown)');
+        
+        // CRITICAL: Wait a bit for status to update
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        console.log('📊 Status after 100ms:', status);
+        console.log('📊 isPending after 100ms:', isPending);
+        console.log('⏰ Called at:', new Date().toISOString());
+        
+        // CRITICAL: If status is still idle after calling, there might be an issue
+        if (status === 'idle' && !isPending) {
+          console.warn('[GameBoard] ⚠️ Status is still idle after writeContract call - transaction may not have started');
+          console.warn('[GameBoard] ⚠️ This could mean:');
+          console.warn('[GameBoard] ⚠️ 1. writeContract function is not working');
+          console.warn('[GameBoard] ⚠️ 2. Wallet connector is not ready');
+          console.warn('[GameBoard] ⚠️ 3. Transaction parameters are invalid');
+        }
       } catch (writeError: any) {
         console.error('❌ [GameBoard] ERROR calling writeContract:', writeError);
         throw writeError;
       }
-      
-      console.log('📊 Status immediately after call:', status);
-      console.log('📊 isPending immediately after call:', isPending);
-      console.log('⏰ Called at:', new Date().toISOString());
-      
-      // CRITICAL: Monitor status changes to detect if wallet popup appeared and hash received
-      let checkCount = 0;
-      const maxChecks = 50; // 10 seconds (50 * 200ms)
-      const statusCheckInterval = setInterval(() => {
-        checkCount++;
-        console.log(`[GameBoard] 📊 Status check #${checkCount}:`, {
-          status,
-          isPending,
-          hasHash: !!hash,
-          hashValue: hash || 'NOT RECEIVED',
-          timestamp: new Date().toISOString(),
-        });
-        
-        // If status changed to pending, wallet popup likely appeared
-        if (status === 'pending' || isPending) {
-          console.log('[GameBoard] ✅ Transaction status is pending - wallet popup should be visible');
-        }
-        
-        // CRITICAL: If we have a hash, transaction was sent
-        if (hash) {
-          console.log('🎉🎉🎉 [GameBoard] ✅✅✅ TRANSACTION HASH RECEIVED! ✅✅✅', hash);
-          clearInterval(statusCheckInterval);
-          setTxStartTime(null);
-        }
-        
-        // Stop checking after max attempts
-        if (checkCount >= maxChecks) {
-          console.warn('[GameBoard] ⚠️ Status check timeout - stopping monitoring');
-          clearInterval(statusCheckInterval);
-        }
-      }, 200);
-      
-      console.log('[GameBoard] ⏳ Waiting for wallet popup and transaction hash...');
     } catch (error: any) {
       console.error('[GameBoard] ❌ Error making choice:', error);
       console.error('[GameBoard] Error details:', {
