@@ -177,21 +177,25 @@ export function RootProvider({ children }: { children: ReactNode }) {
         }
         
         // Check for all variations of Farcaster origin mismatch errors
+        const lowerArgStr = argStr.toLowerCase();
         const farcasterOriginPatterns = [
           'origins don\'t match',
           'origins don\'t match https://',
           'origins don\'t match https://wallet.farcaster.xyz',
           'origins don\'t match https://privy.farcaster.xyz',
           'origins don\'t match https://farcaster.xyz',
+          'origins don\'t match https://jan-ken.vercel.app',
           'wallet.farcaster.xyz',
           'privy.farcaster.xyz',
           'farcaster.xyz',
+          'jan-ken.vercel.app',
         ];
         
         return (
-          argStr.includes('Analytics SDK') || 
-          argStr.includes('Failed to fetch') ||
-          farcasterOriginPatterns.some(pattern => argStr.includes(pattern))
+          lowerArgStr.includes('analytics sdk') || 
+          lowerArgStr.includes('failed to fetch') ||
+          farcasterOriginPatterns.some(pattern => lowerArgStr.includes(pattern.toLowerCase())) ||
+          (lowerArgStr.includes('jan-ken.vercel.app') && lowerArgStr.includes('farcaster.xyz')) // Specific origin mismatch
         );
       };
       
