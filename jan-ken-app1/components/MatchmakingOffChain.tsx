@@ -18,8 +18,9 @@ interface MatchmakingProps {
 
 function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showMatchFound = false }: MatchmakingProps) {
   const { address, isConnected } = useAccount();
-  const [isMatching, setIsMatching] = useState(true);
+  const [isMatching, setIsMatching] = useState(false);
   const [hasJoinedQueue, setHasJoinedQueue] = useState(false);
+  const [isJoining, setIsJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [queueCount, setQueueCount] = useState<number>(0);
   const [playerFid, setPlayerFid] = useState<number | null>(null);
@@ -729,7 +730,7 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
         
         {/* Status Indicators */}
         <div className="space-y-4 sm:space-y-5 w-full max-w-md px-4">
-          {!hasJoinedQueue && !error && (
+          {isJoining && !hasJoinedQueue && !error && (
             <div className="flex flex-col items-center justify-center gap-3 sm:gap-4 px-4 sm:px-6 md:px-8 py-4 sm:py-5 bg-black/60 border-2 border-blue-500/40 rounded-lg shadow-[0_0_30px_rgba(59,130,246,0.4)]">
               <div className="flex items-center gap-3 sm:gap-4">
                 <div className="w-5 h-5 sm:w-6 sm:h-6 border-2 sm:border-3 border-blue-400 border-t-transparent rounded-full animate-spin shadow-[0_0_10px_rgba(59,130,246,1)]"></div>
