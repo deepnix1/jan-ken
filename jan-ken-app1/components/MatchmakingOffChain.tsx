@@ -302,6 +302,11 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
     };
     
       const checkMatch = async () => {
+        // CRITICAL: Set isMatching to true when polling starts
+        if (!isMatching) {
+          setIsMatching(true);
+        }
+        
         // CRITICAL: Check if player is still in waiting queue before polling
         // This prevents unnecessary polling for cancelled players
         try {
