@@ -152,39 +152,47 @@ export function RootProvider({ children }: { children: ReactNode }) {
       
       // Helper function to check if a message should be suppressed
       const shouldSuppress = (arg: unknown): boolean => {
+        // Convert to string for checking
+        let argStr = '';
         if (typeof arg === 'string') {
-          return (
-            arg.includes('Analytics SDK') || 
-            arg.includes('Failed to fetch') ||
-            arg.includes('origins don\'t match') || // Farcaster SDK origin check in web browser
-            arg.includes('wallet.farcaster.xyz') ||
-            arg.includes('privy.farcaster.xyz')
-          );
-        }
-        if (arg && typeof arg === 'object') {
+          argStr = arg;
+        } else if (arg && typeof arg === 'object') {
           // Check message property
           if ('message' in arg && typeof arg.message === 'string') {
-            return (
-              arg.message.includes('Analytics SDK') || 
-              arg.message.includes('Failed to fetch') ||
-              arg.message.includes('origins don\'t match') ||
-              arg.message.includes('wallet.farcaster.xyz') ||
-              arg.message.includes('privy.farcaster.xyz')
-            );
+            argStr = arg.message;
+          } else {
+            // Try toString() as fallback
+            try {
+              argStr = String(arg);
+            } catch {
+              return false;
+            }
           }
-          // Check toString() result
+        } else {
           try {
-            const str = String(arg);
-            return (
-              str.includes('origins don\'t match') ||
-              str.includes('wallet.farcaster.xyz') ||
-              str.includes('privy.farcaster.xyz')
-            );
+            argStr = String(arg);
           } catch {
-            // Ignore toString errors
+            return false;
           }
         }
-        return false;
+        
+        // Check for all variations of Farcaster origin mismatch errors
+        const farcasterOriginPatterns = [
+          'origins don\'t match',
+          'origins don\'t match https://',
+          'origins don\'t match https://wallet.farcaster.xyz',
+          'origins don\'t match https://privy.farcaster.xyz',
+          'origins don\'t match https://farcaster.xyz',
+          'wallet.farcaster.xyz',
+          'privy.farcaster.xyz',
+          'farcaster.xyz',
+        ];
+        
+        return (
+          argStr.includes('Analytics SDK') || 
+          argStr.includes('Failed to fetch') ||
+          farcasterOriginPatterns.some(pattern => argStr.includes(pattern))
+        );
       };
       
       // Suppress console.error for harmless errors
