@@ -576,17 +576,65 @@ export async function tryMatch(betLevel: number): Promise<MatchResult | null> {
       return null
     }
 
-    console.log('[tryMatch] 📊 Verification result:', JSON.stringify({
+    // CRITICAL: Final last_seen check before matching (fresh from database)
+    const finalNow = Date.now()
+    const finalFifteenSecondsAgoMs = finalNow - 15000
+    
+    console.log('[tryMatch] 📊 Verification result with last_seen check:', JSON.stringify({
       found: verifyPlayers?.length || 0,
       required: 2,
-      players: verifyPlayers?.map(p => ({
-        id: p.id,
-        status: p.status,
-        address: p.player_address?.slice(0, 10) + '...',
-        fullAddress: p.player_address, // Log full address
-        bet_level: p.bet_level,
-      })) || [],
+      players: verifyPlayers?.map(p => {
+        const pLastSeen = p.last_seen ? new Date(p.last_seen).getTime() : 0
+        const secondsAgo = p.last_seen ? Math.floor((finalNow - pLastSeen) / 1000) : null
+        const isActive = p.last_seen && pLastSeen >= finalFifteenSecondsAgoMs
+        return {
+          id: p.id,
+          status: p.status,
+          address: p.player_address?.slice(0, 10) + '...',
+          fullAddress: p.player_address, // Log full address
+          bet_level: p.bet_level,
+          last_seen: p.last_seen,
+          seconds_ago: secondsAgo,
+          isActive: isActive,
+        }
+      }) || [],
     }, null, 2))
+    
+    // CRITICAL: Final last_seen verification - reject if any player is inactive
+    if (verifyPlayers && verifyPlayers.length === 2) {
+      const verifiedPlayer1 = verifyPlayers.find(p => p.id === player1.id)
+      const verifiedPlayer2 = verifyPlayers.find(p => p.id === player2.id)
+      
+      if (verifiedPlayer1) {
+        const p1LastSeen = verifiedPlayer1.last_seen ? new Date(verifiedPlayer1.last_seen).getTime() : 0
+        if (!verifiedPlayer1.last_seen || p1LastSeen < finalFifteenSecondsAgoMs) {
+          console.error('[tryMatch] ❌❌❌ FINAL CHECK FAILED: Player1 last_seen is inactive:', JSON.stringify({
+            player1_address: verifiedPlayer1.player_address?.slice(0, 10) + '...',
+            last_seen: verifiedPlayer1.last_seen,
+            seconds_ago: verifiedPlayer1.last_seen ? Math.floor((finalNow - p1LastSeen) / 1000) : null,
+            threshold: 15,
+            isActive: verifiedPlayer1.last_seen && p1LastSeen >= finalFifteenSecondsAgoMs,
+          }, null, 2))
+          releaseLock(betLevel)
+          return null
+        }
+      }
+      
+      if (verifiedPlayer2) {
+        const p2LastSeen = verifiedPlayer2.last_seen ? new Date(verifiedPlayer2.last_seen).getTime() : 0
+        if (!verifiedPlayer2.last_seen || p2LastSeen < finalFifteenSecondsAgoMs) {
+          console.error('[tryMatch] ❌❌❌ FINAL CHECK FAILED: Player2 last_seen is inactive:', JSON.stringify({
+            player2_address: verifiedPlayer2.player_address?.slice(0, 10) + '...',
+            last_seen: verifiedPlayer2.last_seen,
+            seconds_ago: verifiedPlayer2.last_seen ? Math.floor((finalNow - p2LastSeen) / 1000) : null,
+            threshold: 15,
+            isActive: verifiedPlayer2.last_seen && p2LastSeen >= finalFifteenSecondsAgoMs,
+          }, null, 2))
+          releaseLock(betLevel)
+          return null
+        }
+      }
+    }
 
     // CRITICAL: If either player is no longer waiting, abort match
     if (!verifyPlayers || verifyPlayers.length !== 2) {
