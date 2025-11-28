@@ -74,7 +74,9 @@ const nextConfig = {
               "object-src 'none'",
               "base-uri 'self'",
               "form-action 'self'",
-              "frame-ancestors 'self'",
+              // Allow Farcaster Mini App to be embedded in Farcaster clients
+              // Per Farcaster docs: Mini Apps are loaded in iframes
+              "frame-ancestors 'self' https://*.farcaster.xyz https://*.warpcast.com https://farcaster.xyz https://warpcast.com",
               "upgrade-insecure-requests"
             ].join('; ')
           }
