@@ -953,6 +953,93 @@ export async function tryMatch(betLevel: number): Promise<MatchResult | null> {
       return null
     }
 
+    // CRITICAL: ONE MORE ABSOLUTE FINAL CHECK RIGHT BEFORE GAME CREATION
+    // This is the last possible moment to prevent matching inactive players
+    const gameCreationNow = Date.now()
+    const gameCreationFifteenSecondsAgo = gameCreationNow - 15000
+    
+    const { data: gameCreationCheck, error: gameCreationCheckError } = await supabase
+      .from('matchmaking_queue')
+      .select('id, player_address, last_seen, status')
+      .in('id', [player1.id, player2.id])
+      .eq('status', 'matched')
+    
+    if (gameCreationCheckError || !gameCreationCheck || gameCreationCheck.length !== 2) {
+      console.error('[tryMatch] ❌❌❌ GAME CREATION CHECK FAILED:', JSON.stringify({
+        error: gameCreationCheckError?.message || 'No error',
+        found: gameCreationCheck?.length || 0,
+        required: 2,
+      }, null, 2))
+      // Rollback queue status
+      await supabase
+        .from('matchmaking_queue')
+        .update({ status: 'waiting', matched_at: null, matched_with: null })
+        .in('id', [player1.id, player2.id])
+      releaseLock(betLevel)
+      return null
+    }
+    
+    const gameCreationPlayer1 = gameCreationCheck.find(p => p.id === player1.id)
+    const gameCreationPlayer2 = gameCreationCheck.find(p => p.id === player2.id)
+    
+    if (!gameCreationPlayer1 || !gameCreationPlayer2) {
+      console.error('[tryMatch] ❌❌❌ GAME CREATION CHECK FAILED - Players not found')
+      await supabase
+        .from('matchmaking_queue')
+        .update({ status: 'waiting', matched_at: null, matched_with: null })
+        .in('id', [player1.id, player2.id])
+      releaseLock(betLevel)
+      return null
+    }
+    
+    const gameP1LastSeen = gameCreationPlayer1.last_seen ? new Date(gameCreationPlayer1.last_seen).getTime() : 0
+    const gameP2LastSeen = gameCreationPlayer2.last_seen ? new Date(gameCreationPlayer2.last_seen).getTime() : 0
+    
+    if (!gameCreationPlayer1.last_seen || gameP1LastSeen < gameCreationFifteenSecondsAgo) {
+      console.error('[tryMatch] ❌❌❌ GAME CREATION BLOCKED: Player1 last_seen inactive:', JSON.stringify({
+        player1_address: gameCreationPlayer1.player_address?.slice(0, 10) + '...',
+        last_seen: gameCreationPlayer1.last_seen,
+        seconds_ago: gameCreationPlayer1.last_seen ? Math.floor((gameCreationNow - gameP1LastSeen) / 1000) : null,
+        threshold: 15,
+      }, null, 2))
+      // Rollback queue status
+      await supabase
+        .from('matchmaking_queue')
+        .update({ status: 'waiting', matched_at: null, matched_with: null })
+        .in('id', [player1.id, player2.id])
+      releaseLock(betLevel)
+      return null
+    }
+    
+    if (!gameCreationPlayer2.last_seen || gameP2LastSeen < gameCreationFifteenSecondsAgo) {
+      console.error('[tryMatch] ❌❌❌ GAME CREATION BLOCKED: Player2 last_seen inactive:', JSON.stringify({
+        player2_address: gameCreationPlayer2.player_address?.slice(0, 10) + '...',
+        last_seen: gameCreationPlayer2.last_seen,
+        seconds_ago: gameCreationPlayer2.last_seen ? Math.floor((gameCreationNow - gameP2LastSeen) / 1000) : null,
+        threshold: 15,
+      }, null, 2))
+      // Rollback queue status
+      await supabase
+        .from('matchmaking_queue')
+        .update({ status: 'waiting', matched_at: null, matched_with: null })
+        .in('id', [player1.id, player2.id])
+      releaseLock(betLevel)
+      return null
+    }
+    
+    console.log('[tryMatch] ✅✅✅ GAME CREATION CHECK PASSED - Both players active:', JSON.stringify({
+      player1: {
+        address: gameCreationPlayer1.player_address?.slice(0, 10) + '...',
+        last_seen: gameCreationPlayer1.last_seen,
+        seconds_ago: Math.floor((gameCreationNow - gameP1LastSeen) / 1000),
+      },
+      player2: {
+        address: gameCreationPlayer2.player_address?.slice(0, 10) + '...',
+        last_seen: gameCreationPlayer2.last_seen,
+        seconds_ago: Math.floor((gameCreationNow - gameP2LastSeen) / 1000),
+      },
+    }, null, 2))
+    
     // Step 4: Create game only after queue update is confirmed
     // CRITICAL: Use unique game ID with timestamps to prevent collisions
     const timestamp = Date.now()
@@ -964,6 +1051,12 @@ export async function tryMatch(betLevel: number): Promise<MatchResult | null> {
       player1: player1.player_address.slice(0, 10) + '...',
       player2: player2.player_address.slice(0, 10) + '...',
       timestamp,
+      last_seen_verification: {
+        player1_last_seen: gameCreationPlayer1.last_seen,
+        player2_last_seen: gameCreationPlayer2.last_seen,
+        player1_seconds_ago: Math.floor((gameCreationNow - gameP1LastSeen) / 1000),
+        player2_seconds_ago: Math.floor((gameCreationNow - gameP2LastSeen) / 1000),
+      },
     }, null, 2))
 
     const { data: game, error: gameError } = await supabase
