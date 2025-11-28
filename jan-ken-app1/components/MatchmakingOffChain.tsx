@@ -188,6 +188,35 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
       return;
     }
     
+    // CRITICAL: Update last_seen timestamp to keep player active in queue
+    // This ensures only players with open apps can be matched
+    const updateLastSeen = async () => {
+      if (!address || !hasJoinedQueue) return;
+      
+      try {
+        // Check if app is visible
+        if (typeof document !== 'undefined' && document.hidden) {
+          console.log('[Matchmaking] ⚠️ App is hidden - not updating last_seen');
+          return;
+        }
+        
+        // Update last_seen timestamp in queue
+        const { error } = await supabase
+          .from('matchmaking_queue')
+          .update({ last_seen: new Date().toISOString() })
+          .eq('player_address', address.toLowerCase())
+          .eq('status', 'waiting')
+        
+        if (error) {
+          console.warn('[Matchmaking] ⚠️ Could not update last_seen:', error.message);
+        } else {
+          console.log('[Matchmaking] ✅ Updated last_seen timestamp');
+        }
+      } catch (err) {
+        console.warn('[Matchmaking] ⚠️ Error updating last_seen:', err);
+      }
+    };
+    
     const checkMatch = async () => {
       const isMobile = typeof window !== 'undefined' ? /Mobile|Android|iPhone|iPad/.test(navigator.userAgent) : false;
       console.log('[Matchmaking] 🔄 Polling checkForMatch - address:', address?.slice(0, 10) + '...', JSON.stringify({
@@ -195,7 +224,12 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
         userAgent: typeof window !== 'undefined' ? navigator.userAgent : 'server',
         isConnected,
         hasJoinedQueue,
+        isVisible: typeof document !== 'undefined' ? !document.hidden : true,
       }, null, 2))
+      
+      // CRITICAL: Update last_seen before checking for match
+      await updateLastSeen();
+      
       try {
         const match = await checkForMatch(address);
         if (match) {

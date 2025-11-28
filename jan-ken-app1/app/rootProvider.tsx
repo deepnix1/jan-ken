@@ -151,12 +151,16 @@ export function RootProvider({ children }: { children: ReactNode }) {
           (typeof firstArg === 'string' && (
             firstArg.includes('Analytics SDK') || 
             firstArg.includes('Failed to fetch') ||
-            firstArg.includes('origins don\'t match') // Farcaster SDK origin check in web browser
+            firstArg.includes('origins don\'t match') || // Farcaster SDK origin check in web browser
+            firstArg.includes('origins don\'t match https://wallet.farcaster.xyz') || // Farcaster wallet extension
+            firstArg.includes('origins don\'t match https://privy.farcaster.xyz') // Farcaster wallet extension
           )) ||
           (firstArg && typeof firstArg === 'object' && 'message' in firstArg && typeof firstArg.message === 'string' && (
             firstArg.message.includes('Analytics SDK') || 
             firstArg.message.includes('Failed to fetch') ||
-            firstArg.message.includes('origins don\'t match')
+            firstArg.message.includes('origins don\'t match') ||
+            firstArg.message.includes('origins don\'t match https://wallet.farcaster.xyz') ||
+            firstArg.message.includes('origins don\'t match https://privy.farcaster.xyz')
           ))
         ) {
           return; // Ignore harmless errors

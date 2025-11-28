@@ -216,6 +216,7 @@ export async function joinQueue(params: JoinQueueParams): Promise<string> {
             bet_level: betLevel,
             bet_amount: betAmount.toString(),
             status: 'waiting',
+            last_seen: new Date().toISOString(), // CRITICAL: Track when player was last active
           })
           .select()
           .single()
