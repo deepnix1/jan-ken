@@ -690,7 +690,8 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
       </div>
 
       {/* Transaction Approved Notification - Enhanced */}
-      {showApproved && (
+      {/* CRITICAL: Hide notification when wallet popup is open (status === 'pending') to allow clicking Confirm button */}
+      {showApproved && status !== 'pending' && (
         <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 animate-fade-in">
           <div className="relative bg-black/95 backdrop-blur-lg px-8 py-6 rounded-xl shadow-[0_0_60px_rgba(34,197,94,1)] border-3 border-green-500 min-w-[350px]">
             <div className="absolute inset-0 bg-gradient-to-r from-green-500/20 via-emerald-500/20 to-green-500/20 blur-xl"></div>
@@ -727,7 +728,8 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
       )}
 
       {/* Error Display */}
-      {(txError || writeError) && (
+      {/* CRITICAL: Hide error when wallet popup is open (status === 'pending') to allow clicking Confirm button */}
+      {(txError || writeError) && status !== 'pending' && (
         <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 animate-fade-in-down">
           <div className="inline-flex flex-col items-center gap-4 px-8 py-6 bg-black/95 backdrop-blur-lg border-3 border-red-500 rounded-xl shadow-[0_0_60px_rgba(239,68,68,0.8)] min-w-[300px] max-w-[90vw]">
             <div className="flex items-center gap-4">
