@@ -103,6 +103,73 @@ export function DebugPanel() {
         if (logsRef.current.length > 100) logsRef.current.shift();
         setTransactionLogs([...logsRef.current]);
         
+        // CRITICAL: Detect fake match issues (same player matched with themselves)
+        if (logStr.includes('Cannot match player with themselves') || 
+            logStr.includes('Verified players have same address') ||
+            logStr.includes('Duplicate address found in queue')) {
+          addIssue({
+            id: 'fake-match-detected',
+            title: '⚠️ FAKE MATCH DETECTED',
+            status: 'error',
+            message: 'Same player address found in queue - preventing fake match',
+            details: { 
+              step, 
+              data: args.length > 1 ? args.slice(1) : undefined,
+              issue: 'duplicate_player',
+              severity: 'critical',
+            },
+          });
+        }
+        
+        // CRITICAL: Detect not enough players
+        if (logStr.includes('Not enough players') || logStr.includes('found: 1')) {
+          addIssue({
+            id: 'not-enough-players',
+            title: 'Waiting for Opponent',
+            status: 'warning',
+            message: 'Only 1 player in queue - need 1 more to match',
+            details: { 
+              step, 
+              data: args.length > 1 ? args.slice(1) : undefined,
+              issue: 'insufficient_players',
+            },
+          });
+        }
+        
+        // CRITICAL: Detect mobile vs web differences
+        if (logStr.includes('isMobile') || logStr.includes('userAgent')) {
+          const isMobile = logStr.includes('isMobile: true') || /Mobile|Android|iPhone|iPad/.test(logStr);
+          if (isMobile && (logStr.includes('No match found') || logStr.includes('⚠️'))) {
+            addIssue({
+              id: 'mobile-match-issue',
+              title: 'Mobile Match Detection Issue',
+              status: 'warning',
+              message: 'Match not found on mobile - check mobile-specific logs',
+              details: { 
+                step, 
+                data: args.length > 1 ? args.slice(1) : undefined,
+                issue: 'mobile_detection',
+                platform: 'mobile',
+              },
+            });
+          }
+        }
+        
+        // CRITICAL: Detect checkForMatch issues
+        if (logStr.includes('[checkForMatch]') && (logStr.includes('⚠️') || logStr.includes('❌'))) {
+          addIssue({
+            id: `checkForMatch-issue-${Date.now()}`,
+            title: 'CheckForMatch Issue',
+            status: logStr.includes('❌') ? 'error' : 'warning',
+            message: logStr,
+            details: { 
+              step, 
+              data: args.length > 1 ? args.slice(1) : undefined,
+              issue: 'checkForMatch_failure',
+            },
+          });
+        }
+        
         // Create issues for important matchmaking events
         if (logStr.includes('[tryMatch] ⚠️') || logStr.includes('[tryMatch] ❌')) {
           addIssue({
@@ -112,7 +179,9 @@ export function DebugPanel() {
             message: logStr,
             details: { step, data: args.length > 1 ? args.slice(1) : undefined },
           });
-        } else if (logStr.includes('[tryMatch] ✅')) {
+        } else if (logStr.includes('[tryMatch] ✅') || logStr.includes('MATCH CREATED SUCCESSFULLY')) {
+          removeIssue('not-enough-players');
+          removeIssue('fake-match-detected');
           addIssue({
             id: 'match-found',
             title: 'Match Found!',

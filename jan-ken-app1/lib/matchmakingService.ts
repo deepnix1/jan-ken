@@ -360,15 +360,50 @@ export async function tryMatch(betLevel: number): Promise<MatchResult | null> {
 
   try {
     // Step 1: Find two waiting players with same bet level
-    // CRITICAL: Use FOR UPDATE lock equivalent by checking status again after selection
+    // CRITICAL: Use DISTINCT ON to prevent duplicate addresses, then verify uniqueness
     console.log('[tryMatch] 🔍 Step 1: Finding waiting players for betLevel', betLevel)
-    const { data: players, error } = await supabase
+    
+    // CRITICAL: First get all unique waiting players for this bet level
+    const { data: allPlayers, error: allPlayersError } = await supabase
       .from('matchmaking_queue')
-      .select('*')
+      .select('id, player_address, status, bet_level, created_at, player_fid, bet_amount')
       .eq('bet_level', betLevel)
       .eq('status', 'waiting')
       .order('created_at', { ascending: true })
-      .limit(2)
+    
+    if (allPlayersError) {
+      console.error('[tryMatch] ❌ Error finding all players:', JSON.stringify({
+        error: allPlayersError.message || allPlayersError.code || allPlayersError,
+        betLevel,
+      }, null, 2))
+      releaseLock(betLevel)
+      return null
+    }
+    
+    // CRITICAL: Filter out duplicate addresses (case-insensitive)
+    const uniquePlayers = new Map<string, any>()
+    for (const player of (allPlayers || [])) {
+      if (!player.player_address) continue
+      const normalizedAddr = player.player_address.toLowerCase().trim()
+      if (!uniquePlayers.has(normalizedAddr)) {
+        uniquePlayers.set(normalizedAddr, player)
+      } else {
+        console.warn('[tryMatch] ⚠️ Duplicate address found in queue:', JSON.stringify({
+          address: normalizedAddr.slice(0, 10) + '...',
+          existingId: uniquePlayers.get(normalizedAddr)?.id,
+          duplicateId: player.id,
+        }, null, 2))
+      }
+    }
+    
+    const players = Array.from(uniquePlayers.values()).slice(0, 2)
+    
+    console.log('[tryMatch] 📊 Unique players after deduplication:', JSON.stringify({
+      totalFound: allPlayers?.length || 0,
+      uniqueCount: uniquePlayers.size,
+      selectedCount: players.length,
+      betLevel,
+    }, null, 2))
 
     if (error) {
       console.error('[tryMatch] ❌ Error finding players:', {
