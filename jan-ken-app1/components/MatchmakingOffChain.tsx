@@ -228,6 +228,8 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
             now,
           }, null, 2))
           // CRITICAL: This is a serious error - player will be excluded from matching
+          // Try to leave queue if update fails repeatedly
+          console.error('[Matchmaking] ⚠️ last_seen update failed - player will be excluded from matching')
         } else if (data && data.length > 0) {
           console.log('[Matchmaking] ✅✅✅ Updated last_seen successfully:', JSON.stringify({
             updatedRows: data.length,

@@ -475,6 +475,49 @@ export async function tryMatch(betLevel: number): Promise<MatchResult | null> {
     const player1 = players[0]
     const player2 = players[1]
     
+    // CRITICAL: Verify both players have valid last_seen (app is open)
+    const now = Date.now()
+    const player1LastSeen = player1.last_seen ? new Date(player1.last_seen).getTime() : 0
+    const player2LastSeen = player2.last_seen ? new Date(player2.last_seen).getTime() : 0
+    const thirtySecondsAgoMs = now - 30000
+    
+    if (!player1.last_seen || player1LastSeen < thirtySecondsAgoMs) {
+      console.error('[tryMatch] ❌❌❌ CRITICAL: Player1 has inactive last_seen:', JSON.stringify({
+        player1_address: player1.player_address?.slice(0, 10) + '...',
+        last_seen: player1.last_seen,
+        seconds_ago: player1.last_seen ? Math.floor((now - player1LastSeen) / 1000) : null,
+        threshold: 30,
+        isActive: player1.last_seen && player1LastSeen >= thirtySecondsAgoMs,
+      }, null, 2))
+      releaseLock(betLevel)
+      return null
+    }
+    
+    if (!player2.last_seen || player2LastSeen < thirtySecondsAgoMs) {
+      console.error('[tryMatch] ❌❌❌ CRITICAL: Player2 has inactive last_seen:', JSON.stringify({
+        player2_address: player2.player_address?.slice(0, 10) + '...',
+        last_seen: player2.last_seen,
+        seconds_ago: player2.last_seen ? Math.floor((now - player2LastSeen) / 1000) : null,
+        threshold: 30,
+        isActive: player2.last_seen && player2LastSeen >= thirtySecondsAgoMs,
+      }, null, 2))
+      releaseLock(betLevel)
+      return null
+    }
+    
+    console.log('[tryMatch] ✅ Both players have active last_seen:', JSON.stringify({
+      player1: {
+        address: player1.player_address?.slice(0, 10) + '...',
+        last_seen: player1.last_seen,
+        seconds_ago: Math.floor((now - player1LastSeen) / 1000),
+      },
+      player2: {
+        address: player2.player_address?.slice(0, 10) + '...',
+        last_seen: player2.last_seen,
+        seconds_ago: Math.floor((now - player2LastSeen) / 1000),
+      },
+    }, null, 2))
+    
     // CRITICAL: Verify player addresses are valid and not the same
     if (!player1.player_address || !player2.player_address) {
       console.error('[tryMatch] ⚠️ Invalid player addresses:', JSON.stringify({
