@@ -711,15 +711,19 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
   return (
     <div className="relative">
       <div className="flex flex-col items-center justify-center py-4 sm:py-6 md:py-8">
-        <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-4 sm:mb-6 text-center px-4">
-          <span className="bg-gradient-to-r from-red-400 via-blue-400 to-yellow-400 bg-clip-text text-transparent drop-shadow-[0_0_30px_rgba(239,68,68,0.8)]">
-            SEARCHING
-          </span>
-        </h2>
-        
-        <p className="text-gray-400 text-base sm:text-lg md:text-xl mb-6 sm:mb-8 text-center max-w-md font-mono uppercase tracking-wider px-4">
-          Looking for opponent...
-        </p>
+        {!showMatchFound && (
+          <>
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-4 sm:mb-6 text-center px-4">
+              <span className="bg-gradient-to-r from-red-400 via-blue-400 to-yellow-400 bg-clip-text text-transparent drop-shadow-[0_0_30px_rgba(239,68,68,0.8)]">
+                SEARCHING
+              </span>
+            </h2>
+            
+            <p className="text-gray-400 text-base sm:text-lg md:text-xl mb-6 sm:mb-8 text-center max-w-md font-mono uppercase tracking-wider px-4">
+              Looking for opponent...
+            </p>
+          </>
+        )}
         
         {/* Queue Status Display */}
         {hasJoinedQueue && (
