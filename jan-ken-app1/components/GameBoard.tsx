@@ -757,10 +757,10 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
       )}
 
       {/* Transaction Status - Enhanced Visibility */}
-      {/* CRITICAL: Hide our notification when wallet popup is open (status === 'pending' OR isPending) to allow clicking Confirm button */}
-      {/* PC Farcaster wallet: When status === 'pending' OR isPending is true, wallet popup is open - hide our notification completely */}
+      {/* CRITICAL: Hide our notification when wallet popup is open (isPending) to allow clicking Confirm button */}
+      {/* PC Farcaster wallet: When isPending is true, wallet popup is open - hide our notification completely */}
       {/* Only show when transaction is confirming (hash received) but wallet popup is closed */}
-      {(isConfirming && hash) && status !== 'pending' && !isPending && (
+      {(isConfirming && hash) && !isPending && (
         <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-40 animate-fade-in-down" style={{ pointerEvents: 'none' }}>
           <div className="inline-flex flex-col items-center gap-4 px-8 py-6 bg-black/95 backdrop-blur-lg border-3 border-red-500 rounded-xl shadow-[0_0_60px_rgba(220,20,60,0.8)] min-w-[300px]">
             <div className="flex items-center gap-4">
