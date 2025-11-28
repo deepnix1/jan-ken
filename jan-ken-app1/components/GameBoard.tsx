@@ -492,17 +492,45 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
       const player1Choice = gameData[3]; // Choice enum: 0=None, 1=Rock, 2=Paper, 3=Scissors
       const player2Choice = gameData[4];
       
-      // If game is finished (status === 3) or both players made choices
+      console.log('[GameBoard] 📊 Game status check:', JSON.stringify({
+        status,
+        player1Choice,
+        player2Choice,
+        gameFinished,
+        hasHash: !!hash,
+        isTxSuccess,
+      }, null, 2));
+      
+      // CRITICAL: If game is finished (status === 3), go to results
       if (status === 3) {
-        setGameFinished(true);
-        setTimeout(() => onGameEnd(), 2000);
-      } else if (status === 2 && player1Choice > 0 && player2Choice > 0) {
-        // Both players made choices, game should finish soon
-        setGameFinished(true);
-        setTimeout(() => onGameEnd(), 2000);
+        console.log('[GameBoard] ✅✅✅ Game finished (status 3) - calling onGameEnd');
+        if (!gameFinished) {
+          setGameFinished(true);
+          setTimeout(() => {
+            console.log('[GameBoard] 🎯 Calling onGameEnd callback');
+            onGameEnd();
+          }, 2000);
+        }
+      } 
+      // CRITICAL: If both players made choices and game is in progress, wait for contract to finish
+      // Don't call onGameEnd yet - wait for status to become 3
+      else if (status === 2 && player1Choice > 0 && player2Choice > 0) {
+        console.log('[GameBoard] ⏳ Both players made choices, waiting for contract to finish...');
+        // Don't set gameFinished yet - wait for status === 3
+      }
+      // CRITICAL: If game is cancelled (status === 4), go to results
+      else if (status === 4) {
+        console.log('[GameBoard] ⚠️ Game cancelled (status 4) - calling onGameEnd');
+        if (!gameFinished) {
+          setGameFinished(true);
+          setTimeout(() => {
+            console.log('[GameBoard] 🎯 Calling onGameEnd callback (cancelled)');
+            onGameEnd();
+          }, 2000);
+        }
       }
     }
-  }, [gameData, address, onGameEnd]);
+  }, [gameData, address, onGameEnd, gameFinished, hash, isTxSuccess]);
 
   return (
     <div className="w-full">
