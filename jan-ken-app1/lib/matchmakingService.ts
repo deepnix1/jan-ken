@@ -100,6 +100,21 @@ export async function joinQueue(params: JoinQueueParams): Promise<string> {
       betAmount: betAmount.toString(),
     }))
 
+    // CRITICAL: Clean up any old waiting entries for this player first
+    // This prevents duplicate entries if player reconnects
+    try {
+      await supabase
+        .from('matchmaking_queue')
+        .update({ status: 'cancelled' })
+        .eq('player_address', playerAddress.toLowerCase())
+        .eq('status', 'waiting')
+        .lt('created_at', new Date(Date.now() - 3600000).toISOString()) // Older than 1 hour
+      console.log('[joinQueue] ✅ Cleaned up old waiting entries for player')
+    } catch (cleanupError: any) {
+      console.warn('[joinQueue] ⚠️ Could not clean up old entries:', cleanupError?.message)
+      // Continue anyway - not critical
+    }
+    
     // Check if player is already in queue
     // CRITICAL: Use explicit error handling and retry logic
     let existing = null
