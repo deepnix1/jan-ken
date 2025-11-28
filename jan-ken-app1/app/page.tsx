@@ -36,20 +36,30 @@ export default function Home() {
   const [isConnecting, setIsConnecting] = useState(false); // For loading screen
   const [isTransitioning, setIsTransitioning] = useState(false); // For page transitions
 
-  // CRITICAL: Call sdk.actions.ready() to hide Farcaster splash screen
+  // CRITICAL: Call sdk.actions.ready() IMMEDIATELY to hide Farcaster splash screen
   // Per Farcaster docs: https://miniapps.farcaster.xyz/docs/getting-started#making-your-app-display
   // "After your app loads, you must call sdk.actions.ready() to hide the splash screen and display your content"
-  // IMPORTANT: ready() only hides the splash screen - it does NOT control app content visibility
+  // IMPORTANT: ready() MUST be called as soon as possible, even if app is still loading
   // App content should ALWAYS be rendered, ready() just tells Farcaster we're ready
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined') {
+      // On server, just set appReady immediately
+      setAppReady(true);
+      return;
+    }
     
     let mounted = true;
     let readyCalled = false;
     
+    // Set appReady immediately so app content is visible
+    setAppReady(true);
+    
     // Function to call ready() when SDK is available
     const callReady = async () => {
-      if (readyCalled) return true; // Prevent multiple calls
+      if (readyCalled) {
+        console.log('✅ ready() already called, skipping');
+        return true;
+      }
       
       try {
         // Try imported SDK first
@@ -58,17 +68,11 @@ export default function Home() {
           try {
             await sdk.actions.ready();
             readyCalled = true;
-            if (mounted) {
-              setAppReady(true); // Set appReady for auto-connect logic
-            }
             console.log('✅ Farcaster SDK ready() called - splash screen hidden');
             return true;
           } catch (readyError: any) {
             console.error('❌ Error calling sdk.actions.ready():', readyError);
             // Continue anyway - app should work even if ready() fails
-            if (mounted) {
-              setAppReady(true); // Still set appReady so app works
-            }
             return false;
           }
         }
@@ -79,75 +83,69 @@ export default function Home() {
           try {
             await (window as any).farcaster.sdk.actions.ready();
             readyCalled = true;
-            if (mounted) {
-              setAppReady(true); // Set appReady for auto-connect logic
-            }
             console.log('✅ Farcaster SDK ready() called (window SDK) - splash screen hidden');
             return true;
           } catch (readyError: any) {
             console.error('❌ Error calling window.farcaster.sdk.actions.ready():', readyError);
             // Continue anyway - app should work even if ready() fails
-            if (mounted) {
-              setAppReady(true); // Still set appReady so app works
-            }
             return false;
           }
         }
         
-        // If no SDK available, still set appReady (for PC browser)
-        if (mounted) {
-          setAppReady(true);
-        }
+        // Log SDK status for debugging
+        console.log('ℹ️ Farcaster SDK not found:', {
+          hasImportedSDK: !!sdk,
+          hasSDKActions: !!(sdk && sdk.actions),
+          hasReadyFunction: !!(sdk && sdk.actions && typeof sdk.actions.ready === 'function'),
+          hasWindowSDK: !!(window as any).farcaster?.sdk,
+          userAgent: navigator.userAgent,
+        });
+        
         return false;
       } catch (error) {
         console.error('Error in callReady():', error);
-        // Still set appReady so app works
-        if (mounted) {
-          setAppReady(true);
-        }
         return false;
       }
     };
     
-    // Call ready() immediately if SDK is available
-    // If not available, try polling for a short time
-    callReady().then((success) => {
-      if (success) {
-        return;
-      }
-      
-      // If SDK not ready, wait for it with polling (max 2 seconds)
-      let attempts = 0;
-      const maxAttempts = 20; // 2 seconds max (20 * 100ms)
-      
-      const checkSDK = setInterval(async () => {
-        attempts++;
-        
-        const success = await callReady();
+    // Call ready() immediately - don't wait
+    // Use setTimeout to ensure DOM is ready
+    setTimeout(() => {
+      callReady().then((success) => {
         if (success) {
-          clearInterval(checkSDK);
           return;
         }
         
-        if (attempts >= maxAttempts) {
-          clearInterval(checkSDK);
-          // SDK not available - might be normal web browser (not Farcaster Mini App)
-          // Per Farcaster docs: "If you're not in a Farcaster environment, continue anyway"
-          console.log('ℹ️ Farcaster SDK not available - this is normal if running in a regular web browser');
-          console.log('ℹ️ App will continue to work normally without Farcaster SDK');
-          if (mounted && !appReady) {
-            setAppReady(true); // Ensure appReady is set even if SDK not found
+        // If SDK not ready, try again with polling (max 1 second)
+        let attempts = 0;
+        const maxAttempts = 10; // 1 second max (10 * 100ms)
+        
+        const checkSDK = setInterval(async () => {
+          attempts++;
+          
+          const success = await callReady();
+          if (success) {
+            clearInterval(checkSDK);
+            return;
           }
-        }
-      }, 100); // Check every 100ms
-      
-      return () => clearInterval(checkSDK);
-    });
+          
+          if (attempts >= maxAttempts) {
+            clearInterval(checkSDK);
+            // SDK not available - might be normal web browser (not Farcaster Mini App)
+            // Per Farcaster docs: "If you're not in a Farcaster environment, continue anyway"
+            console.log('ℹ️ Farcaster SDK not available after polling - this is normal if running in a regular web browser');
+            console.log('ℹ️ App will continue to work normally without Farcaster SDK');
+          }
+        }, 100); // Check every 100ms
+        
+        return () => clearInterval(checkSDK);
+      });
+    }, 0); // Call immediately on next tick
     
     return () => {
       mounted = false;
     };
-  }, [appReady]);
+  }, []); // Remove appReady dependency to avoid re-running
 
   // Auto-connect wallet when app is ready (Farcaster Mini App)
   useEffect(() => {
