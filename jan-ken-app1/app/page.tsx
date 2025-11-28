@@ -599,14 +599,36 @@ export default function Home() {
                       </div>
                     </div>
                     <h2 className="text-4xl sm:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400 drop-shadow-[0_0_20px_rgba(34,211,238,0.6)] animate-pulse">
-                      CONNECTING...
+                      CONNECT WALLET
                     </h2>
                     <p className="text-lg sm:text-xl text-gray-300 text-center max-w-lg font-medium leading-relaxed">
-                      Initializing Farcaster Mini App...
-                      <br />
-                      <span className="text-gray-400 text-base">Your wallet will connect automatically ✨</span>
+                      {connectors.length > 0 ? (
+                        <>
+                          In Farcaster Mini App, your wallet connects automatically ✨
+                          <br />
+                          <span className="text-gray-400 text-base">Or connect manually below</span>
+                        </>
+                      ) : (
+                        <>
+                          No wallet connectors available
+                          <br />
+                          <span className="text-gray-400 text-base">Please install MetaMask or use Farcaster</span>
+                        </>
+                      )}
                     </p>
                   </div>
+                  
+                  {/* Connect Button - Per Farcaster docs: connect({ connector: connectors[0] }) */}
+                  {connectors.length > 0 && (
+                    <button
+                      onClick={handleConnect}
+                      disabled={isPending}
+                      className="px-8 py-4 bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-600 hover:to-purple-600 text-white font-bold text-lg rounded-lg transition-all transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isPending ? 'Connecting...' : 'Connect Wallet'}
+                    </button>
+                  )}
+                  
                  {connectError && (
                    <div className="mt-4 p-3 sm:p-4 bg-red-500/20 border border-red-500/50 rounded-lg w-full max-w-md animate-shake">
                      <p className="text-red-400 text-xs sm:text-sm font-mono text-center mb-2">
