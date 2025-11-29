@@ -286,9 +286,28 @@ export async function joinQueue(params: JoinQueueParams): Promise<string> {
           throw new Error('No data returned from Supabase')
         }
 
-        // CRITICAL: Don't call tryMatch here - it will be called by checkForMatch polling
-        // Calling tryMatch here causes race conditions and duplicate matching attempts
-        console.log('[joinQueue] ✅ Queue entry created, checkForMatch polling will handle matching')
+        // Try to find a match immediately (don't fail if this fails)
+        console.log('[joinQueue] 🚀 Attempting immediate match for betLevel', betLevel)
+        tryMatch(betLevel)
+          .then(result => {
+            if (result) {
+              console.log('[joinQueue] ✅ Immediate match successful:', JSON.stringify({
+                gameId: result.gameId,
+                player1: result.player1Address.slice(0, 10) + '...',
+                player2: result.player2Address.slice(0, 10) + '...',
+              }))
+            } else {
+              console.log('[joinQueue] ⚠️ Immediate match returned null (no match found)')
+            }
+          })
+          .catch(err => {
+            console.error('[joinQueue] ❌ Failed to try match immediately:', JSON.stringify({
+              error: err?.message || String(err),
+              name: err?.name,
+              stack: err?.stack?.split('\n').slice(0, 3).join('\n'),
+            }))
+            // Non-critical, continue
+          })
 
         return data.id
       } catch (err: any) {
