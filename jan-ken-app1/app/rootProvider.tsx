@@ -12,37 +12,45 @@ export function RootProvider({ children }: { children: ReactNode }) {
   const [sdkReady, setSdkReady] = useState(false);
   const [metaMaskConnector, setMetaMaskConnector] = useState<any>(null);
 
-  // Load MetaMask connector dynamically to avoid optional dependencies issues
+  // Load MetaMask connector dynamically based on browser detection
   useEffect(() => {
     if (mounted && typeof window !== 'undefined') {
-      // Check for MetaMask with a timeout to avoid extension conflicts
-      const checkMetaMask = () => {
-        try {
-          // Only check for MetaMask specifically, not all ethereum providers
-          // This avoids conflicts with other wallet extensions
-          const ethereum = (window as any).ethereum;
-          if (ethereum && ethereum.isMetaMask) {
-            import('wagmi/connectors')
-              .then((wagmiConnectors) => {
-                try {
-                  setMetaMaskConnector(wagmiConnectors.metaMask);
-                } catch (error) {
-                  console.log('MetaMask connector not available:', error);
-                }
-              })
-              .catch((error) => {
-                console.log('Failed to load MetaMask connector:', error);
-              });
-          }
-        } catch (error) {
-          // Silently ignore extension conflicts
-          console.log('Extension conflict detected, skipping MetaMask connector');
-        }
-      };
+      const browserInfo = getBrowserInfo();
       
-      // Use setTimeout to avoid immediate execution conflicts
-      const timeoutId = setTimeout(checkMetaMask, 100);
-      return () => clearTimeout(timeoutId);
+      // Only load MetaMask connector on desktop (PC) browsers
+      // On mobile/Farcaster, use Farcaster connector only
+      if (browserInfo.isDesktop && !browserInfo.isFarcaster) {
+        // Check for MetaMask with a timeout to avoid extension conflicts
+        const checkMetaMask = () => {
+          try {
+            if (isMetaMaskAvailable()) {
+              import('wagmi/connectors')
+                .then((wagmiConnectors) => {
+                  try {
+                    setMetaMaskConnector(wagmiConnectors.metaMask);
+                    console.log('✅ MetaMask connector loaded for desktop browser');
+                  } catch (error) {
+                    console.log('MetaMask connector not available:', error);
+                  }
+                })
+                .catch((error) => {
+                  console.log('Failed to load MetaMask connector:', error);
+                });
+            } else {
+              console.log('ℹ️ MetaMask not detected - will use Farcaster connector if available');
+            }
+          } catch (error) {
+            // Silently ignore extension conflicts
+            console.log('Extension conflict detected, skipping MetaMask connector');
+          }
+        };
+        
+        // Use setTimeout to avoid immediate execution conflicts
+        const timeoutId = setTimeout(checkMetaMask, 100);
+        return () => clearTimeout(timeoutId);
+      } else {
+        console.log('ℹ️ Mobile/Farcaster environment detected - using Farcaster connector only');
+      }
     }
   }, [mounted]);
 
@@ -52,27 +60,36 @@ export function RootProvider({ children }: { children: ReactNode }) {
       return null;
     }
     
+    const browserInfo = getBrowserInfo();
     const connectors: any[] = [];
     
-    // Add Farcaster Mini App connector (per Farcaster docs)
-    // The connector automatically uses sdk.wallet.getEthereumProvider() internally
+    // CRITICAL: Always add Farcaster Mini App connector first (highest priority)
+    // Per Farcaster docs: https://miniapps.farcaster.xyz/docs/guides/wallets
+    // "The Farcaster Mini App connector automatically uses sdk.wallet.getEthereumProvider()"
     try {
       const farcasterConnector = miniAppConnector();
       connectors.push(farcasterConnector);
+      console.log('✅ Farcaster Mini App connector added');
     } catch (error) {
-      console.error('Error creating Farcaster connector:', error);
+      console.error('❌ Error creating Farcaster connector:', error);
     }
     
-    // Add MetaMask connector if available (for PC/browser testing)
-    if (metaMaskConnector) {
+    // Add MetaMask connector ONLY on desktop (PC) browsers, NOT in Farcaster environment
+    // On mobile/Farcaster, Farcaster connector is sufficient
+    if (browserInfo.isDesktop && !browserInfo.isFarcaster && metaMaskConnector) {
       try {
         const mmConnector = metaMaskConnector();
         if (typeof mmConnector === 'function') {
           connectors.push(mmConnector);
+          console.log('✅ MetaMask connector added for desktop browser');
         }
       } catch (error) {
-        console.log('Error adding MetaMask connector:', error);
+        console.log('⚠️ Error adding MetaMask connector:', error);
       }
+    } else if (browserInfo.isFarcaster) {
+      console.log('ℹ️ Farcaster environment - using Farcaster connector only');
+    } else if (browserInfo.isMobile) {
+      console.log('ℹ️ Mobile environment - using Farcaster connector only');
     }
     
     return createConfig({
