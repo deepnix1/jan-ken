@@ -97,7 +97,7 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
     },
   });
   
-  const { isLoading: isConfirming, isSuccess: isTxSuccess, isError: isReceiptError } = useWaitForTransactionReceipt({
+  const { isLoading: isConfirming, isSuccess: isTxSuccess, isError: isReceiptError, error: receiptError } = useWaitForTransactionReceipt({
     hash,
     timeout: 120000, // 120 second timeout (increased for slow networks)
     confirmations: 1,
@@ -107,6 +107,51 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
       enabled: !!hash, // Only wait if we have hash
     },
   });
+  
+  // CRITICAL: Monitor receipt waiting status and detect stuck transactions
+  useEffect(() => {
+    if (hash && isConfirming) {
+      console.log('[GameBoard] ⏳ Waiting for transaction receipt...', {
+        hash: hash.slice(0, 10) + '...',
+        isConfirming,
+        isTxSuccess,
+        isReceiptError,
+        receiptError: receiptError?.message || 'none',
+      });
+      
+      // Set a timeout to detect if receipt never arrives
+      const receiptTimeout = setTimeout(() => {
+        if (isConfirming && !isTxSuccess && !isReceiptError) {
+          console.error('[GameBoard] ❌ Transaction receipt timeout - transaction may be stuck');
+          console.error('[GameBoard] ❌ Hash:', hash);
+          console.error('[GameBoard] ❌ This usually means:');
+          console.error('[GameBoard] ❌ 1. Transaction was sent but not confirmed on blockchain');
+          console.error('[GameBoard] ❌ 2. Network is slow or congested');
+          console.error('[GameBoard] ❌ 3. Transaction failed but error not caught');
+          
+          // Don't reset selectedChoice - let user see the issue
+          setTxError('Transaction is taking longer than expected. Please check your wallet or try again.');
+        }
+      }, 60000); // 60 seconds
+      
+      return () => clearTimeout(receiptTimeout);
+    }
+  }, [hash, isConfirming, isTxSuccess, isReceiptError, receiptError]);
+  
+  // CRITICAL: Handle receipt errors
+  useEffect(() => {
+    if (isReceiptError && receiptError) {
+      console.error('[GameBoard] ❌ Transaction receipt error:', JSON.stringify({
+        error: receiptError?.message || String(receiptError),
+        name: receiptError?.name,
+        hash: hash?.slice(0, 10) + '...',
+      }, null, 2));
+      
+      setTxError(`Transaction failed: ${receiptError?.message || 'Unknown error'}`);
+      setSelectedChoice(null);
+      setTxStartTime(null);
+    }
+  }, [isReceiptError, receiptError, hash]);
   
   // Monitor status changes and hash - ENHANCED LOGGING
   useEffect(() => {
