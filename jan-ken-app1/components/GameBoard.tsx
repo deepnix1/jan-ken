@@ -142,126 +142,6 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
     }
   }, [status, isPending, hash, writeError, selectedChoice]);
 
-  // CRITICAL: When isPending becomes true (wallet popup opens), hide all overlaying elements
-  useEffect(() => {
-    if (isPending) {
-      console.log('[GameBoard] 🔍 Wallet popup detected (isPending) - hiding ALL overlaying elements...');
-      
-      // Find and hide ALL fixed elements that might be overlaying (not just notifications)
-      const overlayingElements: Array<{ el: HTMLElement; originalDisplay: string; originalPointerEvents: string; originalZIndex: string; originalOpacity: string; originalVisibility: string }> = [];
-      
-      // Check ALL fixed elements (not just .fixed class, but all elements with position: fixed)
-      const allElements = document.querySelectorAll('*');
-      allElements.forEach((el) => {
-        const htmlEl = el as HTMLElement;
-        const style = window.getComputedStyle(htmlEl);
-        const position = style.position;
-        const zIndex = parseInt(style.zIndex) || 0;
-        const classes = htmlEl.className || '';
-        const rect = htmlEl.getBoundingClientRect();
-        
-        // Only process fixed elements with high z-index (potential overlays)
-        if (position === 'fixed' && 
-            zIndex >= 40 && // Any z-index >= 40
-            style.display !== 'none' &&
-            style.visibility !== 'hidden' &&
-            style.opacity !== '0' &&
-            rect.width > 0 && rect.height > 0) {
-          
-          // Skip wallet popup itself (check for wallet-related attributes/classes)
-          const isWalletPopup = htmlEl.tagName === 'IFRAME' ||
-                               classes.includes('wallet') ||
-                               classes.includes('farcaster') ||
-                               htmlEl.getAttribute('data-wallet-popup') ||
-                               htmlEl.getAttribute('data-farcaster-wallet') ||
-                               (htmlEl.querySelector && htmlEl.querySelector('iframe[src*="farcaster"]')) ||
-                               (htmlEl.querySelector && htmlEl.querySelector('iframe[src*="wallet"]'));
-          
-          if (!isWalletPopup) {
-            // Check if it's one of our notification elements or any high z-index element
-            const text = htmlEl.textContent || '';
-            const isOurNotification = text.includes('Transaction') || 
-                                     text.includes('Error') || 
-                                     text.includes('Confirmed') ||
-                                     text.includes('Confirming') ||
-                                     classes.includes('animate-fade-in') ||
-                                     classes.includes('animate-fade-in-down') ||
-                                     classes.includes('z-50') ||
-                                     classes.includes('z-40') ||
-                                     classes.includes('z-[50]') ||
-                                     classes.includes('z-[40]');
-            
-            // Hide ALL high z-index fixed elements (not just our notifications)
-            // This ensures nothing blocks the wallet popup
-            if (isOurNotification || zIndex >= 50) {
-              overlayingElements.push({
-                el: htmlEl,
-                originalDisplay: htmlEl.style.display,
-                originalPointerEvents: htmlEl.style.pointerEvents,
-                originalZIndex: htmlEl.style.zIndex,
-                originalOpacity: htmlEl.style.opacity,
-                originalVisibility: htmlEl.style.visibility,
-              });
-              
-              // Hide the element completely
-              htmlEl.style.display = 'none';
-              htmlEl.style.pointerEvents = 'none';
-              htmlEl.style.zIndex = '-1';
-              htmlEl.style.opacity = '0';
-              htmlEl.style.visibility = 'hidden';
-              
-              // Also add a data attribute to mark it as hidden by us
-              htmlEl.setAttribute('data-hidden-by-wallet-popup', 'true');
-            }
-          }
-        }
-      });
-      
-      if (overlayingElements.length > 0) {
-        console.log(`[GameBoard] ✅✅✅ Hidden ${overlayingElements.length} overlaying element(s) to allow wallet popup interaction`);
-        overlayingElements.forEach(({ el }, index) => {
-          console.log(`[GameBoard]   - Hidden element #${index + 1}:`, {
-            tag: el.tagName,
-            classes: el.className,
-            zIndex: window.getComputedStyle(el).zIndex,
-            text: el.textContent?.slice(0, 50) || 'no text',
-          });
-        });
-      } else {
-        console.log('[GameBoard] ⚠️ No overlaying elements found to hide');
-      }
-      
-      // Restore elements after 20 seconds (popup should be closed by then)
-      const restoreTimeout = setTimeout(() => {
-        overlayingElements.forEach(({ el, originalDisplay, originalPointerEvents, originalZIndex, originalOpacity, originalVisibility }) => {
-          el.style.display = originalDisplay;
-          el.style.pointerEvents = originalPointerEvents;
-          el.style.zIndex = originalZIndex;
-          el.style.opacity = originalOpacity;
-          el.style.visibility = originalVisibility;
-          el.removeAttribute('data-hidden-by-wallet-popup');
-        });
-        console.log(`[GameBoard] ✅ Restored ${overlayingElements.length} element(s) after timeout`);
-      }, 20000);
-      
-      return () => {
-        clearTimeout(restoreTimeout);
-        // Also restore on cleanup
-        overlayingElements.forEach(({ el, originalDisplay, originalPointerEvents, originalZIndex, originalOpacity, originalVisibility }) => {
-          el.style.display = originalDisplay;
-          el.style.pointerEvents = originalPointerEvents;
-          el.style.zIndex = originalZIndex;
-          el.style.opacity = originalOpacity;
-          el.style.visibility = originalVisibility;
-          el.removeAttribute('data-hidden-by-wallet-popup');
-        });
-        if (overlayingElements.length > 0) {
-          console.log(`[GameBoard] ✅ Restored ${overlayingElements.length} element(s) on cleanup`);
-        }
-      };
-    }
-  }, [isPending, status]);
-
   // Monitor transaction status and detect stuck transactions
   useEffect(() => {
     if (isPending && !hash && txStartTime) {
@@ -547,18 +427,34 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
       try {
         // CRITICAL: Call writeContract - it should trigger the mutation
         // In Wagmi v3, writeContract is a mutation trigger function
-        // If this call succeeds (no exception), the transaction has been initiated
-        // Status updates will happen asynchronously via hooks and callbacks
         writeContract(finalParams);
         console.log('✅ [GameBoard] writeContract CALLED! (no error thrown)');
-        console.log('📊 Transaction initiated - status will update via hooks');
-        console.log('⏰ Called at:', new Date().toISOString());
-        console.log('💡 Note: Status updates happen asynchronously - onSuccess/onError callbacks will handle results');
         
-        // CRITICAL: Don't check status immediately - Wagmi updates state asynchronously
-        // The onSuccess/onError callbacks will handle success/failure
-        // If writeContract() didn't throw, the transaction was initiated successfully
-        // The wallet popup may take time to appear, and status may take time to update
+        // CRITICAL: Wait a bit for status to update (Wagmi updates state asynchronously)
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        console.log('📊 Status after 300ms:', status);
+        console.log('📊 isPending after 300ms:', isPending);
+        console.log('📊 Hash after 300ms:', hash || 'NOT RECEIVED');
+        console.log('⏰ Called at:', new Date().toISOString());
+        
+        // CRITICAL: If status is still idle after calling, there might be an issue
+        if (status === 'idle' && !isPending && !hash) {
+          console.error('[GameBoard] ❌❌❌ CRITICAL: Status is still idle after writeContract call!');
+          console.error('[GameBoard] ❌ Transaction did not start. Possible causes:');
+          console.error('[GameBoard] ❌ 1. writeContract mutation is not properly configured');
+          console.error('[GameBoard] ❌ 2. Wallet connector is not ready or not connected');
+          console.error('[GameBoard] ❌ 3. Transaction parameters are invalid');
+          console.error('[GameBoard] ❌ 4. Network mismatch (wrong chain)');
+          console.error('[GameBoard] ❌ 5. Contract address or ABI issue');
+          
+          // Show user-friendly error
+          setTxError('Transaction failed to start. Please check your wallet connection and try again.');
+          setSelectedChoice(null);
+          setTxStartTime(null);
+          alert('Transaction failed to start. Please check your wallet connection and network settings.');
+          return;
+        }
       } catch (writeError: any) {
         console.error('❌ [GameBoard] ERROR calling writeContract:', writeError);
         console.error('[GameBoard] Error details:', {
@@ -807,10 +703,9 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
       </div>
 
       {/* Transaction Approved Notification - Enhanced */}
-      {/* CRITICAL: Hide notification when wallet popup is open (status === 'pending' OR isPending) to allow clicking Confirm button */}
-      {/* PC Farcaster wallet: isPending might be true even if status is not 'pending' yet */}
-      {showApproved && status !== 'pending' && !isPending && (
-        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 animate-fade-in" style={{ pointerEvents: 'none' }}>
+      {/* CRITICAL: Hide notification when wallet popup is open (status === 'pending') to allow clicking Confirm button */}
+      {showApproved && status !== 'pending' && (
+        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 animate-fade-in">
           <div className="relative bg-black/95 backdrop-blur-lg px-8 py-6 rounded-xl shadow-[0_0_60px_rgba(34,197,94,1)] border-3 border-green-500 min-w-[350px]">
             <div className="absolute inset-0 bg-gradient-to-r from-green-500/20 via-emerald-500/20 to-green-500/20 blur-xl"></div>
             <div className="relative flex flex-col items-center gap-3">
@@ -846,10 +741,9 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
       )}
 
       {/* Error Display */}
-      {/* CRITICAL: Hide error when wallet popup is open (status === 'pending' OR isPending) to allow clicking Confirm button */}
-      {/* PC Farcaster wallet: isPending might be true even if status is not 'pending' yet */}
-      {(txError || writeError) && status !== 'pending' && !isPending && (
-        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 animate-fade-in-down" style={{ pointerEvents: 'auto' }}>
+      {/* CRITICAL: Hide error when wallet popup is open (status === 'pending') to allow clicking Confirm button */}
+      {(txError || writeError) && status !== 'pending' && (
+        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 animate-fade-in-down">
           <div className="inline-flex flex-col items-center gap-4 px-8 py-6 bg-black/95 backdrop-blur-lg border-3 border-red-500 rounded-xl shadow-[0_0_60px_rgba(239,68,68,0.8)] min-w-[300px] max-w-[90vw]">
             <div className="flex items-center gap-4">
               <div className="text-4xl">❌</div>
@@ -877,18 +771,28 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
       )}
 
       {/* Transaction Status - Enhanced Visibility */}
-      {/* CRITICAL: Hide our notification when wallet popup is open (isPending) to allow clicking Confirm button */}
-      {/* PC Farcaster wallet: When isPending is true, wallet popup is open - hide our notification completely */}
-      {/* Only show when transaction is confirming (hash received) but wallet popup is closed */}
-      {(isConfirming && hash) && !isPending && (
-        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-40 animate-fade-in-down" style={{ pointerEvents: 'none' }}>
+      {/* CRITICAL: Hide our notification when wallet popup is open (status === 'pending') to allow clicking Confirm button */}
+      {(isPending || isConfirming) && status !== 'pending' && (
+        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 animate-fade-in-down">
           <div className="inline-flex flex-col items-center gap-4 px-8 py-6 bg-black/95 backdrop-blur-lg border-3 border-red-500 rounded-xl shadow-[0_0_60px_rgba(220,20,60,0.8)] min-w-[300px]">
             <div className="flex items-center gap-4">
               <div className="w-8 h-8 border-3 border-red-400 border-t-transparent rounded-full animate-spin shadow-[0_0_15px_rgba(220,20,60,1)]"></div>
               <div className="flex flex-col">
                 <p className="text-red-400 font-black text-lg uppercase tracking-wider">
-                  ✅ Confirming...
+                  {isPending && !hash 
+                    ? (status === 'pending' ? '⏳ Wallet popup opened' : '📤 Sending transaction...') 
+                    : '✅ Confirming...'}
                 </p>
+                {isPending && !hash && status === 'pending' && (
+                  <p className="text-green-400 font-mono text-sm mt-1">
+                    Check your wallet popup
+                  </p>
+                )}
+                {isPending && !hash && status !== 'pending' && (
+                  <p className="text-yellow-400 font-mono text-sm mt-1">
+                    Preparing transaction...
+                  </p>
+                )}
                 {hash && (
                   <p className="text-green-400 font-mono text-sm mt-1">
                     Transaction sent! Waiting for confirmation...
