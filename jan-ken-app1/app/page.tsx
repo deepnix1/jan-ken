@@ -38,13 +38,28 @@ export default function Home() {
   const [showGame, setShowGame] = useState(false); // For "Let's Play" button
   const [isConnecting, setIsConnecting] = useState(false); // For loading screen
   const [isTransitioning, setIsTransitioning] = useState(false); // For page transitions
-  const [isFarcasterEnv, setIsFarcasterEnv] = useState(false); // Track if we're in Farcaster Mini App
+  const [browserInfo, setBrowserInfo] = useState<ReturnType<typeof getBrowserInfo> | null>(null);
   const [hasCheckedAutoConnect, setHasCheckedAutoConnect] = useState(false); // Track if we've checked for auto-connect
 
   // CRITICAL: Set appReady immediately - app should ALWAYS be visible
   // ready() only hides Farcaster splash screen, it doesn't control app visibility
   useEffect(() => {
     setAppReady(true);
+    
+    // Initialize browser detection
+    if (typeof window !== 'undefined') {
+      const info = getBrowserInfo();
+      setBrowserInfo(info);
+      console.log('🌐 Browser Detection:', JSON.stringify({
+        isMobile: info.isMobile,
+        isDesktop: info.isDesktop,
+        isFarcaster: info.isFarcaster,
+        browserName: info.browserName,
+        osName: info.osName,
+        recommendedConnector: getRecommendedConnector(info),
+        hasMetaMask: isMetaMaskAvailable(),
+      }, null, 2));
+    }
   }, []);
 
   // CRITICAL: Call sdk.actions.ready() IMMEDIATELY to hide Farcaster splash screen
@@ -158,36 +173,26 @@ export default function Home() {
     };
   }, []); // Remove appReady dependency to avoid re-running
 
-  // Detect Farcaster Mini App environment
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    
-    // Check if we're in Farcaster Mini App environment
-    const inFarcasterEnv = !!(
-      (sdk && sdk.actions && typeof sdk.actions.ready === 'function') ||
-      (window as any).farcaster?.sdk?.actions?.ready ||
-      connectors.some(c => c.name === 'Farcaster Mini App' || c.name?.includes('Farcaster'))
-    );
-    
-    setIsFarcasterEnv(inFarcasterEnv);
-    console.log('🔍 Farcaster environment detected:', inFarcasterEnv);
-  }, [connectors]);
+  // Browser info is already set in the initial useEffect above
+  // No need for separate Farcaster detection - browserInfo already contains this
 
   // Per Farcaster docs: https://miniapps.farcaster.xyz/docs/guides/wallets
   // "If a user already has a connected wallet the connector will automatically connect to it (e.g. isConnected will be true)"
   // The connector automatically connects, but it may take a moment
   // Wait a bit for auto-connect in Farcaster Mini App before showing connect button
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || !browserInfo) return;
+    
     if (isConnected) {
-      console.log('✅ Wallet connected automatically via Farcaster connector');
+      console.log('✅ Wallet connected automatically');
       console.log('Address:', address);
+      console.log('Environment:', browserInfo.isFarcaster ? 'Farcaster Mini App' : 'Web Browser');
       setHasCheckedAutoConnect(true);
       return;
     }
     
     // In Farcaster Mini App, wait a bit for auto-connect
-    if (isFarcasterEnv && !hasCheckedAutoConnect) {
+    if (browserInfo.isFarcaster && !hasCheckedAutoConnect) {
       console.log('⏳ Waiting for Farcaster connector to auto-connect...');
       console.log('Available connectors:', connectors.map(c => c.name));
       
@@ -198,11 +203,12 @@ export default function Home() {
       }, 3000);
       
       return () => clearTimeout(timeout);
-    } else if (!isFarcasterEnv) {
+    } else if (!browserInfo.isFarcaster) {
       // In regular web browser, show connect button immediately
+      console.log('ℹ️ Web browser detected - showing connect button immediately');
       setHasCheckedAutoConnect(true);
     }
-  }, [isConnected, address, connectors, isFarcasterEnv, hasCheckedAutoConnect]);
+  }, [isConnected, address, connectors, browserInfo, hasCheckedAutoConnect]);
 
   useEffect(() => {
     if (!isConnected) {
@@ -385,16 +391,55 @@ export default function Home() {
     
     setIsConnecting(true); // Show loading screen
     
-    // Per Farcaster docs: connect({ connector: connectors[0] })
-    // In Farcaster Mini App, Farcaster connector should be first
-    // In regular web browser, MetaMask or other connectors will be available
-    const farcasterConnector = connectors.find(c => 
-      c.name === 'Farcaster Mini App' || 
-      c.name?.includes('Farcaster')
-    );
-    const connector = farcasterConnector || connectors[0];
+    // Smart connector selection based on browser detection
+    let connector;
+    if (browserInfo) {
+      const recommended = getRecommendedConnector(browserInfo);
+      
+      if (recommended === 'farcaster') {
+        // Prefer Farcaster connector (mobile or Farcaster environment)
+        connector = connectors.find(c => 
+          c.name === 'Farcaster Mini App' || 
+          c.name?.includes('Farcaster')
+        );
+        if (!connector) {
+          console.warn('⚠️ Farcaster connector not found, using first available');
+          connector = connectors[0];
+        }
+      } else if (recommended === 'metamask' && isMetaMaskAvailable()) {
+        // Prefer MetaMask on desktop
+        connector = connectors.find(c => 
+          c.name === 'MetaMask' || 
+          c.name?.includes('MetaMask')
+        );
+        if (!connector) {
+          console.warn('⚠️ MetaMask connector not found, using Farcaster connector');
+          connector = connectors.find(c => 
+            c.name === 'Farcaster Mini App' || 
+            c.name?.includes('Farcaster')
+          ) || connectors[0];
+        }
+      } else {
+        // Fallback to first available
+        connector = connectors[0];
+      }
+    } else {
+      // Fallback if browser info not available
+      const farcasterConnector = connectors.find(c => 
+        c.name === 'Farcaster Mini App' || 
+        c.name?.includes('Farcaster')
+      );
+      connector = farcasterConnector || connectors[0];
+    }
     
     console.log('🔄 Connecting with connector:', connector.name);
+    console.log('🌐 Browser info:', browserInfo ? {
+      isMobile: browserInfo.isMobile,
+      isDesktop: browserInfo.isDesktop,
+      isFarcaster: browserInfo.isFarcaster,
+      browserName: browserInfo.browserName,
+    } : 'Not available');
+    
     connect({ connector });
     
     // Hide loading after attempt (success or fail will be handled by useEffect)
