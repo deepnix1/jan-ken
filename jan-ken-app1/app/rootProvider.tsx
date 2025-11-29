@@ -5,6 +5,7 @@ import { WagmiProvider, createConfig, http } from "wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { farcasterMiniApp as miniAppConnector } from "@farcaster/miniapp-wagmi-connector";
 import { sdk } from "@farcaster/miniapp-sdk";
+import { getBrowserInfo, isMetaMaskAvailable } from "@/lib/browserDetection";
 
 export function RootProvider({ children }: { children: ReactNode }) {
   const [mounted, setMounted] = useState(false);
@@ -63,15 +64,11 @@ export function RootProvider({ children }: { children: ReactNode }) {
     }
     
     // Add MetaMask connector if available (for PC/browser testing)
-    // CRITICAL: MetaMask should be added AFTER Farcaster connector
-    // In Farcaster Mini App, Farcaster connector will be used
-    // In regular web browser, user can choose MetaMask
     if (metaMaskConnector) {
       try {
         const mmConnector = metaMaskConnector();
         if (typeof mmConnector === 'function') {
           connectors.push(mmConnector);
-          console.log('✅ MetaMask connector added for PC/web browser support');
         }
       } catch (error) {
         console.log('Error adding MetaMask connector:', error);
@@ -152,51 +149,39 @@ export function RootProvider({ children }: { children: ReactNode }) {
       
       // Helper function to check if a message should be suppressed
       const shouldSuppress = (arg: unknown): boolean => {
-        // Convert to string for checking
-        let argStr = '';
         if (typeof arg === 'string') {
-          argStr = arg;
-        } else if (arg && typeof arg === 'object') {
+          return (
+            arg.includes('Analytics SDK') || 
+            arg.includes('Failed to fetch') ||
+            arg.includes('origins don\'t match') || // Farcaster SDK origin check in web browser
+            arg.includes('wallet.farcaster.xyz') ||
+            arg.includes('privy.farcaster.xyz')
+          );
+        }
+        if (arg && typeof arg === 'object') {
           // Check message property
           if ('message' in arg && typeof arg.message === 'string') {
-            argStr = arg.message;
-          } else {
-            // Try toString() as fallback
-            try {
-              argStr = String(arg);
-            } catch {
-              return false;
-            }
+            return (
+              arg.message.includes('Analytics SDK') || 
+              arg.message.includes('Failed to fetch') ||
+              arg.message.includes('origins don\'t match') ||
+              arg.message.includes('wallet.farcaster.xyz') ||
+              arg.message.includes('privy.farcaster.xyz')
+            );
           }
-        } else {
+          // Check toString() result
           try {
-            argStr = String(arg);
+            const str = String(arg);
+            return (
+              str.includes('origins don\'t match') ||
+              str.includes('wallet.farcaster.xyz') ||
+              str.includes('privy.farcaster.xyz')
+            );
           } catch {
-            return false;
+            // Ignore toString errors
           }
         }
-        
-        // Check for all variations of Farcaster origin mismatch errors
-        const lowerArgStr = argStr.toLowerCase();
-        const farcasterOriginPatterns = [
-          'origins don\'t match',
-          'origins don\'t match https://',
-          'origins don\'t match https://wallet.farcaster.xyz',
-          'origins don\'t match https://privy.farcaster.xyz',
-          'origins don\'t match https://farcaster.xyz',
-          'origins don\'t match https://jan-ken.vercel.app',
-          'wallet.farcaster.xyz',
-          'privy.farcaster.xyz',
-          'farcaster.xyz',
-          'jan-ken.vercel.app',
-        ];
-        
-        return (
-          lowerArgStr.includes('analytics sdk') || 
-          lowerArgStr.includes('failed to fetch') ||
-          farcasterOriginPatterns.some(pattern => lowerArgStr.includes(pattern.toLowerCase())) ||
-          (lowerArgStr.includes('jan-ken.vercel.app') && lowerArgStr.includes('farcaster.xyz')) // Specific origin mismatch
-        );
+        return false;
       };
       
       // Suppress console.error for harmless errors
