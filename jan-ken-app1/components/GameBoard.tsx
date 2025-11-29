@@ -111,12 +111,18 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
   // CRITICAL: Monitor receipt waiting status and detect stuck transactions
   useEffect(() => {
     if (hash && isConfirming) {
+      const errorMessage = receiptError && typeof receiptError === 'object' && 'message' in receiptError 
+        ? (receiptError as any).message 
+        : receiptError 
+          ? String(receiptError) 
+          : 'none';
+      
       console.log('[GameBoard] ⏳ Waiting for transaction receipt...', {
         hash: hash.slice(0, 10) + '...',
         isConfirming,
         isTxSuccess,
         isReceiptError,
-        receiptError: receiptError?.message || 'none',
+        receiptError: errorMessage,
       });
       
       // Set a timeout to detect if receipt never arrives
@@ -141,13 +147,20 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
   // CRITICAL: Handle receipt errors
   useEffect(() => {
     if (isReceiptError && receiptError) {
+      const errorMessage = receiptError && typeof receiptError === 'object' && 'message' in receiptError 
+        ? (receiptError as any).message 
+        : String(receiptError);
+      const errorName = receiptError && typeof receiptError === 'object' && 'name' in receiptError 
+        ? (receiptError as any).name 
+        : undefined;
+      
       console.error('[GameBoard] ❌ Transaction receipt error:', JSON.stringify({
-        error: receiptError?.message || String(receiptError),
-        name: receiptError?.name,
+        error: errorMessage,
+        name: errorName,
         hash: hash?.slice(0, 10) + '...',
       }, null, 2));
       
-      setTxError(`Transaction failed: ${receiptError?.message || 'Unknown error'}`);
+      setTxError(`Transaction failed: ${errorMessage || 'Unknown error'}`);
       setSelectedChoice(null);
       setTxStartTime(null);
     }
