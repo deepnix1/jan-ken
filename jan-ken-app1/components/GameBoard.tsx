@@ -44,18 +44,43 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
         const isRejected = errorMessage.includes('rejected') || errorMessage.includes('Rejected') || errorMessage.includes('User rejected');
         
         if (isRejected) {
-          console.warn('[GameBoard] ⚠️ User rejected transaction - but checking if wallet popup actually appeared...');
-          // Don't immediately reset - wait a bit to see if it's a timing issue
-          setTimeout(() => {
-            if (!hash && !isPending) {
-              console.error('[GameBoard] ❌ Confirmed: Transaction was rejected by user');
-              setSelectedChoice(null);
-              setTxStartTime(null);
-              setTxError('Transaction was rejected. Please try again and make sure to approve in your wallet.');
-            }
-          }, 1000);
+          console.warn('[GameBoard] ⚠️ User rejected transaction detected');
+          console.warn('[GameBoard] ⚠️ Checking if this is a real rejection or timing issue...');
+          console.warn('[GameBoard] ⚠️ Current state:', {
+            hasHash: !!hash,
+            isPending,
+            status,
+            elapsed: txStartTime ? Date.now() - txStartTime : 'unknown',
+          });
+          
+          // CRITICAL: If we have a hash, transaction was actually sent and user rejected it
+          // If no hash and not pending, transaction never started or was rejected before sending
+          if (hash) {
+            console.error('[GameBoard] ❌ Transaction was sent (hash exists) but user rejected it');
+            setSelectedChoice(null);
+            setTxStartTime(null);
+            setTxError('Transaction was rejected in your wallet. Please try again and approve the transaction.');
+          } else if (isPending) {
+            // Still pending - might be a false positive, wait a bit more
+            console.warn('[GameBoard] ⚠️ Still pending - might be timing issue, waiting...');
+            setTimeout(() => {
+              if (!hash && !isPending) {
+                console.error('[GameBoard] ❌ Confirmed: Transaction was rejected by user (no hash received)');
+                setSelectedChoice(null);
+                setTxStartTime(null);
+                setTxError('Transaction was rejected. Please try again and make sure to approve in your wallet.');
+              }
+            }, 2000); // Wait 2 seconds
+          } else {
+            // Not pending, no hash - transaction was rejected before sending
+            console.error('[GameBoard] ❌ Transaction rejected before sending (no hash, not pending)');
+            setSelectedChoice(null);
+            setTxStartTime(null);
+            setTxError('Transaction was rejected. Please try again and approve the transaction in your wallet.');
+          }
         } else {
           // Other errors - reset immediately
+          console.error('[GameBoard] ❌ Non-rejection error:', errorMessage);
           setSelectedChoice(null);
           setTxStartTime(null);
           setTxError(errorMessage);
@@ -494,53 +519,61 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
         // CRITICAL: Wait longer for status to update (Wagmi updates state asynchronously via React Query)
         // Farcaster wallet may take longer to respond
         console.log('[GameBoard] ⏳ Waiting for mutation state to update...');
+        console.log('[GameBoard] ⏳ Farcaster wallet may take 5-30 seconds to show popup and respond');
         
-        // Check status multiple times with increasing delays
-        let statusUpdated = false;
-        for (let i = 0; i < 10; i++) {
-          await new Promise(resolve => setTimeout(resolve, 200)); // Check every 200ms
+        // Check status multiple times - but don't fail immediately if still idle
+        // Farcaster wallet can take a long time to respond
+        for (let i = 0; i < 15; i++) {
+          await new Promise(resolve => setTimeout(resolve, 200)); // Check every 200ms (3 seconds total)
           
-          // Check if status changed (use a ref or state check)
-          // Since we can't directly check status here (it's from hook), we'll wait and check in useEffect
-          if (i === 0 || i === 4 || i === 9) {
-            console.log(`[GameBoard] 📊 Status check #${i + 1}:`, {
+          // Log status at key intervals
+          if (i === 0 || i === 4 || i === 9 || i === 14) {
+            console.log(`[GameBoard] 📊 Status check #${i + 1}/15:`, {
               status,
               isPending,
               hasHash: !!hash,
+              elapsed: `${(i + 1) * 0.2}s`,
               timestamp: new Date().toISOString(),
             });
           }
+          
+          // If status changed or hash received, we're good
+          if (status !== 'idle' || isPending || hash) {
+            console.log('[GameBoard] ✅ Status updated or hash received - transaction is processing');
+            break;
+          }
         }
         
-        // Final check after 2 seconds
-        console.log('📊 Final status check after 2s:', {
+        // Final check after 3 seconds
+        console.log('[GameBoard] 📊 Final status check after 3s:', {
           status,
           isPending,
           hash: hash || 'NOT RECEIVED',
           timestamp: new Date().toISOString(),
         });
         
-        // CRITICAL: If status is still idle after 2 seconds, there might be an issue
-        // But don't reset immediately - mutation might still be processing
+        // CRITICAL: If status is still idle after 3 seconds, log warning but don't reset
+        // Farcaster wallet can take 5-30 seconds to show popup
         // The onError callback will handle actual errors
         if (status === 'idle' && !isPending && !hash) {
-          console.warn('[GameBoard] ⚠️ Status still idle after 2s - mutation may be processing or failed silently');
-          console.warn('[GameBoard] ⚠️ This could mean:');
-          console.warn('[GameBoard] ⚠️ 1. Wallet popup is open but user hasn\'t confirmed yet');
-          console.warn('[GameBoard] ⚠️ 2. Farcaster wallet is processing the request');
-          console.warn('[GameBoard] ⚠️ 3. Network issue preventing transaction');
-          console.warn('[GameBoard] ⚠️ 4. Mutation failed but error not caught yet');
+          console.warn('[GameBoard] ⚠️ Status still idle after 3s - this is normal for Farcaster wallet');
+          console.warn('[GameBoard] ⚠️ Farcaster wallet may take 5-30 seconds to:');
+          console.warn('[GameBoard] ⚠️ 1. Show wallet popup');
+          console.warn('[GameBoard] ⚠️ 2. Process user confirmation');
+          console.warn('[GameBoard] ⚠️ 3. Send transaction to blockchain');
+          console.warn('[GameBoard] ⚠️ 4. Return transaction hash');
+          console.warn('[GameBoard] ⚠️ Waiting for onSuccess (hash) or onError callback...');
           
-          // Don't reset immediately - wait for onError callback or hash
-          // Set a longer timeout to detect truly stuck transactions
+          // Set a very long timeout (30 seconds) to detect truly stuck transactions
+          // But don't reset immediately - let onError handle it
           setTimeout(() => {
             if (status === 'idle' && !isPending && !hash && selectedChoice === choiceId) {
-              console.error('[GameBoard] ❌ Transaction truly stuck - no response after 10 seconds');
-              setTxError('Transaction is taking too long. Please check your wallet and try again.');
-              setSelectedChoice(null);
-              setTxStartTime(null);
+              console.error('[GameBoard] ❌ Transaction truly stuck - no response after 30 seconds');
+              console.error('[GameBoard] ❌ This usually means wallet popup never appeared or transaction failed silently');
+              setTxError('Transaction is taking too long. Please check your wallet popup or try again.');
+              // Don't reset selectedChoice - let user see the error and try again
             }
-          }, 10000); // 10 second total timeout
+          }, 30000); // 30 second total timeout for Farcaster wallet
         }
       } catch (writeError: any) {
         console.error('❌ [GameBoard] ERROR calling writeContract:', writeError);
