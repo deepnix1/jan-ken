@@ -485,33 +485,62 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
       try {
         // CRITICAL: Call writeContract - it should trigger the mutation
         // In Wagmi v3, writeContract is a mutation trigger function
+        // IMPORTANT: writeContract is async in some cases, but in Wagmi v3 it's synchronous
+        // The mutation state updates asynchronously via React Query
+        console.log('[GameBoard] 🔄 Calling writeContract - mutation will update state asynchronously');
         writeContract(finalParams);
         console.log('✅ [GameBoard] writeContract CALLED! (no error thrown)');
         
-        // CRITICAL: Wait a bit for status to update (Wagmi updates state asynchronously)
-        await new Promise(resolve => setTimeout(resolve, 300));
+        // CRITICAL: Wait longer for status to update (Wagmi updates state asynchronously via React Query)
+        // Farcaster wallet may take longer to respond
+        console.log('[GameBoard] ⏳ Waiting for mutation state to update...');
         
-        console.log('📊 Status after 300ms:', status);
-        console.log('📊 isPending after 300ms:', isPending);
-        console.log('📊 Hash after 300ms:', hash || 'NOT RECEIVED');
-        console.log('⏰ Called at:', new Date().toISOString());
-        
-        // CRITICAL: If status is still idle after calling, there might be an issue
-        if (status === 'idle' && !isPending && !hash) {
-          console.error('[GameBoard] ❌❌❌ CRITICAL: Status is still idle after writeContract call!');
-          console.error('[GameBoard] ❌ Transaction did not start. Possible causes:');
-          console.error('[GameBoard] ❌ 1. writeContract mutation is not properly configured');
-          console.error('[GameBoard] ❌ 2. Wallet connector is not ready or not connected');
-          console.error('[GameBoard] ❌ 3. Transaction parameters are invalid');
-          console.error('[GameBoard] ❌ 4. Network mismatch (wrong chain)');
-          console.error('[GameBoard] ❌ 5. Contract address or ABI issue');
+        // Check status multiple times with increasing delays
+        let statusUpdated = false;
+        for (let i = 0; i < 10; i++) {
+          await new Promise(resolve => setTimeout(resolve, 200)); // Check every 200ms
           
-          // Show user-friendly error
-          setTxError('Transaction failed to start. Please check your wallet connection and try again.');
-          setSelectedChoice(null);
-          setTxStartTime(null);
-          alert('Transaction failed to start. Please check your wallet connection and network settings.');
-          return;
+          // Check if status changed (use a ref or state check)
+          // Since we can't directly check status here (it's from hook), we'll wait and check in useEffect
+          if (i === 0 || i === 4 || i === 9) {
+            console.log(`[GameBoard] 📊 Status check #${i + 1}:`, {
+              status,
+              isPending,
+              hasHash: !!hash,
+              timestamp: new Date().toISOString(),
+            });
+          }
+        }
+        
+        // Final check after 2 seconds
+        console.log('📊 Final status check after 2s:', {
+          status,
+          isPending,
+          hash: hash || 'NOT RECEIVED',
+          timestamp: new Date().toISOString(),
+        });
+        
+        // CRITICAL: If status is still idle after 2 seconds, there might be an issue
+        // But don't reset immediately - mutation might still be processing
+        // The onError callback will handle actual errors
+        if (status === 'idle' && !isPending && !hash) {
+          console.warn('[GameBoard] ⚠️ Status still idle after 2s - mutation may be processing or failed silently');
+          console.warn('[GameBoard] ⚠️ This could mean:');
+          console.warn('[GameBoard] ⚠️ 1. Wallet popup is open but user hasn\'t confirmed yet');
+          console.warn('[GameBoard] ⚠️ 2. Farcaster wallet is processing the request');
+          console.warn('[GameBoard] ⚠️ 3. Network issue preventing transaction');
+          console.warn('[GameBoard] ⚠️ 4. Mutation failed but error not caught yet');
+          
+          // Don't reset immediately - wait for onError callback or hash
+          // Set a longer timeout to detect truly stuck transactions
+          setTimeout(() => {
+            if (status === 'idle' && !isPending && !hash && selectedChoice === choiceId) {
+              console.error('[GameBoard] ❌ Transaction truly stuck - no response after 10 seconds');
+              setTxError('Transaction is taking too long. Please check your wallet and try again.');
+              setSelectedChoice(null);
+              setTxStartTime(null);
+            }
+          }, 10000); // 10 second total timeout
         }
       } catch (writeError: any) {
         console.error('❌ [GameBoard] ERROR calling writeContract:', writeError);
