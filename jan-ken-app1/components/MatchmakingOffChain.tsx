@@ -18,32 +18,11 @@ interface MatchmakingProps {
 
 function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showMatchFound = false }: MatchmakingProps) {
   const { address, isConnected } = useAccount();
-  const [isMatching, setIsMatching] = useState(false);
+  const [isMatching, setIsMatching] = useState(true);
   const [hasJoinedQueue, setHasJoinedQueue] = useState(false);
-  const [isJoining, setIsJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [queueCount, setQueueCount] = useState<number>(0);
   const [playerFid, setPlayerFid] = useState<number | null>(null);
-  
-  // CRITICAL: When showMatchFound becomes true, immediately stop all matching UI
-  useEffect(() => {
-    if (showMatchFound) {
-      console.log('[Matchmaking] 🛑 showMatchFound is true - stopping all matching UI and polling');
-      setIsMatching(false);
-      setHasJoinedQueue(false);
-      setIsJoining(false);
-      
-      // Clear all intervals
-      if (matchCheckIntervalRef.current) {
-        clearInterval(matchCheckIntervalRef.current);
-        matchCheckIntervalRef.current = null;
-      }
-      if (queueCountIntervalRef.current) {
-        clearInterval(queueCountIntervalRef.current);
-        queueCountIntervalRef.current = null;
-      }
-    }
-  }, [showMatchFound]);
   
   // Convert betAmount to betLevel
   const betLevel = useMemo(() => getBetLevelFromAmount(betAmount), [betAmount]);
@@ -67,11 +46,6 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
         });
     }
   }, [address, isConnected]);
-  
-  // CRITICAL: If showMatchFound is true, don't render anything (match found animation will be shown by parent)
-  if (showMatchFound) {
-    return null;
-  }
   
   if (!betLevel) {
     return (
@@ -153,8 +127,6 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
         
         console.log('[Matchmaking] ✅ Joined queue successfully. Queue ID:', queueId);
         setHasJoinedQueue(true);
-        setIsMatching(true);
-        setIsJoining(false);
         setError(null);
       } catch (err: any) {
         // Log detailed error information with proper serialization
@@ -193,8 +165,6 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
         
         setError(errorMessage);
         setHasJoinedQueue(false);
-        setIsMatching(false);
-        setIsJoining(false);
       }
     };
     
@@ -202,26 +172,22 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
   }, [isConnected, address, betLevel, betAmount, playerFid, hasJoinedQueue]);
   
   // Check for matches (polling)
-  useEffect(() => {
-      // CRITICAL: Stop polling if match found or not in queue
-      if (!isConnected || !address || !hasJoinedQueue || showMatchFound) {
-        if (matchCheckIntervalRef.current) {
-          clearInterval(matchCheckIntervalRef.current);
-          matchCheckIntervalRef.current = null;
-          console.log('[Matchmaking] 🛑 Stopped checkForMatch polling:', JSON.stringify({
-            isConnected,
-            hasAddress: !!address,
-            hasJoinedQueue,
-            showMatchFound,
-          }, null, 2))
-        }
-        // CRITICAL: If showMatchFound is true, stop matching UI
-        if (showMatchFound) {
+      useEffect(() => {
+        // CRITICAL: Stop polling if match found or not in queue
+        if (!isConnected || !address || !hasJoinedQueue || showMatchFound) {
+          if (matchCheckIntervalRef.current) {
+            clearInterval(matchCheckIntervalRef.current);
+            matchCheckIntervalRef.current = null;
+            console.log('[Matchmaking] 🛑 Stopped checkForMatch polling:', JSON.stringify({
+              isConnected,
+              hasAddress: !!address,
+              hasJoinedQueue,
+              showMatchFound,
+            }, null, 2))
+          }
           setIsMatching(false);
-          setHasJoinedQueue(false);
+          return;
         }
-        return;
-      }
       
       // CRITICAL: Check if player is still in queue before polling
       // This prevents unnecessary polling for cancelled players
@@ -349,6 +315,8 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
               clearInterval(matchCheckIntervalRef.current);
               matchCheckIntervalRef.current = null;
             }
+            setIsMatching(false);
+            setHasJoinedQueue(false);
             return
           }
         } catch (err) {
@@ -420,30 +388,6 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
             }, null, 2))
           }
         } else {
-          // CRITICAL: If checkForMatch returns null and player is cancelled, stop polling
-          // Double-check player status to prevent unnecessary polling
-          const { data: finalStatusCheck } = await supabase
-            .from('matchmaking_queue')
-            .select('status')
-            .eq('player_address', address.toLowerCase())
-            .limit(1);
-          
-          const finalStatus = finalStatusCheck?.[0]?.status;
-          if (finalStatus && finalStatus !== 'waiting' && finalStatus !== 'matched') {
-            console.log('[Matchmaking] 🛑 Player status is', finalStatus, '- stopping checkForMatch polling');
-            if (matchCheckIntervalRef.current) {
-              clearInterval(matchCheckIntervalRef.current);
-              matchCheckIntervalRef.current = null;
-            }
-            if (queueCountIntervalRef.current) {
-              clearInterval(queueCountIntervalRef.current);
-              queueCountIntervalRef.current = null;
-            }
-            setIsMatching(false);
-            setHasJoinedQueue(false);
-            return; // Stop this polling cycle
-          }
-          
           console.log('[Matchmaking] ⚠️ No match found in this polling cycle')
         }
       } catch (err: any) {
@@ -472,17 +416,13 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
     }, 10000); // Every 10 seconds
     
     return () => {
+      console.log('[Matchmaking] 🧹 Cleanup: Clearing all intervals');
       if (matchCheckIntervalRef.current) {
         clearInterval(matchCheckIntervalRef.current);
         matchCheckIntervalRef.current = null;
       }
-      clearInterval(heartbeatInterval);
-    };
-    
-    return () => {
-      if (matchCheckIntervalRef.current) {
-        clearInterval(matchCheckIntervalRef.current);
-        matchCheckIntervalRef.current = null;
+      if (heartbeatInterval) {
+        clearInterval(heartbeatInterval);
       }
     };
   }, [isConnected, address, hasJoinedQueue, onMatchFound, showMatchFound]);
@@ -736,19 +676,15 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
   return (
     <div className="relative">
       <div className="flex flex-col items-center justify-center py-4 sm:py-6 md:py-8">
-        {!showMatchFound && (
-          <>
-            <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-4 sm:mb-6 text-center px-4">
-              <span className="bg-gradient-to-r from-red-400 via-blue-400 to-yellow-400 bg-clip-text text-transparent drop-shadow-[0_0_30px_rgba(239,68,68,0.8)]">
-                SEARCHING
-              </span>
-            </h2>
-            
-            <p className="text-gray-400 text-base sm:text-lg md:text-xl mb-6 sm:mb-8 text-center max-w-md font-mono uppercase tracking-wider px-4">
-              Looking for opponent...
-            </p>
-          </>
-        )}
+        <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-4 sm:mb-6 text-center px-4">
+          <span className="bg-gradient-to-r from-red-400 via-blue-400 to-yellow-400 bg-clip-text text-transparent drop-shadow-[0_0_30px_rgba(239,68,68,0.8)]">
+            SEARCHING
+          </span>
+        </h2>
+        
+        <p className="text-gray-400 text-base sm:text-lg md:text-xl mb-6 sm:mb-8 text-center max-w-md font-mono uppercase tracking-wider px-4">
+          Looking for opponent...
+        </p>
         
         {/* Queue Status Display */}
         {hasJoinedQueue && (
@@ -768,7 +704,7 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
         
         {/* Status Indicators */}
         <div className="space-y-4 sm:space-y-5 w-full max-w-md px-4">
-          {isJoining && !hasJoinedQueue && !error && (
+          {!hasJoinedQueue && !error && (
             <div className="flex flex-col items-center justify-center gap-3 sm:gap-4 px-4 sm:px-6 md:px-8 py-4 sm:py-5 bg-black/60 border-2 border-blue-500/40 rounded-lg shadow-[0_0_30px_rgba(59,130,246,0.4)]">
               <div className="flex items-center gap-3 sm:gap-4">
                 <div className="w-5 h-5 sm:w-6 sm:h-6 border-2 sm:border-3 border-blue-400 border-t-transparent rounded-full animate-spin shadow-[0_0_10px_rgba(59,130,246,1)]"></div>
