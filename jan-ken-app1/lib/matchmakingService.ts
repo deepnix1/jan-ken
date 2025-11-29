@@ -1881,6 +1881,7 @@ export async function leaveQueue(playerAddress: Address): Promise<void> {
 
 /**
  * Get queue status for a bet level
+ * CRITICAL: Only count active players (last_seen in last 15 seconds) and unique addresses
  */
 export async function getQueueCount(betLevel: number): Promise<number> {
   try {
@@ -1888,11 +1889,16 @@ export async function getQueueCount(betLevel: number): Promise<number> {
     
     while (retries > 0) {
       try {
-        const { count, error } = await supabase
+        // CRITICAL: Get all waiting players with active last_seen (same filter as tryMatch)
+        const fifteenSecondsAgo = new Date(Date.now() - 15000).toISOString()
+        
+        const { data: players, error } = await supabase
           .from('matchmaking_queue')
-          .select('*', { count: 'exact', head: true })
+          .select('id, player_address, last_seen, status')
           .eq('bet_level', betLevel)
           .eq('status', 'waiting')
+          .not('last_seen', 'is', null) // Exclude NULL last_seen (inactive players)
+          .gte('last_seen', fifteenSecondsAgo) // Active in last 15 seconds
 
         if (error) {
           // Retry on network errors
@@ -1903,11 +1909,44 @@ export async function getQueueCount(betLevel: number): Promise<number> {
               continue
             }
           }
-          console.error('Error getting queue count:', error)
+          console.error('[getQueueCount] ❌ Error getting queue count:', JSON.stringify({
+            error: error.message || error.code || error,
+            code: error.code,
+            betLevel,
+          }, null, 2))
           return 0
         }
 
-        return count || 0
+        // CRITICAL: Filter out duplicate addresses (case-insensitive) and invalid addresses
+        const validPlayers = (players || []).filter(p => {
+          if (!p.player_address || p.player_address.trim() === '') {
+            return false
+          }
+          return true
+        })
+
+        const uniqueAddresses = new Set<string>()
+        for (const player of validPlayers) {
+          const normalizedAddr = player.player_address.toLowerCase().trim()
+          uniqueAddresses.add(normalizedAddr)
+        }
+
+        const count = uniqueAddresses.size
+        
+        console.log('[getQueueCount] 📊 Queue count for betLevel', betLevel, ':', JSON.stringify({
+          totalFound: players?.length || 0,
+          validCount: validPlayers.length,
+          uniqueCount: count,
+          betLevel,
+          threshold: '15 seconds',
+          players: validPlayers.map(p => ({
+            address: p.player_address?.slice(0, 10) + '...',
+            last_seen: p.last_seen,
+            seconds_ago: p.last_seen ? Math.floor((Date.now() - new Date(p.last_seen).getTime()) / 1000) : null,
+          })),
+        }, null, 2))
+
+        return count
       } catch (err: any) {
         if (err.message?.includes('fetch') || err.message?.includes('Load failed')) {
           retries--
@@ -1916,14 +1955,22 @@ export async function getQueueCount(betLevel: number): Promise<number> {
             continue
           }
         }
-        console.error('Error getting queue count:', err)
+        console.error('[getQueueCount] ❌ Exception getting queue count:', JSON.stringify({
+          error: err?.message || String(err),
+          name: err?.name,
+          betLevel,
+        }, null, 2))
         return 0
       }
     }
     
     return 0
   } catch (error: any) {
-    console.error('Error getting queue count:', error)
+    console.error('[getQueueCount] ❌ Final error getting queue count:', JSON.stringify({
+      error: error?.message || String(error),
+      name: error?.name,
+      betLevel,
+    }, null, 2))
     return 0
   }
 }
