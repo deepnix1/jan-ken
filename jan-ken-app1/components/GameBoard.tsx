@@ -21,7 +21,7 @@ const CHOICES = [
 ];
 
 export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }: GameBoardProps) {
-  const { address } = useAccount();
+  const { address, connector } = useAccount();
   const { data: connectorClient } = useConnectorClient();
   const [selectedChoice, setSelectedChoice] = useState<number | null>(null);
   const [timeLeft, setTimeLeft] = useState(20); // Changed from 40 to 20 seconds
@@ -424,7 +424,7 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
         isFarcaster: browserInfo?.isFarcaster,
         isMobile: browserInfo?.isMobile,
         isPCDesktop,
-        connectorName: connectorClient?.connector?.name,
+        connectorName: connector?.name || 'unknown',
       });
       
       // CRITICAL: On PC desktop, Farcaster wallet popup may not work in iframe
@@ -452,7 +452,7 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
         }
       } else if (isPCDesktop) {
         console.log('[GameBoard] ℹ️ PC Desktop detected - using connector client directly (MetaMask or Farcaster connector)');
-        console.log('[GameBoard] ℹ️ Farcaster wallet popup may not work on PC - using connector:', connectorClient?.connector?.name);
+        console.log('[GameBoard] ℹ️ Farcaster wallet popup may not work on PC - using connector:', connector?.name || 'unknown');
       }
       
       // CRITICAL: Verify connector client is ready and has correct account
