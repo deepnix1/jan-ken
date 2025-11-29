@@ -6,6 +6,7 @@ import { useWriteContract, useReadContract, useAccount, useWaitForTransactionRec
 import { sdk } from '@farcaster/miniapp-sdk';
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from '@/lib/contract';
 import { isValidChoice, isValidBetAmount } from '@/lib/security';
+import { getBrowserInfo } from '@/lib/browserDetection';
 
 interface GameBoardProps {
   betAmount: bigint;
@@ -28,6 +29,14 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
   const [player1Profile, setPlayer1Profile] = useState<{ pfpUrl: string | null; username: string | null } | null>(null);
   const [player2Profile, setPlayer2Profile] = useState<{ pfpUrl: string | null; username: string | null } | null>(null);
   const [txError, setTxError] = useState<string | null>(null);
+  const [browserInfo, setBrowserInfo] = useState<ReturnType<typeof getBrowserInfo> | null>(null);
+  
+  // Detect browser info on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setBrowserInfo(getBrowserInfo());
+    }
+  }, []);
 
   const { data: hash, writeContract, isPending, error: writeError, reset: resetWriteContract, status } = useWriteContract({
     mutation: {
@@ -405,8 +414,22 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
       
       // CRITICAL: Try to get Farcaster wallet provider directly
       // This ensures the wallet popup appears in Farcaster Mini App
+      // BUT: On PC desktop browsers, Farcaster wallet may not work properly
+      // In that case, we should use MetaMask connector instead
       let farcasterProvider: any = null;
-      if (sdk && sdk.wallet) {
+      const isPCDesktop = browserInfo?.isDesktop && !browserInfo?.isFarcaster;
+      
+      console.log('[GameBoard] 🔍 Browser info:', {
+        isDesktop: browserInfo?.isDesktop,
+        isFarcaster: browserInfo?.isFarcaster,
+        isMobile: browserInfo?.isMobile,
+        isPCDesktop,
+        connectorName: connectorClient?.connector?.name,
+      });
+      
+      // CRITICAL: On PC desktop, Farcaster wallet popup may not work in iframe
+      // Only try to get Farcaster provider if we're in Farcaster environment or mobile
+      if (!isPCDesktop && sdk && sdk.wallet) {
         try {
           farcasterProvider = await sdk.wallet.getEthereumProvider();
           console.log('[GameBoard] ✅ Farcaster wallet provider obtained:', !!farcasterProvider);
@@ -427,6 +450,9 @@ export function GameBoard({ betAmount: _betAmount, gameId: _gameId, onGameEnd }:
         } catch (err) {
           console.warn('[GameBoard] ⚠️ Could not get Farcaster provider:', err);
         }
+      } else if (isPCDesktop) {
+        console.log('[GameBoard] ℹ️ PC Desktop detected - using connector client directly (MetaMask or Farcaster connector)');
+        console.log('[GameBoard] ℹ️ Farcaster wallet popup may not work on PC - using connector:', connectorClient?.connector?.name);
       }
       
       // CRITICAL: Verify connector client is ready and has correct account
