@@ -443,75 +443,11 @@ function MatchmakingOffChainComponent({ betAmount, onMatchFound, onCancel, showM
         console.log('[Matchmaking] 📊 Queue count updated:', count, 'for betLevel', betLevel)
         setQueueCount(count);
         
-        // CRITICAL: If 2+ players waiting, force tryMatch
+        // CRITICAL: Don't call tryMatch here - it causes duplicate matching attempts
+        // checkForMatch polling already calls tryMatch, so this is redundant
+        // Just log the count for debugging
         if (count >= 2) {
-          console.log('[Matchmaking] 🚀🚀🚀 2+ players waiting, forcing tryMatch for betLevel', betLevel)
-          // Import tryMatch and call it directly
-          const { tryMatch: tryMatchFn } = await import('@/lib/matchmakingService')
-          tryMatchFn(betLevel)
-            .then(result => {
-              if (result) {
-                console.log('[Matchmaking] ✅✅✅ Force tryMatch successful!', JSON.stringify({
-                  gameId: result.gameId,
-                  player1: result.player1Address.slice(0, 10) + '...',
-                  player2: result.player2Address.slice(0, 10) + '...',
-                  betLevel: result.betLevel,
-                }, null, 2))
-                
-                // CRITICAL: If we're one of the matched players, trigger match found immediately
-                const isPlayer1 = result.player1Address.toLowerCase() === address?.toLowerCase()
-                const isPlayer2 = result.player2Address.toLowerCase() === address?.toLowerCase()
-                
-                if (isPlayer1 || isPlayer2) {
-                  console.log('[Matchmaking] 🎯🎯🎯 WE ARE IN THE MATCH! Triggering onMatchFound immediately!', JSON.stringify({
-                    gameId: result.gameId,
-                    player1: result.player1Address.slice(0, 10) + '...',
-                    player2: result.player2Address.slice(0, 10) + '...',
-                    currentPlayer: address?.slice(0, 10) + '...',
-                    isPlayer1,
-                    isPlayer2,
-                    userAgent: typeof window !== 'undefined' ? navigator.userAgent : 'server',
-                    isMobile: typeof window !== 'undefined' ? /Mobile|Android|iPhone|iPad/.test(navigator.userAgent) : false,
-                  }, null, 2))
-                  
-                  setIsMatching(false);
-                  setHasJoinedQueue(false);
-                  
-                  // Clear intervals
-                  if (matchCheckIntervalRef.current) {
-                    clearInterval(matchCheckIntervalRef.current);
-                    matchCheckIntervalRef.current = null;
-                  }
-                  if (queueCountIntervalRef.current) {
-                    clearInterval(queueCountIntervalRef.current);
-                    queueCountIntervalRef.current = null;
-                  }
-                  
-                  // Call onMatchFound immediately
-                  console.log('[Matchmaking] 📞 Calling onMatchFound from queue count update...')
-                  try {
-                    onMatchFound(result.gameId, result.player1Address, result.player2Address);
-                    console.log('[Matchmaking] ✅ onMatchFound called successfully from queue count update')
-                  } catch (callbackError: any) {
-                    console.error('[Matchmaking] ❌ Error calling onMatchFound from queue count update:', JSON.stringify({
-                      error: callbackError?.message || String(callbackError),
-                      name: callbackError?.name,
-                    }, null, 2))
-                  }
-                } else {
-                  console.log('[Matchmaking] ⚠️ Match created but we are not one of the players')
-                }
-              } else {
-                console.log('[Matchmaking] ⚠️ Force tryMatch returned null - no match created')
-              }
-            })
-            .catch(err => {
-              console.error('[Matchmaking] ❌ Force tryMatch error:', JSON.stringify({
-                error: err?.message || String(err),
-                name: err?.name,
-                stack: err?.stack?.split('\n').slice(0, 5).join('\n'),
-              }, null, 2))
-            })
+          console.log('[Matchmaking] 📊 2+ players waiting for betLevel', betLevel, '- checkForMatch will handle matching')
         }
       } catch (err) {
         console.error('[Matchmaking] Error getting queue count:', err);
